@@ -2,8 +2,9 @@
 
 import torch.nn as nn
 from src.config import GraphBuildingConfig, ModelConfig
-from src.mesh import get_hierarchy_of_triangular_meshes_for_sphere
+from src.mesh.create_mesh import get_hierarchy_of_triangular_meshes_for_sphere
 from typing import Optional
+from torch_geometric.data import Data
 
 
 class WeatherPrediction(nn.Module):
@@ -34,7 +35,10 @@ class WeatherPrediction(nn.Module):
         self._meshes = get_hierarchy_of_triangular_meshes_for_sphere(
             splits=graph_config.mesh_size
         )
-        import pdb; pdb.set_trace()
+    
+    
+    def forward(self, data: Data):
+      pass
 
 
 if __name__ == "__main__":
