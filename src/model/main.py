@@ -1,10 +1,12 @@
 """Defines the main Weather Prediction pytorch model."""
 
+import torch
 import torch.nn as nn
-from src.config import GraphBuildingConfig, ModelConfig
+import numpy as np
+from src.config import GraphBuildingConfig, ModelConfig, Grid2MeshEdgeCreation
 from src.mesh.create_mesh import get_hierarchy_of_triangular_meshes_for_sphere
-from typing import Optional
-from torch_geometric.data import Data
+from src.graph import create as graph_create
+from typing import Optional, Tuple
 
 
 class WeatherPrediction(nn.Module):
@@ -29,21 +31,61 @@ class WeatherPrediction(nn.Module):
 
     def __init__(
         self,
+        cordinates: Tuple[np.array, np.array],
         graph_config: GraphBuildingConfig,
         model_config: Optional[ModelConfig] = None,
     ):
         self._meshes = get_hierarchy_of_triangular_meshes_for_sphere(
             splits=graph_config.mesh_size
         )
-    
-    
-    def forward(self, data: Data):
-      pass
+
+        self.grid2mesh_graph_index = graph_create.create_grid_to_mesh_graph(
+            cordinates=cordinates,
+            mesh=self._meshes[-1],
+            graph_building_config=graph_config,
+        )
+
+        self.mesh2mesh_graph_index = graph_create.create_mesh_to_mesh_graph(
+            graph_building_config=graph_config
+        )
+
+        self.mesh2grid_graph_index = graph_create.create_mesh_to_grid_graph(
+            graph_building_config=graph_config
+        )
+
+    @staticmethod
+    def _create_grid_lat_lon_cordinates(lats: np.array, longs: np.array):
+        """This is what GraphCast does to they latitude and longitudes. Skipping this for now and using the original
+        latitudes and longitudes directly."""
+        grid_nodes_lon, grid_nodes_lat = np.meshgrid(lats, longs)
+        grid_nodes_lon = grid_nodes_lon.reshape([-1]).astype(np.float32)
+        grid_nodes_lat = grid_nodes_lat.reshape([-1]).astype(np.float32)
+
+        return grid_nodes_lat, grid_nodes_lon
+
+    def forward(self, X: torch.Tensor):
+        """The forward method takes the features of the grid nodes and passes them through the three graphs defined above.
+        Grid2Mesh performs the encoding and calculates the
+
+        Parameters
+        ----------
+        X : torch.Tensor
+          The input data of the shape [batch, num_grid_nodes, num_features, timesteps].
+        """
+        pass
 
 
 if __name__ == "__main__":
+
+    num_grid_nodes = 100
+    lats = np.random.uniform(low=-1, high=1, size=(num_grid_nodes,))
+    longs = np.random.uniform(low=-1, high=1, size=(num_grid_nodes,))
+
     graph_config = GraphBuildingConfig(
-        resolution=0.25, mesh_size=1, radius_query_fraction_edge_length=0.5
+        resolution=0.25,
+        mesh_size=1,
+        grid2mesh_radius_query=0.5,
+        grid2mesh_edge_creation=Grid2MeshEdgeCreation.RADIUS,
     )
-    
-    model = WeatherPrediction(graph_config=graph_config)
+
+    model = WeatherPrediction(cordinates=(lats, longs), graph_config=graph_config)
