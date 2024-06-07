@@ -9,6 +9,7 @@ from src.config import (
 )
 from src.model.encoder import AggregationEncoder
 from src.model.decoder import AggregationDecoder
+from src.model.processor import SimpleProcessor
 
 
 def get_encoder_from_encoder_config(
@@ -45,11 +46,13 @@ def get_processor_from_process_config(process_config: ProcessConfig):
     process_config : ProcessConfig
         The process config based on which the processor will be loaded.
     """
-    pass
+    return SimpleProcessor(
+        in_out_dim=process_config.in_out_dim, hidden_dims=process_config.hidden_dims
+    )
 
 
 def get_decoder_from_decode_config(
-    decoder_config: Union[AggregationEncoderConfig], num_grid_nodes: int
+    decoder_config: Union[AggregationDecoderConfig], num_grid_nodes: int
 ):
     """Returns an object of the decoder module based on the decoder config provided.
 

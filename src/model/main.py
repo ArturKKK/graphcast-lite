@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from src.config import GraphBuildingConfig, ModelConfig
-from src.mesh.create_mesh import get_hierarchy_of_triangular_meshes_for_sphere
+from src.mesh.create_mesh import get_hierarchy_of_triangular_meshes_for_sphere, filter_mesh
 from src.graph import create as graph_create
 from typing import Optional, Tuple
 from .utils import (
@@ -48,25 +48,25 @@ class WeatherPrediction(nn.Module):
             splits=graph_config.mesh_size
         )
 
-        self.grid2mesh_graph = graph_create.create_grid_to_mesh_graph(
+        mesh_we_want = self._meshes[-1]
+
+        self.grid2mesh_graph_index = graph_create.create_grid_to_mesh_graph(
             cordinates=cordinates,
-            mesh=self._meshes[-1],
+            mesh=mesh_we_want,
             graph_building_config=graph_config,
         )
 
-        self.mesh2mesh_graph = graph_create.create_mesh_to_mesh_graph(
-            graph_building_config=graph_config
-        )
+        mesh_we_want = filter_mesh(mesh_we_want, graph_config.mesh_level)
 
         self.mesh2grid_graph = graph_create.create_mesh_to_grid_graph(
             cordinates=cordinates,
-            mesh=self._meshes[-1],
+            mesh=mesh_we_want,
             graph_building_config=graph_config,
         )
 
         self.encoder = get_encoder_from_encoder_config(
             encoder_config=model_config.encoder,
-            num_mesh_nodes=self._meshes[-1].vertices.shape[0],
+            num_mesh_nodes=mesh_we_want.vertices.shape[0],
         )
 
         self.processor = get_processor_from_process_config(
