@@ -12,7 +12,6 @@ from src.model.encoder import AggregationEncoder
 def get_encoder_from_encoder_config(
     encoder_config: Union[AggregationEncoderConfig, MLPEncoderConfig],
     num_mesh_nodes: int,
-    num_grid_nodes: int,
 ):
     """Returns an object of the encoder model based on the encoding config provided.
 
@@ -28,7 +27,6 @@ def get_encoder_from_encoder_config(
     if encoder_config.encoder_name == Encoders.AGGREGATION:
         return AggregationEncoder(
             encoder_config=encoder_config,
-            num_grid_nodes=num_grid_nodes,
             num_mesh_nodes=num_mesh_nodes,
         )
     else:

@@ -56,7 +56,6 @@ def radius_query_indices(
         [num_lat_points, num_lon_points] grid, after flattening the leading axes.
       * mesh_indices: Indices of shape [num_edges], that index into mesh.vertices.
     """
-
     # [num_grid_points=num_lat_points * num_lon_points, 3]
     grid_positions = _grid_lat_lon_to_coordinates(
         grid_latitude, grid_longitude

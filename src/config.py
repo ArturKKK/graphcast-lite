@@ -29,9 +29,6 @@ class Encoders(str, Enum):
 class GraphBuildingConfig(BaseModel):
     """This defines the parameters for building the graph.
 
-    TODO: Support multiple ways of building the grid2mesh edges here. GraohCase uses radius_query_fraction_edge_length.
-    But we could simply do k-nearest mesh nodes for every grid node for example.
-
     resolution: float
         The resolution of the data, in degrees (e.g. 0.25 or 1.0).
     mesh_size: int

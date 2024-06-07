@@ -1,6 +1,8 @@
+from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
 from src.config import AggregationEncoderConfig
+from src.utils import get_adjacency_matrix_from_edge_index
 
 
 class AggregationEncoder(nn.Module):
@@ -13,12 +15,11 @@ class AggregationEncoder(nn.Module):
     def __init__(
         self,
         encoder_config: AggregationEncoderConfig,
-        num_grid_nodes: int,
         num_mesh_nodes: int,
     ):
+        super().__init__()
         self.encoder_config = encoder_config
         self.num_mesh_nodes = num_mesh_nodes
-        self.num_grid_nodes: num_grid_nodes
 
     def forward(self, grid_node_features: torch.Tensor, edge_index: torch.Tensor):
         """Calculates the latent representation of the mesh nodes by aggregating the grid nodes that connect to the mesh nodes.
@@ -31,4 +32,25 @@ class AggregationEncoder(nn.Module):
         edge_index : torch.Tensor
             This has a shape [num_edges, 2]. This represents the edges between the grid and the mesh nodes for each batch.
         """
-        pass
+
+        batch_size, num_grid_nodes, _ = grid_node_features.shape
+
+        # Convert edge_index to adjacency matrix
+        adjacency_matrix = get_adjacency_matrix_from_edge_index(
+            edge_index=edge_index,
+            num_sender_nodes=num_grid_nodes,
+            num_receiver_nodes=self.num_mesh_nodes,
+        )
+
+        # Normalize the adjacency matrix to average the contributions from each connected grid node
+        normalization_factor = adjacency_matrix.sum(dim=0, keepdim=True)
+        normalization_factor[normalization_factor == 0] = 1  # To avoid division by zero
+        adjacency_matrix = adjacency_matrix / normalization_factor
+
+        adjacency_matrix = (
+            adjacency_matrix.unsqueeze(0).repeat(batch_size, 1, 1).transpose(1, 2)
+        )
+
+        mesh_node_features = torch.bmm(adjacency_matrix, grid_node_features)
+
+        return mesh_node_features

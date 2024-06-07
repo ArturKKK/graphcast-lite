@@ -7,7 +7,7 @@ from src.config import GraphBuildingConfig, ModelConfig, Grid2MeshEdgeCreation
 from src.mesh.create_mesh import get_hierarchy_of_triangular_meshes_for_sphere
 from src.graph import create as graph_create
 from typing import Optional, Tuple
-from utils import (
+from .utils import (
     get_encoder_from_encoder_config,
     get_processor_from_process_config,
     get_decoder_from_decode_config,
@@ -38,9 +38,12 @@ class WeatherPrediction(nn.Module):
         self,
         cordinates: Tuple[np.array, np.array],
         graph_config: GraphBuildingConfig,
-        num_grid_nodes: int,
         model_config: Optional[ModelConfig] = None,
     ):
+        super().__init__()
+        
+        self.num_grid_nodes = len(cordinates[0]) * len(cordinates[1])
+
         self._meshes = get_hierarchy_of_triangular_meshes_for_sphere(
             splits=graph_config.mesh_size
         )
@@ -61,8 +64,7 @@ class WeatherPrediction(nn.Module):
 
         self.encoder = get_encoder_from_encoder_config(
             encoder_config=model_config.encoder,
-            num_grid_nodes=num_grid_nodes,
-            num_mesh_nodes=len(self._meshes[-1]),
+            num_mesh_nodes=self._meshes[-1].vertices.shape[0],
         )
 
         self.processor = get_processor_from_process_config(
@@ -90,16 +92,37 @@ class WeatherPrediction(nn.Module):
         Parameters
         ----------
         X : torch.Tensor
-          The input data of the shape [batch, num_grid_nodes, num_features, timesteps].
+          The input data of the shape [batch, num_grid_nodes, num_features].
         """
-        pass
+
+        mesh_node_features = self.encoder(
+            grid_node_features=X, edge_index=self.grid2mesh_graph_index
+        )
+
+        processed_mesh_node_features = self.processor(
+            mesh_node_features, edge_index=self.mesh2mesh_graph
+        )
+
+        decoded_grid_node_features = self.decoder(
+            mesh_node_features=mesh_node_features, edge_index=self.mesh2grid_graph
+        )
+
+        return decoded_grid_node_features
 
 
 if __name__ == "__main__":
 
-    num_grid_nodes = 100
-    lats = np.random.uniform(low=-1, high=1, size=(num_grid_nodes,))
-    longs = np.random.uniform(low=-1, high=1, size=(num_grid_nodes,))
+    from src.config import (
+        Encoders,
+        DecoderConfig,
+        ProcessConfig,
+        AggregationEncoderConfig,
+        AggregationTypes,
+    )
+    
+    num_features = 10
+    lats = np.linspace(start=-90, stop=90, num=32, endpoint=True)
+    longs = np.linspace(start=0, stop=360, num=64, endpoint=False)
 
     graph_config = GraphBuildingConfig(
         resolution=0.25,
@@ -108,4 +131,22 @@ if __name__ == "__main__":
         grid2mesh_edge_creation=Grid2MeshEdgeCreation.RADIUS,
     )
 
-    model = WeatherPrediction(cordinates=(lats, longs), graph_config=graph_config)
+    model_config = ModelConfig(
+        encoder=AggregationEncoderConfig(
+            encoder_name=Encoders.AGGREGATION, aggregation_type=AggregationTypes.MEAN
+        ),
+        decoder=DecoderConfig(),
+        processor=ProcessConfig(),
+    )
+
+    model = WeatherPrediction(
+        cordinates=(lats, longs),
+        graph_config=graph_config,
+        model_config=model_config,
+    )
+    
+    num_grid_nodes = len(lats) * len(longs)
+
+    grid_features = torch.randn((8, num_grid_nodes, num_features))
+
+    mesh_level_features = model.forward(grid_features)

@@ -1,8 +1,8 @@
-import numpy as np
+import torch
 
 
 def get_adjacency_matrix_from_edge_index(
-    edge_index: np.array,
+    edge_index: torch.Tensor,
     num_sender_nodes: int,
     num_receiver_nodes: int,
 ):
@@ -13,14 +13,17 @@ def get_adjacency_matrix_from_edge_index(
 
     Parameters
     ----------
-    edge_index : np.array
-        The edge array of shape (num_edges, 2).
+    edge_index : torch.Tensor
+        The edge tensor of shape (num_edges, 2).
     num_sender_nodes : int
         Number of sender nodes.
     num_receiver_nodes : int
         Number of receiver nodes.
     """
     
-    adjacency_matrix = np.zeros((num_sender_nodes, num_receiver_nodes))
+    adjacency_matrix = torch.zeros((num_sender_nodes, num_receiver_nodes))
+    adjacency_matrix[edge_index[:, 0], edge_index[:, 1]] = 1
+    
+    return adjacency_matrix
     
     
