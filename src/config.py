@@ -65,16 +65,12 @@ class GraphBuildingConfig(BaseModel):
     mesh2grid_edge_normalization_factor: Optional[float] = None
 
 
-class EncoderConfig(BaseModel):
-    pass
-
-
-class SimpleAggregationEncoder(EncoderConfig):
+class AggregationEncoderConfig(BaseModel):
     encoder_name: Literal[Encoders.AGGREGATION]
     aggregation_type: AggregationTypes
 
 
-class MLPEncoder(EncoderConfig):
+class MLPEncoderConfig(BaseModel):
     encoder_name: Literal[Encoders.MLP]
     num_hidden_layers: int
     hidden_sizes: List[int]
@@ -89,7 +85,7 @@ class DecoderConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    encoder: Union[MLPEncoder, SimpleAggregationEncoder] = Field(
+    encoder: Union[MLPEncoderConfig, AggregationEncoderConfig] = Field(
         ..., discriminator="encoder_name"
     )
     processor: ProcessConfig

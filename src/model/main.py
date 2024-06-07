@@ -7,6 +7,11 @@ from src.config import GraphBuildingConfig, ModelConfig, Grid2MeshEdgeCreation
 from src.mesh.create_mesh import get_hierarchy_of_triangular_meshes_for_sphere
 from src.graph import create as graph_create
 from typing import Optional, Tuple
+from utils import (
+    get_encoder_from_encoder_config,
+    get_processor_from_process_config,
+    get_decoder_from_decode_config,
+)
 
 
 class WeatherPrediction(nn.Module):
@@ -33,6 +38,7 @@ class WeatherPrediction(nn.Module):
         self,
         cordinates: Tuple[np.array, np.array],
         graph_config: GraphBuildingConfig,
+        num_grid_nodes: int,
         model_config: Optional[ModelConfig] = None,
     ):
         self._meshes = get_hierarchy_of_triangular_meshes_for_sphere(
@@ -45,12 +51,26 @@ class WeatherPrediction(nn.Module):
             graph_building_config=graph_config,
         )
 
-        self.mesh2mesh_graph_index = graph_create.create_mesh_to_mesh_graph(
+        self.mesh2mesh_graph = graph_create.create_mesh_to_mesh_graph(
             graph_building_config=graph_config
         )
 
-        self.mesh2grid_graph_index = graph_create.create_mesh_to_grid_graph(
+        self.mesh2grid_graph = graph_create.create_mesh_to_grid_graph(
             graph_building_config=graph_config
+        )
+
+        self.encoder = get_encoder_from_encoder_config(
+            encoder_config=model_config.encoder,
+            num_grid_nodes=num_grid_nodes,
+            num_mesh_nodes=len(self._meshes[-1]),
+        )
+
+        self.processor = get_processor_from_process_config(
+            process_config=model_config.processor
+        )
+
+        self.decoder = get_decoder_from_decode_config(
+            decoder_config=model_config.decoder
         )
 
     @staticmethod
