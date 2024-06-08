@@ -4,11 +4,18 @@ from enum import Enum
 
 
 class Grid2MeshEdgeCreation(str, Enum):
-    """The different stratehies to create grid to mesh edges."""
-    
+    """The different strategies to create grid to mesh edges."""
+
     K_NEAREST = "k_nearest"
     RADIUS = "radius"
-    
+
+
+class Mesh2GridEdgeCreation(str, Enum):
+    """The different strategies to create mesh to grid edges."""
+
+    CONTAINED = "contained"
+
+
 class AggregationTypes(str, Enum):
     """The different aggregation types we support. An aggregation is used to aggregate information from
     connected nodes without any paramters.
@@ -26,6 +33,15 @@ class Encoders(str, Enum):
     MLP = "mlp"
 
 
+class Decoders(str, Enum):
+    """The different decoder models we support. The decoder creates the retreives the grid node representation back
+    from the mesh nodes and the edges in the mesh2grid graph.
+    """
+
+    AGGREGATION = "aggregation"
+    MLP = "mlp"
+
+
 class GraphBuildingConfig(BaseModel):
     """This defines the parameters for building the graph.
 
@@ -34,7 +50,9 @@ class GraphBuildingConfig(BaseModel):
     mesh_size: int
         How many refinements to do on the multi-mesh.
     grid2mesh_edge_creation: Grid2MeshEdgeCreation
-        The strategy to create the Grid2Mesh edges.
+        The strategy to create the Grid2Mesh edges for encoding.
+    mesh2grid_edge_creation: Mesh2GridEdgeCreation
+        The strategy to create the Mesh2Grid edges for decoding.
     grid2mesh_radius_query: Optional[float]
         This needs to be passed if grid2mesh_edge_creation is 'radius'.
         Scalar that will be multiplied by the
@@ -57,6 +75,7 @@ class GraphBuildingConfig(BaseModel):
     resolution: float
     mesh_size: int
     grid2mesh_edge_creation: Grid2MeshEdgeCreation
+    mesh2grid_edge_creation: Mesh2GridEdgeCreation
     grid2mesh_radius_query: Optional[float] = None
     grid2mesh_k: Optional[int] = None
     mesh2grid_edge_normalization_factor: Optional[float] = None
@@ -73,11 +92,12 @@ class MLPEncoderConfig(BaseModel):
     hidden_sizes: List[int]
 
 
+class AggregationDecoderConfig(BaseModel):
+    decoder_name: Literal[Decoders.AGGREGATION]
+    aggregation_type: AggregationTypes
+
+
 class ProcessConfig(BaseModel):
-    pass
-
-
-class DecoderConfig(BaseModel):
     pass
 
 
@@ -86,7 +106,7 @@ class ModelConfig(BaseModel):
         ..., discriminator="encoder_name"
     )
     processor: ProcessConfig
-    decoder: DecoderConfig
+    decoder: Union[AggregationDecoderConfig] = Field(..., discriminator="decoder_name")
 
 
 class ExperimentConfig(BaseModel):
