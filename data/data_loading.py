@@ -114,14 +114,20 @@ def read_dataset_from_netcdf(file_path: str, chunk_size: int = 10):
 
 class WeatherDataset(Dataset):
     def __init__(self, X, y):
-        self.X = X
-        self.y = y
+        self.X = torch.tensor(X.values, dtype=torch.float32)
+        self.y = torch.tensor(y.values, dtype=torch.float32)
+
+        self.X_xr = X
+        self.y_xr = y
 
     def __len__(self):
         return len(self.X)
 
     def __getitem__(self, idx):
         return self.X[idx], self.y[idx]
+    
+    def get_xr(self):
+        return self.X_xr, self.y_xr
     
 
 
@@ -178,7 +184,7 @@ def get_weather_dataset_from_array(
     X = rolled_dataset.isel(window=slice(obs_window))
     y = rolled_dataset.isel(window=slice(obs_window, None))
 
-    print('Lage features created successfully')
+    print('Lag features created successfully')
 
 
     # Make array 2d
@@ -190,7 +196,7 @@ def get_weather_dataset_from_array(
     # Train-test split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, shuffle=True, random_state=42)
 
-    print('Train-test split done")
+    print('Train-test split done')
 
 
     grouping = ['window', 'variable'] if group_by_time else ['variable', 'window']
@@ -198,6 +204,7 @@ def get_weather_dataset_from_array(
     # Scaling
     X_scaler = StandardScaler()
     y_scaler = StandardScaler()
+
 
     # Since this is regression, we must also scale the y
     X_train_scaled = X_scaler.fit_transform(X_train).unstack().stack(lag_features=grouping)
@@ -207,26 +214,13 @@ def get_weather_dataset_from_array(
     y_test_scaled = y_scaler.transform(y_test).unstack().stack(lag_features=grouping)
 
 
+    # return X_train_scaled, y_train_scaled, X_test_scaled, y_test_scaled
+
     print('Scaling done')
 
-
-
-    # Convert Xarray DataArray to PyTorch tensor
-    def to_tensor(dataarray):
-        return torch.tensor(dataarray.values, dtype=torch.float32)
-
-    # Example conversion
-    X_train_tensor = to_tensor(X_train_scaled)
-    y_train_tensor = to_tensor(y_train_scaled)
-    X_test_tensor = to_tensor(X_test_scaled)
-    y_test_tensor = to_tensor(y_test_scaled)
-
-    print('Conversion to tensor done')
-
-
     # Create dataset instances
-    train_dataset = WeatherDataset(X_train_tensor, y_train_tensor)
-    test_dataset = WeatherDataset(X_test_tensor, y_test_tensor)
+    train_dataset = WeatherDataset(X_train_scaled, y_train_scaled)
+    test_dataset = WeatherDataset(X_test_scaled, y_test_scaled)
 
     return train_dataset, test_dataset
 
@@ -251,13 +245,8 @@ def get_dataset(url: str):
     dataset = get_dataset('gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr')
     """
     era5 = get_xarray_dataset(url, chunk_size=48)
-    era5 = get_selected_variables(era5, ['10m_u_component_of_wind', '10m_v_component_of_wind', '2m_temperature'])
-    era5 = get_selected_time_range(era5, '2010-01-01', '2010-12-31')
-
-    # Store the xarray dataset to netcdf file
-    write_dataset_to_netcdf(era5, 'era5_2010.nc')
-    print("Dataset saved to netcdf file")
-
+    era5 = era5['10m_u_component_of_wind', '10m_v_component_of_wind', '2m_temperature']
+    era5 = era5.sel(time=slice('2010-01-01', '2010-12-31'))
     era5 = era5.to_array()
 
     train_dataset, test_dataset = get_weather_dataset_from_array(era5, obs_window=4, pred_window=1, overlap=False, group_by_time=True, test_size=0.2)
