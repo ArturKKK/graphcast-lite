@@ -57,7 +57,11 @@ class WeatherPrediction(nn.Module):
         )
 
         mesh_we_want = filter_mesh(mesh_we_want, graph_config.mesh_level)
-
+        self.mesh2mesh_graph = graph_create.create_mesh_to_mesh_graph(
+            mesh_we_want,
+            graph_building_config=graph_config
+        )
+        
         self.mesh2grid_graph = graph_create.create_mesh_to_grid_graph(
             cordinates=cordinates,
             mesh=mesh_we_want,
@@ -104,6 +108,7 @@ class WeatherPrediction(nn.Module):
         processed_mesh_node_features = self.processor(
             mesh_node_features, edge_index=self.mesh2mesh_graph
         )
+        import pdb; pdb.set_trace()
 
         decoded_grid_node_features = self.decoder(
             mesh_node_features=processed_mesh_node_features,
@@ -136,6 +141,7 @@ if __name__ == "__main__":
         grid2mesh_radius_query=0.5,
         grid2mesh_edge_creation=Grid2MeshEdgeCreation.RADIUS,
         mesh2grid_edge_creation=Mesh2GridEdgeCreation.CONTAINED,
+        mesh_level=-1
     )
 
     model_config = ModelConfig(

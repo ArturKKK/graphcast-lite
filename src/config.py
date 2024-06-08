@@ -85,7 +85,7 @@ class GraphBuildingConfig(BaseModel):
     mesh2grid_edge_normalization_factor: Optional[float] = None
 
     # mesh-to-mesh graph configs
-    mesh_resolution: List[float]
+    mesh_level: int
 
 
     # mesh-to-grid graph configs

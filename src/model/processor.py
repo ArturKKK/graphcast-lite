@@ -1,9 +1,9 @@
 import torch
 from torch_geometric.nn import GCNConv
 
-class SimpleProcessor(torch.nn.module):
+class SimpleProcessor(torch.nn.Module):
     """
-    
+
     """
 
     def __init__(self, in_out_dim, hidden_dims):
