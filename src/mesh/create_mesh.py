@@ -227,3 +227,25 @@ def filter_mesh(meshes, level_desired=-1):
     mesh_we_want = TriangularMesh(vertices=mesh_we_want.vertices, faces=faces)
         
     return mesh_we_want
+
+def get_edges_from_faces(faces) -> np.ndarray:
+    """
+    Get edges from faces.
+
+    Parameters
+    ----------
+    faces : np.array
+        The faces of the triangular mesh.
+
+    Returns
+    -------
+        Returns a numpy array of shape [2, num_edges] which defines the edges.
+
+    """
+    edges = []
+    for face in faces:
+        edges.extend([[face[0], face[1]], [face[1], face[2]], [face[2], face[0]]])
+    edges = np.array(edges)
+    edges = np.unique(edges, axis=0)
+    edges = np.sort(edges, axis=1)
+    return edges.T

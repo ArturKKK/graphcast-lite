@@ -47,7 +47,9 @@ def get_processor_from_process_config(process_config: ProcessConfig):
         The process config based on which the processor will be loaded.
     """
     return SimpleProcessor(
-        in_out_dim=process_config.in_out_dim, hidden_dims=process_config.hidden_dims
+        input_dim=process_config.in_out_dim,
+        hidden_dims=process_config.hidden_dims,
+        output_dim=process_config.in_out_dim
     )
 
 

@@ -50,8 +50,8 @@ def create_grid_to_mesh_graph(
         )
 
 
-def create_mesh_to_mesh_graph(mesh: TriangularMesh, graph_building_config: GraphBuildingConfig):
-    """ Creates the edges between the mesh nodes based on the desired k-hops in config.mesh_resolution list.
+def create_mesh_graph_edges(mesh: TriangularMesh, graph_building_config: GraphBuildingConfig):
+    """ ...
 
     Parameters
     ----------

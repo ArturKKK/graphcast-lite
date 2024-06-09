@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from src.config import GraphBuildingConfig, ModelConfig
-from src.mesh.create_mesh import get_hierarchy_of_triangular_meshes_for_sphere, filter_mesh
+from src.mesh.create_mesh import get_hierarchy_of_triangular_meshes_for_sphere, filter_mesh, get_edges_from_faces
 from src.graph import create as graph_create
 from typing import Optional, Tuple
 from .utils import (
@@ -48,29 +48,25 @@ class WeatherPrediction(nn.Module):
             splits=graph_config.mesh_size
         )
 
-        mesh_we_want = self._meshes[-1]
-
-        self.grid2mesh_graph_index = graph_create.create_grid_to_mesh_graph(
+        self.grid2mesh_graph = graph_create.create_grid_to_mesh_graph(
             cordinates=cordinates,
-            mesh=mesh_we_want,
+            mesh=self._meshes[-1],
             graph_building_config=graph_config,
-        )
-
-        mesh_we_want = filter_mesh(mesh_we_want, graph_config.mesh_level)
-        self.mesh2mesh_graph = graph_create.create_mesh_to_mesh_graph(
-            mesh_we_want,
-            graph_building_config=graph_config
-        )
+        )   # TODO edge array should be [2, num_edges] for torch-geometric. We should have the same here, for sake of consistency.
         
+        self.mesh_we_want = self._meshes[-1]
+        self.mesh_we_want = filter_mesh(self.mesh_we_want, graph_config.mesh_level)        
+        self.mesh_edeges = torch.tensor(get_edges_from_faces(self.mesh_we_want.faces))
+
         self.mesh2grid_graph = graph_create.create_mesh_to_grid_graph(
             cordinates=cordinates,
-            mesh=mesh_we_want,
+            mesh=self.mesh_we_want,
             graph_building_config=graph_config,
         )
 
         self.encoder = get_encoder_from_encoder_config(
             encoder_config=model_config.encoder,
-            num_mesh_nodes=mesh_we_want.vertices.shape[0],
+            num_mesh_nodes=self._meshes[-1].vertices.shape[0],
         )
 
         self.processor = get_processor_from_process_config(
@@ -102,13 +98,12 @@ class WeatherPrediction(nn.Module):
         """
 
         mesh_node_features = self.encoder(
-            grid_node_features=X, edge_index=self.grid2mesh_graph
+            grid_node_features=X, edge_index=self.grid2mesh_graph     # TODO edge_index should be a tensor for processor as torch-geometric is used. We should have the same here, for sake of consistency. 
         )
 
         processed_mesh_node_features = self.processor(
-            mesh_node_features, edge_index=self.mesh2mesh_graph
+            mesh_node_features, edge_index=self.mesh_edeges
         )
-        import pdb; pdb.set_trace()
 
         decoded_grid_node_features = self.decoder(
             mesh_node_features=processed_mesh_node_features,
@@ -151,7 +146,10 @@ if __name__ == "__main__":
         decoder=AggregationDecoderConfig(
             decoder_name=Decoders.AGGREGATION, aggregation_type=AggregationTypes.MEAN
         ),
-        processor=ProcessConfig(),
+        processor=ProcessConfig(
+            in_out_dim=num_features,
+            hidden_dims=[32, 32],
+        ),
     )
 
     model = WeatherPrediction(

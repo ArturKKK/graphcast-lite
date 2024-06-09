@@ -84,8 +84,8 @@ class GraphBuildingConfig(BaseModel):
     grid2mesh_k: Optional[int] = None
     mesh2grid_edge_normalization_factor: Optional[float] = None
 
-    # mesh-to-mesh graph configs
-    mesh_level: int
+    # mesh graph configs
+    mesh_level: int = -1
 
 
     # mesh-to-grid graph configs
@@ -108,7 +108,8 @@ class AggregationDecoderConfig(BaseModel):
 
 
 class ProcessConfig(BaseModel):
-    pass
+    in_out_dim: int
+    hidden_dims: List[int]
 
 
 class ModelConfig(BaseModel):
