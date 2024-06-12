@@ -114,20 +114,14 @@ def read_dataset_from_netcdf(file_path: str, chunk_size: int = 10):
 
 class WeatherDataset(Dataset):
     def __init__(self, X, y):
-        self.X = torch.tensor(X.values, dtype=torch.float32)
-        self.y = torch.tensor(y.values, dtype=torch.float32)
-
-        self.X_xr = X
-        self.y_xr = y
+        self.X = X
+        self.y = y
 
     def __len__(self):
         return len(self.X)
 
     def __getitem__(self, idx):
         return self.X[idx], self.y[idx]
-    
-    def get_xr(self):
-        return self.X_xr, self.y_xr
     
 
 
@@ -139,7 +133,8 @@ def get_weather_dataset_from_array(
         pred_window: int, 
         overlap: bool = False, 
         group_by_time: bool = True,
-        test_size: float = 0.2
+        test_size: float = 0.2,
+        return_tensors: bool = True
     ):
     """
     From the dataset, get a pytorch Dataset instance
@@ -213,20 +208,35 @@ def get_weather_dataset_from_array(
     X_test_scaled = X_scaler.transform(X_test).unstack().stack(lag_features=grouping)
     y_test_scaled = y_scaler.transform(y_test).unstack().stack(lag_features=grouping)
 
-
-    # return X_train_scaled, y_train_scaled, X_test_scaled, y_test_scaled
-
     print('Scaling done')
 
-    # Create dataset instances
-    train_dataset = WeatherDataset(X_train_scaled, y_train_scaled)
-    test_dataset = WeatherDataset(X_test_scaled, y_test_scaled)
+    X_train_scaled = torch.tensor(X_train_scaled.values, dtype=torch.float32)
+    y_train_scaled = torch.tensor(y_train_scaled.values, dtype=torch.float32)
+    X_test_scaled = torch.tensor(X_test_scaled.values, dtype=torch.float32)
+    y_test_scaled = torch.tensor(y_test_scaled.values, dtype=torch.float32)
 
-    return train_dataset, test_dataset
+    print('Converted to tensors')
+
+    if return_tensors:
+        return X_train_scaled, y_train_scaled, X_test_scaled, y_test_scaled
+    
+    else:
+        # Create dataset instances
+        train_dataset = WeatherDataset(X_train_scaled, y_train_scaled)
+        test_dataset = WeatherDataset(X_test_scaled, y_test_scaled)
+
+        return train_dataset, test_dataset
 
 
 
-def get_dataset(url: str):
+
+
+
+
+
+
+
+def get_dataset(url: str, asTensors: bool = True):
     """
     Get the dataset from the given url
 
@@ -245,10 +255,13 @@ def get_dataset(url: str):
     dataset = get_dataset('gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr')
     """
     era5 = get_xarray_dataset(url, chunk_size=48)
-    era5 = era5['10m_u_component_of_wind', '10m_v_component_of_wind', '2m_temperature']
+    era5 = era5[['10m_u_component_of_wind', '10m_v_component_of_wind', '2m_temperature']]
     era5 = era5.sel(time=slice('2010-01-01', '2010-12-31'))
     era5 = era5.to_array()
 
-    train_dataset, test_dataset = get_weather_dataset_from_array(era5, obs_window=4, pred_window=1, overlap=False, group_by_time=True, test_size=0.2)
-
-    return train_dataset, test_dataset
+    if asTensors:
+        X_train, y_train, X_test, y_test = get_weather_dataset_from_array(era5, obs_window=4, pred_window=1, overlap=False, group_by_time=True, test_size=0.2, return_tensors=asTensors)
+        return X_train, y_train, X_test, y_test
+    else:
+        train_dataset, test_dataset = get_weather_dataset_from_array(era5, obs_window=4, pred_window=1, overlap=False, group_by_time=True, test_size=0.2, return_tensors=asTensors)
+        return train_dataset, test_dataset
