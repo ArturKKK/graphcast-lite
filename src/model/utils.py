@@ -1,12 +1,14 @@
 from typing import Union
 from src.config import (
     Encoders,
+    Decoders,
     AggregationEncoderConfig,
     MLPEncoderConfig,
     ProcessConfig,
-    DecoderConfig,
+    AggregationDecoderConfig,
 )
 from src.model.encoder import AggregationEncoder
+from src.model.decoder import AggregationDecoder
 
 
 def get_encoder_from_encoder_config(
@@ -46,7 +48,9 @@ def get_processor_from_process_config(process_config: ProcessConfig):
     pass
 
 
-def get_decoder_from_decode_config(decoder_config: DecoderConfig):
+def get_decoder_from_decode_config(
+    decoder_config: Union[AggregationEncoderConfig], num_grid_nodes: int
+):
     """Returns an object of the decoder module based on the decoder config provided.
 
     Parameters
@@ -54,4 +58,12 @@ def get_decoder_from_decode_config(decoder_config: DecoderConfig):
     decoder_config : DecoderConfig
         The decoder config based on which the decoder will be loaded.
     """
-    pass
+    if decoder_config.decoder_name == Decoders.AGGREGATION:
+        return AggregationDecoder(
+            decoder_config=decoder_config,
+            num_grid_nodes=num_grid_nodes,
+        )
+    else:
+        raise NotImplementedError(
+            f"Decoder of type {decoder_config.decoder_name} is not supported."
+        )

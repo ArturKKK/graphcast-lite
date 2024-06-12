@@ -11,3 +11,4 @@ fsspec==2022.5.0
 gcsfs==2022.5.0
 cartopy==0.23.0
 dask_ml==2024.4.4
+rtree==1.2.0
