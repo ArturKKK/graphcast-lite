@@ -205,3 +205,47 @@ def _two_split_unit_sphere_triangle_faces(
         vertices=new_vertices_builder.get_all_vertices(),
         faces=np.array(new_faces, dtype=np.int32),
     )
+
+
+def filter_mesh(meshes, level_desired=-1):
+    """ Remove the faces of lower level meshes from the mesh that we want.
+        Needed as graphcast creates a hierarchy of meshes and we only want the specific level.
+        
+        Lower levels have less faces.
+    """
+
+    mesh_we_want = meshes[level_desired]
+    face_set = set()
+    for face in mesh_we_want.faces:
+        face_set.add(tuple(face))
+
+    for mesh in meshes[:level_desired]:
+        for face in mesh.faces:
+            face_set.discard(tuple(face))
+
+    faces = np.array(list(face_set))
+    mesh_we_want = TriangularMesh(vertices=mesh_we_want.vertices, faces=faces)
+        
+    return mesh_we_want
+
+def get_edges_from_faces(faces) -> np.ndarray:
+    """
+    Get edges from faces.
+
+    Parameters
+    ----------
+    faces : np.array
+        The faces of the triangular mesh.
+
+    Returns
+    -------
+        Returns a numpy array of shape [2, num_edges] which defines the edges.
+
+    """
+    edges = []
+    for face in faces:
+        edges.extend([[face[0], face[1]], [face[1], face[2]], [face[2], face[0]]])
+    edges = np.array(edges)
+    edges = np.unique(edges, axis=0)
+    edges = np.sort(edges, axis=1)
+    return edges.T

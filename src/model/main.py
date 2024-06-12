@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from src.config import GraphBuildingConfig, ModelConfig
-from src.mesh.create_mesh import get_hierarchy_of_triangular_meshes_for_sphere
+from src.mesh.create_mesh import get_hierarchy_of_triangular_meshes_for_sphere, filter_mesh, get_edges_from_faces
 from src.graph import create as graph_create
 from typing import Optional, Tuple
 from .utils import (
@@ -52,15 +52,15 @@ class WeatherPrediction(nn.Module):
             cordinates=cordinates,
             mesh=self._meshes[-1],
             graph_building_config=graph_config,
-        )
-
-        self.mesh2mesh_graph = graph_create.create_mesh_to_mesh_graph(
-            graph_building_config=graph_config
-        )
+        )   # TODO edge array should be [2, num_edges] for torch-geometric. We should have the same here, for sake of consistency.
+        
+        self.mesh_we_want = self._meshes[-1]
+        self.mesh_we_want = filter_mesh(self.mesh_we_want, graph_config.mesh_level)        
+        self.mesh_edeges = torch.tensor(get_edges_from_faces(self.mesh_we_want.faces))
 
         self.mesh2grid_graph = graph_create.create_mesh_to_grid_graph(
             cordinates=cordinates,
-            mesh=self._meshes[-1],
+            mesh=self.mesh_we_want,
             graph_building_config=graph_config,
         )
 
@@ -98,11 +98,11 @@ class WeatherPrediction(nn.Module):
         """
 
         mesh_node_features = self.encoder(
-            grid_node_features=X, edge_index=self.grid2mesh_graph
+            grid_node_features=X, edge_index=self.grid2mesh_graph     # TODO edge_index should be a tensor for processor as torch-geometric is used. We should have the same here, for sake of consistency. 
         )
 
         processed_mesh_node_features = self.processor(
-            mesh_node_features, edge_index=self.mesh2mesh_graph
+            mesh_node_features, edge_index=self.mesh_edeges
         )
 
         decoded_grid_node_features = self.decoder(
@@ -136,6 +136,7 @@ if __name__ == "__main__":
         grid2mesh_radius_query=0.5,
         grid2mesh_edge_creation=Grid2MeshEdgeCreation.RADIUS,
         mesh2grid_edge_creation=Mesh2GridEdgeCreation.CONTAINED,
+        mesh_level=-1
     )
 
     model_config = ModelConfig(
@@ -145,7 +146,10 @@ if __name__ == "__main__":
         decoder=AggregationDecoderConfig(
             decoder_name=Decoders.AGGREGATION, aggregation_type=AggregationTypes.MEAN
         ),
-        processor=ProcessConfig(),
+        processor=ProcessConfig(
+            in_out_dim=num_features,
+            hidden_dims=[32, 32],
+        ),
     )
 
     model = WeatherPrediction(

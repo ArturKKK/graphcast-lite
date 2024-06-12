@@ -70,8 +70,12 @@ class GraphBuildingConfig(BaseModel):
         This supports using pre-trained model weights with a different graph
         structure to what it was trained on.
 
+    mesh_level: int
+        The level of the mesh to use for the processing. -1 means the finest mesh.
+
     """
 
+    # grid-to-mesh graph configs
     resolution: float
     mesh_size: int
     grid2mesh_edge_creation: Grid2MeshEdgeCreation
@@ -79,6 +83,12 @@ class GraphBuildingConfig(BaseModel):
     grid2mesh_radius_query: Optional[float] = None
     grid2mesh_k: Optional[int] = None
     mesh2grid_edge_normalization_factor: Optional[float] = None
+
+    # mesh graph configs
+    mesh_level: int = -1
+
+
+    # mesh-to-grid graph configs
 
 
 class AggregationEncoderConfig(BaseModel):
@@ -98,7 +108,8 @@ class AggregationDecoderConfig(BaseModel):
 
 
 class ProcessConfig(BaseModel):
-    pass
+    in_out_dim: int
+    hidden_dims: List[int]
 
 
 class ModelConfig(BaseModel):
