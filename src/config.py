@@ -45,8 +45,6 @@ class Decoders(str, Enum):
 class GraphBuildingConfig(BaseModel):
     """This defines the parameters for building the graph.
 
-    resolution: float
-        The resolution of the data, in degrees (e.g. 0.25 or 1.0).
     mesh_size: int
         How many refinements to do on the multi-mesh.
     grid2mesh_edge_creation: Grid2MeshEdgeCreation
@@ -64,36 +62,27 @@ class GraphBuildingConfig(BaseModel):
     grid2mesh_k: Optional[int]:
         This needs to be passed if grid2mesh_edge_creation is 'k_nearest'. Each grid node
         will be connected to the nearest grid2mesh_k mesh nodes.
-    mesh2grid_edge_normalization_factor: float
-        Allows explicitly controlling edge
-        normalization for mesh2grid edges. If None, defaults to max edge length.
-        This supports using pre-trained model weights with a different graph
-        structure to what it was trained on.
-
     mesh_level: int
         The level of the mesh to use for the processing. -1 means the finest mesh.
 
     """
 
     # grid-to-mesh graph configs
-    resolution: float
     mesh_size: int
     grid2mesh_edge_creation: Grid2MeshEdgeCreation
     mesh2grid_edge_creation: Mesh2GridEdgeCreation
     grid2mesh_radius_query: Optional[float] = None
     grid2mesh_k: Optional[int] = None
-    mesh2grid_edge_normalization_factor: Optional[float] = None
 
     # mesh graph configs
     mesh_level: int = -1
-
 
     # mesh-to-grid graph configs
 
 
 class AggregationEncoderConfig(BaseModel):
     encoder_name: Literal[Encoders.AGGREGATION]
-    aggregation_type: AggregationTypes
+    aggregation_type: AggregationTypes = AggregationTypes.MEAN
 
 
 class MLPEncoderConfig(BaseModel):
@@ -104,7 +93,7 @@ class MLPEncoderConfig(BaseModel):
 
 class AggregationDecoderConfig(BaseModel):
     decoder_name: Literal[Decoders.AGGREGATION]
-    aggregation_type: AggregationTypes
+    aggregation_type: AggregationTypes = AggregationTypes.MEAN
 
 
 class ProcessConfig(BaseModel):
@@ -120,6 +109,16 @@ class ModelConfig(BaseModel):
     decoder: Union[AggregationDecoderConfig] = Field(..., discriminator="decoder_name")
 
 
+class DataConfig(BaseModel):
+    data_directory: str
+    num_latitudes: int
+    num_longitudes: int
+
+
 class ExperimentConfig(BaseModel):
-    graph_config: GraphBuildingConfig
+    batch_size: int
+    learning_rate: float
+    num_epochs: int
+    graph: GraphBuildingConfig
     model: ModelConfig
+    data: DataConfig

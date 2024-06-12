@@ -4,7 +4,11 @@ import torch
 import torch.nn as nn
 import numpy as np
 from src.config import GraphBuildingConfig, ModelConfig
-from src.mesh.create_mesh import get_hierarchy_of_triangular_meshes_for_sphere, filter_mesh, get_edges_from_faces
+from src.mesh.create_mesh import (
+    get_hierarchy_of_triangular_meshes_for_sphere,
+    filter_mesh,
+    get_edges_from_faces,
+)
 from src.graph import create as graph_create
 from typing import Optional, Tuple
 from .utils import (
@@ -52,10 +56,10 @@ class WeatherPrediction(nn.Module):
             cordinates=cordinates,
             mesh=self._meshes[-1],
             graph_building_config=graph_config,
-        )   # TODO edge array should be [2, num_edges] for torch-geometric. We should have the same here, for sake of consistency.
-        
+        )  # TODO edge array should be [2, num_edges] for torch-geometric. We should have the same here, for sake of consistency.
+
         self.mesh_we_want = self._meshes[-1]
-        self.mesh_we_want = filter_mesh(self.mesh_we_want, graph_config.mesh_level)        
+        self.mesh_we_want = filter_mesh(self.mesh_we_want, graph_config.mesh_level)
         self.mesh_edeges = torch.tensor(get_edges_from_faces(self.mesh_we_want.faces))
 
         self.mesh2grid_graph = graph_create.create_mesh_to_grid_graph(
@@ -98,7 +102,8 @@ class WeatherPrediction(nn.Module):
         """
 
         mesh_node_features = self.encoder(
-            grid_node_features=X, edge_index=self.grid2mesh_graph     # TODO edge_index should be a tensor for processor as torch-geometric is used. We should have the same here, for sake of consistency. 
+            grid_node_features=X,
+            edge_index=self.grid2mesh_graph,  # TODO edge_index should be a tensor for processor as torch-geometric is used. We should have the same here, for sake of consistency.
         )
 
         processed_mesh_node_features = self.processor(
@@ -111,55 +116,3 @@ class WeatherPrediction(nn.Module):
         )
 
         return decoded_grid_node_features
-
-
-if __name__ == "__main__":
-
-    from src.config import (
-        Encoders,
-        Decoders,
-        AggregationDecoderConfig,
-        ProcessConfig,
-        AggregationEncoderConfig,
-        AggregationTypes,
-        Grid2MeshEdgeCreation,
-        Mesh2GridEdgeCreation,
-    )
-
-    num_features = 10
-    lats = np.linspace(start=-90, stop=90, num=32, endpoint=True)
-    longs = np.linspace(start=0, stop=360, num=64, endpoint=False)
-
-    graph_config = GraphBuildingConfig(
-        resolution=0.25,
-        mesh_size=1,
-        grid2mesh_radius_query=0.5,
-        grid2mesh_edge_creation=Grid2MeshEdgeCreation.RADIUS,
-        mesh2grid_edge_creation=Mesh2GridEdgeCreation.CONTAINED,
-        mesh_level=-1
-    )
-
-    model_config = ModelConfig(
-        encoder=AggregationEncoderConfig(
-            encoder_name=Encoders.AGGREGATION, aggregation_type=AggregationTypes.MEAN
-        ),
-        decoder=AggregationDecoderConfig(
-            decoder_name=Decoders.AGGREGATION, aggregation_type=AggregationTypes.MEAN
-        ),
-        processor=ProcessConfig(
-            in_out_dim=num_features,
-            hidden_dims=[32, 32],
-        ),
-    )
-
-    model = WeatherPrediction(
-        cordinates=(lats, longs),
-        graph_config=graph_config,
-        model_config=model_config,
-    )
-
-    num_grid_nodes = len(lats) * len(longs)
-
-    grid_features = torch.randn((8, num_grid_nodes, num_features))
-
-    mesh_level_features = model.forward(grid_features)

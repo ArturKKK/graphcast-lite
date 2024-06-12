@@ -1,22 +1,22 @@
 import torch
 from torch_geometric.nn import GCNConv
+from typing import List
+
 
 class SimpleProcessor(torch.nn.Module):
-    """
+    """ """
 
-    """
-
-    def __init__(self, input_dim, hidden_dims, output_dim):
+    def __init__(self, input_dim: int, hidden_dims: List[int], output_dim: int):
         """
         Parameters
         ----------
-        
+
         """
         super().__init__()
         self.layers = torch.nn.ModuleList()
         self.layers.append(GCNConv(input_dim, hidden_dims[0]))
         for i in range(1, len(hidden_dims)):
-            self.layers.append(GCNConv(hidden_dims[i-1], hidden_dims[i]))
+            self.layers.append(GCNConv(hidden_dims[i - 1], hidden_dims[i]))
         self.layers.append(GCNConv(hidden_dims[-1], output_dim))
 
         self.activation = torch.nn.ReLU()

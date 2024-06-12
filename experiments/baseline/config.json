@@ -1,0 +1,32 @@
+{
+    "batch_size": 1,
+    "learning_rate": 1e-3,
+    "num_epochs": 10,
+    "graph": {
+        "mesh_size": 1,
+        "grid2mesh_edge_creation": "radius",
+        "mesh2grid_edge_creation": "contained",
+        "grid2mesh_radius_query": 0.5,
+        "mesh_level": -1
+    },
+    "model": {
+        "encoder": {
+            "encoder_name": "aggregation"
+        },
+        "processor": {
+            "in_out_dim": 6,
+            "hidden_dims": [
+                16,
+                32
+            ]
+        },
+        "decoder": {
+            "decoder_name": "aggregation"
+        }
+    },
+    "data": {
+        "data_directory": "/Users/aditwhorra/Desktop/Delft/Q4/ML Graph Data/cyclone-tracking/data/datasets",
+        "num_latitudes": 32,
+        "num_longitudes": 64
+    }
+}
