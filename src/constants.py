@@ -4,5 +4,7 @@ class FolderNames:
 
 class FileNames:
     EXPERIMENT_CONFIG = "config.json"
-    TRAIN_DATA = "train_dataset.pt"
-    TEST_DATA = "test_dataset.py"
+    TRAIN_X = "X_train.pt"
+    TRAIN_Y = "y_train.pt"
+    TEST_X = "X_train.pt"
+    TEST_Y = "y_train.pt"

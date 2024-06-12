@@ -58,8 +58,7 @@ class WeatherPrediction(nn.Module):
             graph_building_config=graph_config,
         )  # TODO edge array should be [2, num_edges] for torch-geometric. We should have the same here, for sake of consistency.
 
-        self.mesh_we_want = self._meshes[-1]
-        self.mesh_we_want = filter_mesh(self.mesh_we_want, graph_config.mesh_level)
+        self.mesh_we_want = filter_mesh(self._meshes, graph_config.mesh_level)
         self.mesh_edeges = torch.tensor(get_edges_from_faces(self.mesh_we_want.faces))
 
         self.mesh2grid_graph = graph_create.create_mesh_to_grid_graph(

@@ -97,7 +97,8 @@ class AggregationDecoderConfig(BaseModel):
 
 
 class ProcessConfig(BaseModel):
-    in_out_dim: int
+    in_dim: int
+    out_dim: int
     hidden_dims: List[int]
 
 

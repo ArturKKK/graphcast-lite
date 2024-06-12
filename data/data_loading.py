@@ -114,11 +114,8 @@ def read_dataset_from_netcdf(file_path: str, chunk_size: int = 10):
 
 class WeatherDataset(Dataset):
     def __init__(self, X, y):
-        self.X = torch.tensor(X.values, dtype=torch.float32)
-        self.y = torch.tensor(y.values, dtype=torch.float32)
-
-        self.X_xr = X
-        self.y_xr = y
+        self.X = X
+        self.y = y
 
     def __len__(self):
         return len(self.X)

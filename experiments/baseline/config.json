@@ -14,7 +14,8 @@
             "encoder_name": "aggregation"
         },
         "processor": {
-            "in_out_dim": 6,
+            "in_dim": 12,
+            "out_dim": 3,
             "hidden_dims": [
                 16,
                 32
@@ -25,7 +26,7 @@
         }
     },
     "data": {
-        "data_directory": "/Users/aditwhorra/Desktop/Delft/Q4/ML Graph Data/cyclone-tracking/data/datasets",
+        "data_directory": "/Users/aditwhorra/Desktop/Delft/Q4/MLGraphData/cyclone-tracking/data/datasets",
         "num_latitudes": 32,
         "num_longitudes": 64
     }

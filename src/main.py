@@ -9,7 +9,7 @@ from src.model.main import WeatherPrediction
 import numpy as np
 from torch.optim import Adam
 from src.train import train
-from data.data_loading import *
+from src.data.dataloader import load_train_and_test_datasets
 
 
 def load_model_from_experiment_config(
@@ -18,13 +18,13 @@ def load_model_from_experiment_config(
     lats = np.linspace(
         start=-90,
         stop=90,
-        num=experiment_config.data_config.num_latitudes,
+        num=experiment_config.data.num_latitudes,
         endpoint=True,
     )
     longs = np.linspace(
         start=0,
         stop=360,
-        num=experiment_config.data_config.num_longitudes,
+        num=experiment_config.data.num_longitudes,
         endpoint=False,
     )
 
@@ -41,11 +41,8 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
     data_config: DataConfig = experiment_config.data
 
-    train_dataset = torch.load(
-        os.path.join(data_config.data_directory, FileNames.TRAIN_DATA)
-    )
-    test_dataset = torch.load(
-        os.path.join(data_config.data_directory, FileNames.TEST_DATA)
+    train_dataset, test_dataset = load_train_and_test_datasets(
+        data_path=data_config.data_directory
     )
 
     train_dataloader = DataLoader(
