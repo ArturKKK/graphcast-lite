@@ -1,5 +1,5 @@
 {
-    "batch_size": 1,
+    "batch_size": 2,
     "learning_rate": 1e-3,
     "num_epochs": 30,
     "graph": {
@@ -16,9 +16,10 @@
             "mlp": {
                 "mlp_hidden_dims": [
                     36,
-                    36
+                    72
+                
                 ],
-                "output_dim": 36
+                "output_dim": 128
             },
             "gcn": {
                 "layer_type": "simple_conv"
@@ -28,17 +29,17 @@
             "gcn": {
                 "layer_type": "conv_gcn",
                 "hidden_dims": [
-                    36,
-                    36
+                    128,
+                    128
                 ],
-                "output_dim": 36
+                "output_dim": 128
             }
         },
         "decoder": {
             "mlp": {
                 "mlp_hidden_dims": [
-                    24,
-                    12
+                    72,
+                    36
                 ],
                 "output_dim": 3
             },
