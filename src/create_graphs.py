@@ -7,9 +7,12 @@ from src.mesh import (
     in_mesh_triangle_indices,
 )
 from src.config import GraphBuildingConfig, Grid2MeshEdgeCreation, Mesh2GridEdgeCreation
+import torch
+
+from src.mesh.create_mesh import filter_mesh, get_edges_from_faces
 
 
-def create_grid_to_mesh_graph(
+def create_encoding_graph(
     cordinates: Tuple[np.array, np.array],
     mesh: TriangularMesh,
     graph_building_config: GraphBuildingConfig,
@@ -28,7 +31,7 @@ def create_grid_to_mesh_graph(
     Returns
     -------
     np.array
-        Returns a numpy array of shape [num_edges, 2] which defines the edges between the grid nodes and the mesh nodes.
+        Returns a numpy array of shape [2, num_edges] which defines the edges between the grid nodes and the mesh nodes.
     """
     if graph_building_config.grid2mesh_edge_creation == Grid2MeshEdgeCreation.RADIUS:
         radius = (
@@ -43,34 +46,25 @@ def create_grid_to_mesh_graph(
             radius=radius,
         )
 
-        return np.stack([grid_indices, mesh_indices], axis=-1)
+        return torch.tensor(
+            np.stack([grid_indices, mesh_indices], axis=0), dtype=torch.int64
+        )
     else:
         raise NotImplementedError(
             f"There is no support for {graph_building_config.grid2mesh_edge_creation} to create Grid2Mesh edges."
         )
 
 
-def create_mesh_graph_edges(mesh: TriangularMesh, graph_building_config: GraphBuildingConfig):
-    """ ...
+def create_processing_graph(meshes: List[TriangularMesh], mesh_levels: List[int]):
 
-    Parameters
-    ----------
-    mesh : TriangularMesh
-        The mesh created over the grid nodes.
-    graph_building_config : GraphBuildingConfig
-        The graph building configuration for the experiment
-
-    Returns
-    -------
-    np.array
-        Returns a numpy array of shape [num_edges, 2] which defines the edges between the mesh nodes.
-    """
-    pass
-
-    
+    # This will have to be updated on taking multiple levels of edges
+    meshes_we_want = filter_mesh(meshes=meshes, mesh_levels=mesh_levels)
+    return torch.tensor(
+        get_edges_from_faces(meshes_we_want.faces), dtype=torch.int64
+    )
 
 
-def create_mesh_to_grid_graph(
+def create_decoding_graph(
     cordinates: Tuple[np.array, np.array],
     mesh: TriangularMesh,
     graph_building_config: GraphBuildingConfig,
@@ -89,7 +83,7 @@ def create_mesh_to_grid_graph(
     Returns
     -------
     np.array
-        Returns a numpy array of shape [num_edges, 2] which defines the edges between the mesh nodes and the grid nodes.
+        Returns a numpy array of shape [2, num_edges] which defines the edges between the mesh nodes and the grid nodes.
     """
 
     if graph_building_config.mesh2grid_edge_creation == Mesh2GridEdgeCreation.CONTAINED:
@@ -97,7 +91,9 @@ def create_mesh_to_grid_graph(
             grid_latitude=cordinates[0], grid_longitude=cordinates[1], mesh=mesh
         )
 
-        return np.stack([mesh_indices, grid_indices], axis=-1)
+        return torch.tensor(
+            np.stack([mesh_indices, grid_indices], axis=0), dtype=torch.int64
+        )
 
     else:
         raise NotImplementedError(

@@ -3,9 +3,8 @@ import os
 from src.constants import FileNames, FolderNames
 from src.config import ExperimentConfig, DataConfig
 from src.utils import load_from_json_file
-import torch
 from torch.utils.data import DataLoader
-from src.model.main import WeatherPrediction
+from src.models import WeatherPrediction
 import numpy as np
 from torch.optim import Adam
 from src.train import train
@@ -31,7 +30,8 @@ def load_model_from_experiment_config(
     model = WeatherPrediction(
         cordinates=(lats, longs),
         graph_config=experiment_config.graph,
-        model_config=experiment_config.model,
+        pipeline_config=experiment_config.pipeline,
+        data_config=experiment_config.data,
     )
 
     return model
@@ -39,10 +39,8 @@ def load_model_from_experiment_config(
 
 def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
-    data_config: DataConfig = experiment_config.data
-
     train_dataset, test_dataset = load_train_and_test_datasets(
-        data_path=data_config.data_directory
+        data_path=experiment_config.data.data_directory
     )
 
     train_dataloader = DataLoader(

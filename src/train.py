@@ -1,4 +1,4 @@
-from src.model.main import WeatherPrediction
+from src.models import WeatherPrediction
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
