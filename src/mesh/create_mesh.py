@@ -207,13 +207,16 @@ def _two_split_unit_sphere_triangle_faces(
     )
 
 
-def filter_mesh(meshes, level_desired=-1):
+def filter_mesh(meshes, mesh_levels: int):
     """ Remove the faces of lower level meshes from the mesh that we want.
         Needed as graphcast creates a hierarchy of meshes and we only want the specific level.
         
         Lower levels have less faces.
     """
 
+    #TODO: This now has to handle lists of mesh levels
+    level_desired = mesh_levels[0]
+    
     mesh_we_want = meshes[level_desired]
     face_set = set()
     for face in mesh_we_want.faces:

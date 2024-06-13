@@ -13,3 +13,6 @@ A scalable and end-to-end approach to tropical cyclone tracking using Graph Atte
 - Equiangular conservative with(out) poles at subsampled lon/lat resolutions
 - Reduced Gaussian grid (ignored by us)
 - Icosahedric mesh made us and GraphCast
+
+To run an experiment, run 
+```python -m src.main "<path-to-repository>/experiments/baseline"```
