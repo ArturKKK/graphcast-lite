@@ -1,7 +1,7 @@
 import sys
 import os
 from src.constants import FileNames, FolderNames
-from src.config import ExperimentConfig, DataConfig
+from src.config import ExperimentConfig
 from src.utils import load_from_json_file
 from torch.utils.data import DataLoader
 from src.models import WeatherPrediction
@@ -40,7 +40,7 @@ def load_model_from_experiment_config(
 def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
     train_dataset, test_dataset = load_train_and_test_datasets(
-        data_path=experiment_config.data.data_directory
+        data_path=experiment_config.data.data_directory, data_config=experiment_config.data
     )
 
     train_dataloader = DataLoader(
@@ -63,6 +63,13 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
         optimiser=optimizer,
         num_epochs=experiment_config.num_epochs,
     )
+
+    results = {
+        "train_losses": train_losses,
+        "test_losses": test_losses,
+    }
+
+    return results
 
 
 if __name__ == "__main__":

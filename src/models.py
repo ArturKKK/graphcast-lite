@@ -36,7 +36,7 @@ class MLP(nn.Module):
     def __init__(self, mlp_config: MLPBlock, input_dim):
         super().__init__()
         hidden_dims = mlp_config.mlp_hidden_dims
-        output_dim = mlp_config.output_dim
+        output_dim = mlp_config.output_dim  # TODO, this should not be hardcoded but come from "data.num_features"
 
         self.MLP = nn.ModuleList(
             [
