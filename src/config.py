@@ -62,6 +62,7 @@ class GraphBuildingConfig(BaseModel):
 class MLPBlock(BaseModel):
     mlp_hidden_dims: List[int]
     output_dim: int
+    use_layer_norm: bool = True
 
 
 class GraphBlock(BaseModel):

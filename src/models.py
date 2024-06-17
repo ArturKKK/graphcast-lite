@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 
 import torch.nn as nn
 import torch
@@ -33,10 +33,14 @@ from src.utils import (
 
 
 class MLP(nn.Module):
-    def __init__(self, mlp_config: MLPBlock, input_dim):
+    def __init__(
+        self, mlp_config: MLPBlock, input_dim, num_nodes: Optional[int] = None
+    ):
         super().__init__()
         hidden_dims = mlp_config.mlp_hidden_dims
-        output_dim = mlp_config.output_dim  # TODO, this should not be hardcoded but come from "data.num_features"
+        output_dim = (
+            mlp_config.output_dim
+        )  # TODO, this should not be hardcoded but come from "data.num_features"
 
         self.MLP = nn.ModuleList(
             [
@@ -60,6 +64,9 @@ class MLP(nn.Module):
             )
 
         self.MLP.append(nn.Linear(in_features=hidden_dims[-1], out_features=output_dim))
+
+        if mlp_config.use_layer_norm:
+            self.MLP.append(nn.LayerNorm(normalized_shape=(num_nodes, output_dim)))
 
     def forward(self, X: torch.Tensor):
         for layer in self.MLP:
@@ -110,13 +117,17 @@ class GraphLayer(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, model_config: ModelConfig, input_dim: int):
+    def __init__(
+        self, model_config: ModelConfig, input_dim: int, num_nodes: Optional[int] = None
+    ):
         super().__init__()
         self.mlp = None
         self.output_dim = None
         graph_input_dim = input_dim
         if model_config.mlp:
-            self.mlp = MLP(mlp_config=model_config.mlp, input_dim=input_dim)
+            self.mlp = MLP(
+                mlp_config=model_config.mlp, input_dim=input_dim, num_nodes=num_nodes
+            )
             graph_input_dim = model_config.mlp.output_dim
 
         self.graph_layer = GraphLayer(
@@ -169,6 +180,8 @@ class WeatherPrediction(nn.Module):
         self._init_grid_properties(grid_lat=cordinates[0], grid_lon=cordinates[1])
         self._init_mesh_properties(graph_config)
 
+        self._total_nodes = self._num_grid_nodes + self._num_mesh_nodes
+
         self.encoding_graph, self.init_grid_features, self.init_mesh_features = (
             create_encoding_graph(
                 grid_node_lats=self._grid_lat,
@@ -198,6 +211,7 @@ class WeatherPrediction(nn.Module):
         self.encoder = Model(
             model_config=pipeline_config.encoder,
             input_dim=self.total_feature_size + self._init_feature_size,
+            num_nodes=self._total_nodes,
         )
 
         self.processor = Model(
@@ -205,7 +219,9 @@ class WeatherPrediction(nn.Module):
         )
 
         self.decoder = Model(
-            model_config=pipeline_config.decoder, input_dim=self.processor.output_dim
+            model_config=pipeline_config.decoder,
+            input_dim=self.processor.output_dim,
+            num_nodes=self._total_nodes,
         )
 
     def _init_grid_properties(self, grid_lat: np.ndarray, grid_lon: np.ndarray):
