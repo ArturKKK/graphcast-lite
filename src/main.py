@@ -13,7 +13,7 @@ from src.data.dataloader import load_train_and_test_datasets
 
 
 def load_model_from_experiment_config(
-    experiment_config: ExperimentConfig,
+    experiment_config: ExperimentConfig, device
 ) -> WeatherPrediction:
     lats = np.linspace(
         start=-90,
@@ -33,6 +33,7 @@ def load_model_from_experiment_config(
         graph_config=experiment_config.graph,
         pipeline_config=experiment_config.pipeline,
         data_config=experiment_config.data,
+        device=device,
     )
 
     return model
@@ -55,7 +56,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
     )
 
     model: WeatherPrediction = load_model_from_experiment_config(
-        experiment_config=experiment_config
+        experiment_config=experiment_config, device=device
     )
 
     model = model.to(device)
