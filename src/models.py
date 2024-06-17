@@ -44,7 +44,7 @@ class MLP(nn.Module):
                     in_features=input_dim,
                     out_features=hidden_dims[0],
                 ),
-                nn.ReLU(),
+                nn.PReLU(),
             ]
         )
 
@@ -55,7 +55,7 @@ class MLP(nn.Module):
                         in_features=hidden_dims[h_index - 1],
                         out_features=hidden_dims[h_index],
                     ),
-                    nn.ReLU(),
+                    nn.PReLU(),
                 ]
             )
 
@@ -77,7 +77,7 @@ class GraphLayer(nn.Module):
 
         if graph_config.layer_type == GraphLayerType.SimpleConv:
             self.output_dim = input_dim
-            self.layers = SimpleConv()
+            self.layers = SimpleConv(aggr="mean")
 
         elif graph_config.layer_type == GraphLayerType.ConvGCN:
             self.output_dim = graph_config.output_dim
@@ -89,7 +89,7 @@ class GraphLayer(nn.Module):
                 self.layers.append(GCNConv(hidden_dims[i - 1], hidden_dims[i]))
 
             self.layers.append(GCNConv(hidden_dims[-1], graph_config.output_dim))
-            self.activation = torch.nn.ReLU()
+            self.activation = torch.nn.PReLU()
 
         else:
             raise NotImplementedError(

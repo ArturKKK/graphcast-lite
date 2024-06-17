@@ -1,9 +1,9 @@
 {
     "batch_size": 2,
-    "learning_rate": 1e-3,
+    "learning_rate": 1e-5,
     "num_epochs": 30,
     "graph": {
-        "mesh_size": 1,
+        "mesh_size": 3,
         "grid2mesh_edge_creation": "radius",
         "mesh2grid_edge_creation": "contained",
         "grid2mesh_radius_query": 0.5,
