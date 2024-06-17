@@ -66,7 +66,10 @@ class MLP(nn.Module):
         self.MLP.append(nn.Linear(in_features=hidden_dims[-1], out_features=output_dim))
 
         if mlp_config.use_layer_norm:
-            self.MLP.append(nn.LayerNorm(normalized_shape=(num_nodes, output_dim)))
+            normalised_shape = (num_nodes, output_dim)
+            if mlp_config.use_only_last_dim_for_normalisation:
+                normalised_shape = output_dim
+            self.MLP.append(nn.LayerNorm(normalized_shape=normalised_shape))
 
     def forward(self, X: torch.Tensor):
         for layer in self.MLP:

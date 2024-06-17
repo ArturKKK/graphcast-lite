@@ -63,6 +63,7 @@ class MLPBlock(BaseModel):
     mlp_hidden_dims: List[int]
     output_dim: int
     use_layer_norm: bool = True
+    use_only_last_dim_for_normalisation: bool = False
 
 
 class GraphBlock(BaseModel):
