@@ -25,11 +25,7 @@ from src.mesh.create_mesh import (
     get_hierarchy_of_triangular_meshes_for_sphere,
 )
 
-from src.utils import (
-    get_bipartite_graph_spatial_features,
-    get_mesh_lat_long,
-    GraphStructure,
-)
+from src.utils import get_mesh_lat_long
 
 
 class MLP(nn.Module):
@@ -231,6 +227,12 @@ class WeatherPrediction(nn.Module):
             model_config=pipeline_config.decoder,
             input_dim=self.processor.output_dim,
             num_nodes=self._total_nodes,
+        )
+
+        self.encoding_graph, self.decoding_graph, self.processing_graph = (
+            self.encoding_graph.to(self.device),
+            self.decoding_graph.to(device),
+            self.processing_graph.to(device),
         )
 
     def _init_grid_properties(self, grid_lat: np.ndarray, grid_lon: np.ndarray):
