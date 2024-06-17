@@ -177,6 +177,7 @@ class WeatherPrediction(nn.Module):
     ):
         super().__init__()
 
+        self.device = device
         self.timesteps = data_config.num_timesteps
         self.num_features = data_config.num_features
         self.total_feature_size = self.timesteps * self.num_features
@@ -271,7 +272,7 @@ class WeatherPrediction(nn.Module):
         # Initialise the mesh node features to 0s and append the initial mesh features
         mesh_node_features = torch.zeros(
             (batch_size, self._num_mesh_nodes, self.total_feature_size)
-        )
+        ).to(self.device)
 
         updated_mesh_node_features = torch.cat(
             (mesh_node_features, broadcasted_mesh_grid_features), dim=-1
