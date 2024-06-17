@@ -1,15 +1,14 @@
 import sys
 import os
 from src.constants import FileNames, FolderNames
-from src.config import ExperimentConfig, DataConfig
+from src.config import ExperimentConfig
 from src.utils import load_from_json_file
-import torch
 from torch.utils.data import DataLoader
-from src.model.main import WeatherPrediction
+from src.models import WeatherPrediction
 import numpy as np
 from torch.optim import Adam
 from src.train import train
-from data.data_loading import *
+from src.data.dataloader import load_train_and_test_datasets
 
 
 def load_model_from_experiment_config(
@@ -18,20 +17,21 @@ def load_model_from_experiment_config(
     lats = np.linspace(
         start=-90,
         stop=90,
-        num=experiment_config.data_config.num_latitudes,
+        num=experiment_config.data.num_latitudes,
         endpoint=True,
     )
     longs = np.linspace(
         start=0,
         stop=360,
-        num=experiment_config.data_config.num_longitudes,
+        num=experiment_config.data.num_longitudes,
         endpoint=False,
     )
 
     model = WeatherPrediction(
         cordinates=(lats, longs),
         graph_config=experiment_config.graph,
-        model_config=experiment_config.model,
+        pipeline_config=experiment_config.pipeline,
+        data_config=experiment_config.data,
     )
 
     return model
@@ -39,13 +39,8 @@ def load_model_from_experiment_config(
 
 def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
-    data_config: DataConfig = experiment_config.data
-
-    train_dataset = torch.load(
-        os.path.join(data_config.data_directory, FileNames.TRAIN_DATA)
-    )
-    test_dataset = torch.load(
-        os.path.join(data_config.data_directory, FileNames.TEST_DATA)
+    train_dataset, test_dataset = load_train_and_test_datasets(
+        data_path=experiment_config.data.data_directory, data_config=experiment_config.data
     )
 
     train_dataloader = DataLoader(
@@ -68,6 +63,13 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
         optimiser=optimizer,
         num_epochs=experiment_config.num_epochs,
     )
+
+    results = {
+        "train_losses": train_losses,
+        "test_losses": test_losses,
+    }
+
+    return results
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-from src.model.main import WeatherPrediction
+from src.models import WeatherPrediction
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -22,7 +22,7 @@ def train_epoch(
         batch_loss.backward()
         optimiser.step()
         total_loss += batch_loss.detach().item()
-        total += X.shape[0]
+        total_samples += X.shape[0]
 
     avg_loss = total_loss / total_samples
 
@@ -41,7 +41,7 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn):
             outs = model(X=X)
             batch_loss = loss_fn(outs, y)
             total_loss += batch_loss.detach().item()
-            total += X.shape[0]
+            total_samples += X.shape[0]
 
     avg_loss = total_loss / total_samples
 
