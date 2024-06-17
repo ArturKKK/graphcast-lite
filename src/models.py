@@ -173,6 +173,7 @@ class WeatherPrediction(nn.Module):
         graph_config: GraphBuildingConfig,
         pipeline_config: PipelineConfig,
         data_config: DataConfig,
+        device,
     ):
         super().__init__()
 
@@ -196,6 +197,10 @@ class WeatherPrediction(nn.Module):
                 num_grid_nodes=self._num_grid_nodes,
             )
         )
+
+        self.init_grid_features, self.init_mesh_features = self.init_grid_features.to(
+            device
+        ), self.init_mesh_features.to(device)
 
         # The shape of the initial static features that are added to each node
         self._init_feature_size = self.init_grid_features.shape[1]
