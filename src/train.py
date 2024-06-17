@@ -11,12 +11,15 @@ def train_epoch(
     train_dataloader: DataLoader,
     optimiser: Optimizer,
     loss_fn,
-):
+    device,
+): 
+    model.train()
     total_loss = 0
     total_samples = 0
     optimiser.zero_grad()
     for batch in train_dataloader:
         X, y = batch
+        X, y = X.to(device), y.to(device)
         outs = model(X=X)
         batch_loss = loss_fn(outs, y)
         batch_loss.backward()
@@ -29,7 +32,7 @@ def train_epoch(
     return avg_loss
 
 
-def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn):
+def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device):
     model.eval()
 
     total_loss = 0
@@ -38,6 +41,7 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn):
     with torch.no_grad():
         for batch in test_dataloader:
             X, y = batch
+            X, y = X.to(device), y.to(device)
             outs = model(X=X)
             batch_loss = loss_fn(outs, y)
             total_loss += batch_loss.detach().item()
@@ -54,6 +58,7 @@ def train(
     test_dataloader: DataLoader,
     optimiser: Optimizer,
     num_epochs: int,
+    device,
 ):
     # TODO: Make this configurable if we want to combine two losses later.
     loss_fn = nn.MSELoss()
@@ -66,11 +71,12 @@ def train(
             optimiser=optimiser,
             train_dataloader=train_datalaoder,
             loss_fn=loss_fn,
+            device=device,
         )
         print(f"Train loss after epoch {epoch+1}: {epoch_train_loss}")
 
         epoch_test_loss = test(
-            model=model, test_dataloader=test_dataloader, loss_fn=loss_fn
+            model=model, test_dataloader=test_dataloader, loss_fn=loss_fn, device=device
         )
         print(f"Test loss after epoch {epoch+1}: {epoch_test_loss}")
 
