@@ -19,6 +19,7 @@ class Mesh2GridEdgeCreation(str, Enum):
 class GraphLayerType(str, Enum):
     ConvGCN = "conv_gcn"
     SimpleConv = "simple_conv"
+    GATConv = "conv_gat"
 
 
 class GraphBuildingConfig(BaseModel):
@@ -73,6 +74,7 @@ class GraphBlock(BaseModel):
 class ModelConfig(BaseModel):
     mlp: Optional[MLPBlock] = None
     gcn: GraphBlock
+    gat: Optional[GraphBlock] = None
 
 
 class PipelineConfig(BaseModel):

@@ -2,7 +2,7 @@ from typing import Tuple
 
 import torch.nn as nn
 import torch
-from torch_geometric.nn import GCNConv, SimpleConv
+from torch_geometric.nn import GCNConv, SimpleConv, GATConv
 import numpy as np
 
 from src.config import (
@@ -91,6 +91,19 @@ class GraphLayer(nn.Module):
             self.layers.append(GCNConv(hidden_dims[-1], graph_config.output_dim))
             self.activation = torch.nn.PReLU()
 
+        elif graph_config.layer_type == GraphLayerType.GATConv:
+            print('GAT')
+            self.output_dim = graph_config.output_dim
+            self.layers = torch.nn.ModuleList()
+            hidden_dims = graph_config.hidden_dims
+
+            self.layers.append(GATConv(input_dim, hidden_dims[0]))
+            for i in range(1, len(hidden_dims)):
+                self.layers.append(GATConv(hidden_dims[i - 1], hidden_dims[i]))
+
+            self.layers.append(GATConv(hidden_dims[-1], graph_config.output_dim))
+            self.activation = torch.nn.PReLU()
+
         else:
             raise NotImplementedError(
                 f"Layer type {graph_config.layer_type} not supported."
@@ -110,7 +123,7 @@ class GraphLayer(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, model_config: ModelConfig, input_dim: int):
+    def __init__(self, model_config: ModelConfig, input_dim: int, stage=None):
         super().__init__()
         self.mlp = None
         self.output_dim = None
@@ -119,9 +132,15 @@ class Model(nn.Module):
             self.mlp = MLP(mlp_config=model_config.mlp, input_dim=input_dim)
             graph_input_dim = model_config.mlp.output_dim
 
-        self.graph_layer = GraphLayer(
-            graph_config=model_config.gcn, input_dim=graph_input_dim
-        )
+        if stage == "processor":
+            self.graph_layer = GraphLayer(
+                graph_config=model_config.gat, input_dim=graph_input_dim
+            )
+        else:
+            self.graph_layer = GraphLayer(
+                graph_config=model_config.gcn, input_dim=graph_input_dim
+            )
+
         self.output_dim = self.graph_layer.output_dim
 
     def forward(self, X: torch.Tensor, edge_index: torch.Tensor):
@@ -201,7 +220,9 @@ class WeatherPrediction(nn.Module):
         )
 
         self.processor = Model(
-            model_config=pipeline_config.processor, input_dim=self.encoder.output_dim
+            model_config=pipeline_config.processor, 
+            input_dim=self.encoder.output_dim,
+            stage="processor"
         )
 
         self.decoder = Model(
