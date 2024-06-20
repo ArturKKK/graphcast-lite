@@ -60,16 +60,18 @@ class GraphBuildingConfig(BaseModel):
 
 
 class MLPBlock(BaseModel):
-    mlp_hidden_dims: List[int]
+    mlp_hidden_dims: Optional[List[int]] = None
     output_dim: int
-    use_layer_norm: bool = True
-    use_only_last_dim_for_normalisation: bool = False
+    use_layer_norm: bool
+    layer_norm_mode: Optional[str] = None
 
 
 class GraphBlock(BaseModel):
     layer_type: GraphLayerType
     hidden_dims: Optional[List[int]] = None
     output_dim: Optional[int] = None
+    use_layer_norm: Optional[bool] = None
+    layer_norm_mode: Optional[str] = None
 
 
 class ModelConfig(BaseModel):
@@ -81,6 +83,7 @@ class PipelineConfig(BaseModel):
     encoder: ModelConfig
     processor: ModelConfig
     decoder: ModelConfig
+    residual_output: bool = False
 
 
 class DataConfig(BaseModel):
@@ -95,6 +98,7 @@ class ExperimentConfig(BaseModel):
     batch_size: int
     learning_rate: float
     num_epochs: int
+    random_seed: Optional[int] = None
     graph: GraphBuildingConfig
     pipeline: PipelineConfig
     data: DataConfig
