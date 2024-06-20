@@ -4,15 +4,23 @@ from src.constants import FileNames, FolderNames
 from src.config import ExperimentConfig
 from src.utils import load_from_json_file
 from torch.utils.data import DataLoader
+import torch
 from src.models import WeatherPrediction
 import numpy as np
 from torch.optim import Adam
 from src.train import train
 from src.data.dataloader import load_train_and_test_datasets
+import random
+
+
+def set_random_seeds(seed: int = 42):
+    random.seed(42)
+    np.random.seed(42)
+    torch.manual_seed(42)
 
 
 def load_model_from_experiment_config(
-    experiment_config: ExperimentConfig,
+    experiment_config: ExperimentConfig, device
 ) -> WeatherPrediction:
     lats = np.linspace(
         start=-90,
@@ -32,6 +40,7 @@ def load_model_from_experiment_config(
         graph_config=experiment_config.graph,
         pipeline_config=experiment_config.pipeline,
         data_config=experiment_config.data,
+        device=device,
     )
 
     return model
@@ -39,8 +48,13 @@ def load_model_from_experiment_config(
 
 def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    set_random_seeds(seed=experiment_config.random_seed)
+
     train_dataset, test_dataset = load_train_and_test_datasets(
-        data_path=experiment_config.data.data_directory, data_config=experiment_config.data
+        data_path=experiment_config.data.data_directory,
+        data_config=experiment_config.data,
     )
 
     train_dataloader = DataLoader(
@@ -51,8 +65,10 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
     )
 
     model: WeatherPrediction = load_model_from_experiment_config(
-        experiment_config=experiment_config
+        experiment_config=experiment_config, device=device
     )
+
+    model = model.to(device)
 
     optimizer = Adam(params=model.parameters(), lr=experiment_config.learning_rate)
 
@@ -62,6 +78,10 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
         test_dataloader=test_dataloader,
         optimiser=optimizer,
         num_epochs=experiment_config.num_epochs,
+        device=device,
+        config=experiment_config,
+        print_losses=True,
+        wandb_log=True
     )
 
     results = {

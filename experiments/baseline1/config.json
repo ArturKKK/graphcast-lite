@@ -1,0 +1,55 @@
+{
+    "batch_size": 2,
+    "learning_rate": 1e-5,
+    "num_epochs": 30,
+    "graph": {
+        "mesh_size": 3,
+        "grid2mesh_edge_creation": "radius",
+        "mesh2grid_edge_creation": "contained",
+        "grid2mesh_radius_query": 0.5,
+        "mesh_levels": [
+            -1
+        ]
+    },
+    "pipeline": {
+        "encoder": {
+            "mlp": {
+                "output_dim": 32,
+                "use_layer_norm": "true",
+                "layer_norm_mode": "node"
+            },
+            "gcn": {
+                "layer_type": "simple_conv"
+            }
+        },
+        "processor": {
+            "gcn": {
+                "layer_type": "conv_gcn",
+                "hidden_dims": [
+                    32,
+                    32
+                ],
+                "output_dim": 32,
+                "use_layer_norm": "true",
+                "layer_norm_mode": "node"
+            }
+        },
+        "decoder": {
+            "mlp": {
+                "output_dim": 3,
+                "use_layer_norm": "true",
+                "layer_norm_mode": "node"
+            },
+            "gcn": {
+                "layer_type": "simple_conv"
+            }
+        }
+    },
+    "data": {
+        "data_directory": "/Users/aditwhorra/Desktop/Delft/Q4/MLGraphData/cyclone-tracking/data/datasets",
+        "num_latitudes": 32,
+        "num_longitudes": 64,
+        "num_features": 3,
+        "num_timesteps": 4
+    }
+}
