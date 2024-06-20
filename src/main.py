@@ -70,6 +70,9 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
         optimiser=optimizer,
         num_epochs=experiment_config.num_epochs,
         device=device,
+        config=experiment_config,
+        print_losses=True,
+        wandb_log=True
     )
 
     results = {

@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
 from tqdm import tqdm
-
+import wandb
 
 def train_epoch(
     model: WeatherPrediction,
@@ -58,13 +58,23 @@ def train(
     test_dataloader: DataLoader,
     optimiser: Optimizer,
     num_epochs: int,
-    device,
+    device: str,
+    config: dict,
+    print_losses: bool = True,
+    wandb_log: bool = True,
 ):
     # TODO: Make this configurable if we want to combine two losses later.
     loss_fn = nn.MSELoss()
 
     train_losses = []
     test_losses = []
+    
+    if wandb_log:
+        wandb.init(
+            entity="graphml-group4",
+            project="weather-prediction",
+            config=dict(config))
+
     for epoch in range(num_epochs):
         epoch_train_loss = train_epoch(
             model=model,
@@ -73,14 +83,18 @@ def train(
             loss_fn=loss_fn,
             device=device,
         )
-        print(f"Train loss after epoch {epoch+1}: {epoch_train_loss}")
+        if print_losses:
+            print(f"Train loss after epoch {epoch+1}: {epoch_train_loss}")
 
         epoch_test_loss = test(
             model=model, test_dataloader=test_dataloader, loss_fn=loss_fn, device=device
         )
-        print(f"Test loss after epoch {epoch+1}: {epoch_test_loss}")
+        if print_losses:
+            print(f"Test loss after epoch {epoch+1}: {epoch_test_loss}")
 
-        train_losses.append(train_losses)
-        test_losses.append(test_losses)
+        train_losses.append(epoch_train_loss)
+        test_losses.append(epoch_test_loss)
+        wandb.log({"train_loss": epoch_train_loss, "test_loss": epoch_test_loss})
 
+    wandb.finish()
     return train_losses, test_losses
