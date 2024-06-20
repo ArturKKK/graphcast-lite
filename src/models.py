@@ -162,9 +162,9 @@ class WeatherPrediction(nn.Module):
     ):
         super().__init__()
 
-        self.timesteps = data_config.num_timesteps
-        self.num_features = data_config.num_features
-        self.total_feature_size = self.timesteps * self.num_features
+        self.obs_window = data_config.obs_window_used
+        self.num_features = data_config.num_features_used
+        self.total_feature_size = self.obs_window * self.num_features
 
         self._init_grid_properties(grid_lat=cordinates[0], grid_lon=cordinates[1])
         self._init_mesh_properties(graph_config)

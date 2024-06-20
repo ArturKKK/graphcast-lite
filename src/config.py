@@ -83,10 +83,23 @@ class PipelineConfig(BaseModel):
 
 class DataConfig(BaseModel):
     data_directory: str
+        
+    # metadata about the dataset
+    # because the dataset can take many forms
+    # stacked means the features and observation windows are stacked together in one dim
+    stacked: bool
     num_latitudes: int
     num_longitudes: int
     num_features: int
-    num_timesteps: int
+    obs_window: int
+    pred_window: int
+
+    # these are data for you to change in the config regardless of the dataset
+    num_features_used: int
+    obs_window_used: int
+    pred_window_used: int
+    
+    want_as_stacked: bool
 
 
 class ExperimentConfig(BaseModel):
