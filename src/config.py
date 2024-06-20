@@ -74,7 +74,6 @@ class GraphBlock(BaseModel):
 class ModelConfig(BaseModel):
     mlp: Optional[MLPBlock] = None
     gcn: GraphBlock
-    gat: Optional[GraphBlock] = None
 
 
 class PipelineConfig(BaseModel):

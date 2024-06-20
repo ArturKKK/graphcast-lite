@@ -21,7 +21,7 @@
     },
     "processor": {
       "gcn": {
-        "layer_type": "conv_gcn",
+        "layer_type": "conv_gat",
         "hidden_dims": [128, 128],
         "output_dim": 128
       }

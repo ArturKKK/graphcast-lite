@@ -123,7 +123,7 @@ class GraphLayer(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, model_config: ModelConfig, input_dim: int, stage=None):
+    def __init__(self, model_config: ModelConfig, input_dim: int):
         super().__init__()
         self.mlp = None
         self.output_dim = None
@@ -132,15 +132,9 @@ class Model(nn.Module):
             self.mlp = MLP(mlp_config=model_config.mlp, input_dim=input_dim)
             graph_input_dim = model_config.mlp.output_dim
 
-        if stage == "processor":
-            self.graph_layer = GraphLayer(
-                graph_config=model_config.gat, input_dim=graph_input_dim
-            )
-        else:
-            self.graph_layer = GraphLayer(
-                graph_config=model_config.gcn, input_dim=graph_input_dim
-            )
-
+        self.graph_layer = GraphLayer(
+            graph_config=model_config.gcn, input_dim=graph_input_dim
+        )
         self.output_dim = self.graph_layer.output_dim
 
     def forward(self, X: torch.Tensor, edge_index: torch.Tensor):
@@ -222,7 +216,6 @@ class WeatherPrediction(nn.Module):
         self.processor = Model(
             model_config=pipeline_config.processor, 
             input_dim=self.encoder.output_dim,
-            stage="processor"
         )
 
         self.decoder = Model(
