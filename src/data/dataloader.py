@@ -41,6 +41,7 @@ def load_train_and_test_datasets(data_path: str, data_config: DataConfig):
 
     grid_dimension_size = num_longitudes * num_latitudes
 
+    # handle the dataset differently if it is already stacked
     if stacked:
         _, LONG, LAT, X_F = X_train.shape
         _, _, _, Y_F = y_train.shape
@@ -52,24 +53,26 @@ def load_train_and_test_datasets(data_path: str, data_config: DataConfig):
         assert Y_F == num_features * pred_window
 
 
-        #filter out the features we want to use
-        X_train = X_train.view(-1, LONG, LAT, obs_window, num_features)
-        y_train = y_train.view(-1, LONG, LAT, pred_window, num_features)
-        X_test = X_test.view(-1, LONG, LAT, obs_window, num_features)
-        y_test = y_test.view(-1, LONG, LAT, pred_window, num_features)
+        # reshape the data so we can filter out the features we want to use
+        X_train = X_train.reshape(-1, LONG, LAT, obs_window, num_features)
+        y_train = y_train.reshape(-1, LONG, LAT, pred_window, num_features)
+        X_test = X_test.reshape(-1, LONG, LAT, obs_window, num_features)
+        y_test = y_test.reshape(-1, LONG, LAT, pred_window, num_features)
 
+        # filter out the features we want to use
         X_train = X_train[:, :, :, :obs_window_used, :num_features_used]
         y_train = y_train[:, :, :, :pred_window_used, :num_features_used]
         X_test = X_test[:, :, :, :obs_window_used, :num_features_used]
         y_test = y_test[:, :, :, :pred_window_used, :num_features_used]
 
+        # reshape the data back to the original shape if we want it that way
         if want_as_stacked:
-            X_train = X_train.view(-1, grid_dimension_size, obs_window_used * num_features_used)
-            y_train = y_train.view(-1, grid_dimension_size, pred_window_used * num_features_used)
-            X_test = X_test.view(-1, grid_dimension_size, obs_window_used * num_features_used)
-            y_test = y_test.view(-1, grid_dimension_size, pred_window_used * num_features_used)
+            X_train = X_train.reshape(-1, grid_dimension_size, obs_window_used * num_features_used)
+            y_train = y_train.reshape(-1, grid_dimension_size, pred_window_used * num_features_used)
+            X_test = X_test.reshape(-1, grid_dimension_size, obs_window_used * num_features_used)
+            y_test = y_test.reshape(-1, grid_dimension_size, pred_window_used * num_features_used)
 
-
+    # if the dataset is not stacked - the features and windows are in separate dimensions
     else:
         _, LONG, LAT, X_F, OBS = X_train.shape
         _, _, _, Y_F, PRED = y_train.shape

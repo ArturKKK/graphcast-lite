@@ -46,10 +46,17 @@
         }
     },
     "data": {
-        "data_directory": "/Users/aditwhorra/Desktop/Delft/Q4/MLGraphData/cyclone-tracking/data/datasets",
+        "data_directory": "data/datasets",
+        "stacked": true,
         "num_latitudes": 32,
         "num_longitudes": 64,
         "num_features": 3,
-        "num_timesteps": 4
+        "obs_window": 4,
+        "pred_window": 1,
+
+        "num_features_used": 3,
+        "obs_window_used": 4,
+        "pred_window_used": 1,
+        "want_as_stacked": true
     }
 }

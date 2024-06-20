@@ -62,7 +62,7 @@
         "pred_window": 1,
 
         "num_features_used": 3,
-        "obs_window_used": 2,
+        "obs_window_used": 4,
         "pred_window_used": 1,
         "want_as_stacked": true
     }
