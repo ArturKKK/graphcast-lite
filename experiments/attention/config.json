@@ -1,0 +1,57 @@
+{
+  "batch_size": 2,
+  "learning_rate": 1e-5,
+  "num_epochs": 30,
+  "graph": {
+    "mesh_size": 3,
+    "grid2mesh_edge_creation": "radius",
+    "mesh2grid_edge_creation": "contained",
+    "grid2mesh_radius_query": 0.5,
+    "mesh_levels": [-1]
+  },
+  "pipeline": {
+    "encoder": {
+      "mlp": {
+        "mlp_hidden_dims": [36, 72],
+        "output_dim": 128,
+        "use_layer_norm": "true",
+        "layer_norm_mode": "node"
+      },
+      "gcn": {
+        "layer_type": "simple_conv"
+      }
+    },
+    "processor": {
+      "gcn": {
+        "layer_type": "conv_gat",
+        "hidden_dims": [128, 128],
+        "output_dim": 128
+      }
+    },
+    "decoder": {
+      "mlp": {
+        "mlp_hidden_dims": [72, 36],
+        "output_dim": 2,
+        "use_layer_norm": "true",
+        "layer_norm_mode": "node"
+      },
+      "gcn": {
+        "layer_type": "simple_conv"
+      }
+    }
+  },
+  "data": {
+    "data_directory": "data/datasets",
+    "feats_flattened": true,
+    "num_latitudes": 32,
+    "num_longitudes": 64,
+    "num_features": 3,
+    "obs_window": 4,
+    "pred_window": 1,
+
+    "num_features_used": 2,
+    "obs_window_used": 2,
+    "pred_window_used": 1,
+    "want_feats_flattened": true
+}
+}
