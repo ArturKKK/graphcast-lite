@@ -91,8 +91,8 @@ class DataConfig(BaseModel):
         
     # metadata about the dataset
     # because the dataset can take many forms
-    # stacked means the features and observation windows are stacked together in one dim
-    stacked: bool
+    # feats_flattened means the features and observation windows are flattened together in one dim
+    feats_flattened: bool
     num_latitudes: int
     num_longitudes: int
     num_features: int
@@ -104,7 +104,7 @@ class DataConfig(BaseModel):
     obs_window_used: int
     pred_window_used: int
     
-    want_as_stacked: bool
+    want_feats_flattened: bool
 
 
 class ExperimentConfig(BaseModel):

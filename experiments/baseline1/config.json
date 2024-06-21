@@ -36,7 +36,7 @@
         },
         "decoder": {
             "mlp": {
-                "output_dim": 3,
+                "output_dim": 2,
                 "use_layer_norm": "true",
                 "layer_norm_mode": "node"
             },
@@ -47,16 +47,16 @@
     },
     "data": {
         "data_directory": "data/datasets",
-        "stacked": true,
+        "feats_flattened": true,
         "num_latitudes": 32,
         "num_longitudes": 64,
         "num_features": 3,
         "obs_window": 4,
         "pred_window": 1,
 
-        "num_features_used": 3,
-        "obs_window_used": 4,
+        "num_features_used": 2,
+        "obs_window_used": 2,
         "pred_window_used": 1,
-        "want_as_stacked": true
+        "want_feats_flattened": true
     }
 }
