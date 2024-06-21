@@ -88,20 +88,33 @@ class GraphLayer(nn.Module):
             self.output_dim = input_dim
             self.layers = SimpleConv(aggr="mean")
 
-        elif graph_config.layer_type == GraphLayerType.ConvGCN:
+        elif graph_config.layer_type in [GraphLayerType.ConvGCN, GraphLayerType.GATConv]:
             self.activation = torch.nn.PReLU()
             self.output_dim = graph_config.output_dim
             self.layers = torch.nn.ModuleList()
             hidden_dims = graph_config.hidden_dims
-
-            self.layers.append(GCNConv(input_dim, hidden_dims[0]))
-            self.layers.append(self.activation)
-
-            for i in range(1, len(hidden_dims)):
-                self.layers.append(GCNConv(hidden_dims[i - 1], hidden_dims[i]))
+            
+            if graph_config.layer_type == GraphLayerType.ConvGCN:
+                self.layers.append(GCNConv(input_dim, hidden_dims[0]))
                 self.layers.append(self.activation)
 
-            self.layers.append(GCNConv(hidden_dims[-1], graph_config.output_dim))
+                for i in range(1, len(hidden_dims)):
+                    self.layers.append(GCNConv(hidden_dims[i - 1], hidden_dims[i]))
+                    self.layers.append(self.activation)
+
+                self.layers.append(GCNConv(hidden_dims[-1], graph_config.output_dim))
+
+            elif graph_config.layer_type == GraphLayerType.GATConv:
+                print('GAT')
+                self.layers.append(GATConv(input_dim, hidden_dims[0]))
+                self.layers.append(self.activation)
+
+                for i in range(1, len(hidden_dims)):
+                    self.layers.append(GATConv(hidden_dims[i - 1], hidden_dims[i]))
+                    self.layers.append(self.activation)
+
+                self.layers.append(GATConv(hidden_dims[-1], graph_config.output_dim))
+
             if graph_config.use_layer_norm:
                 self.layers.append(
                     LayerNorm(
@@ -109,6 +122,7 @@ class GraphLayer(nn.Module):
                         mode=graph_config.layer_norm_mode,
                     )
                 )
+
 
         else:
             raise NotImplementedError(

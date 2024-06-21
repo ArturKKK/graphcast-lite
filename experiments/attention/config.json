@@ -13,7 +13,9 @@
     "encoder": {
       "mlp": {
         "mlp_hidden_dims": [36, 72],
-        "output_dim": 128
+        "output_dim": 128,
+        "use_layer_norm": "true",
+        "layer_norm_mode": "node"
       },
       "gcn": {
         "layer_type": "simple_conv"
@@ -29,7 +31,9 @@
     "decoder": {
       "mlp": {
         "mlp_hidden_dims": [72, 36],
-        "output_dim": 3
+        "output_dim": 2,
+        "use_layer_norm": "true",
+        "layer_norm_mode": "node"
       },
       "gcn": {
         "layer_type": "simple_conv"
@@ -38,9 +42,16 @@
   },
   "data": {
     "data_directory": "data/datasets",
+    "feats_flattened": true,
     "num_latitudes": 32,
     "num_longitudes": 64,
     "num_features": 3,
-    "num_timesteps": 4
-  }
+    "obs_window": 4,
+    "pred_window": 1,
+
+    "num_features_used": 2,
+    "obs_window_used": 2,
+    "pred_window_used": 1,
+    "want_feats_flattened": true
+}
 }
