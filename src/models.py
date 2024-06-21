@@ -1,8 +1,8 @@
-from typing import Tuple
+from typing import Tuple, Optional
 
 import torch.nn as nn
 import torch
-from torch_geometric.nn import GCNConv, SimpleConv
+from torch_geometric.nn import GCNConv, SimpleConv, LayerNorm
 import numpy as np
 
 from src.config import (
@@ -25,41 +25,50 @@ from src.mesh.create_mesh import (
     get_hierarchy_of_triangular_meshes_for_sphere,
 )
 
-from src.utils import (
-    get_bipartite_graph_spatial_features,
-    get_mesh_lat_long,
-    GraphStructure,
-)
+from src.utils import get_mesh_lat_long
 
 
 class MLP(nn.Module):
     def __init__(self, mlp_config: MLPBlock, input_dim):
         super().__init__()
         hidden_dims = mlp_config.mlp_hidden_dims
-        output_dim = mlp_config.output_dim  # TODO, this should not be hardcoded but come from "data.num_features"
+        output_dim = (
+            mlp_config.output_dim
+        )  # TODO, this should not be hardcoded but come from "data.num_features"
 
-        self.MLP = nn.ModuleList(
-            [
-                nn.Linear(
-                    in_features=input_dim,
-                    out_features=hidden_dims[0],
-                ),
-                nn.PReLU(),
-            ]
-        )
-
-        for h_index in range(1, len(hidden_dims)):
+        self.MLP = nn.ModuleList()
+        in_features_for_last_layer = input_dim
+        if hidden_dims:
             self.MLP.extend(
                 [
                     nn.Linear(
-                        in_features=hidden_dims[h_index - 1],
-                        out_features=hidden_dims[h_index],
+                        in_features=input_dim,
+                        out_features=hidden_dims[0],
                     ),
                     nn.PReLU(),
                 ]
             )
 
-        self.MLP.append(nn.Linear(in_features=hidden_dims[-1], out_features=output_dim))
+            for h_index in range(1, len(hidden_dims)):
+                self.MLP.extend(
+                    [
+                        nn.Linear(
+                            in_features=hidden_dims[h_index - 1],
+                            out_features=hidden_dims[h_index],
+                        ),
+                        nn.PReLU(),
+                    ]
+                )
+            in_features_for_last_layer = hidden_dims[-1]
+
+        self.MLP.append(
+            nn.Linear(in_features=in_features_for_last_layer, out_features=output_dim)
+        )
+
+        if mlp_config.use_layer_norm:
+            self.MLP.append(
+                LayerNorm(in_channels=output_dim, mode=mlp_config.layer_norm_mode)
+            )
 
     def forward(self, X: torch.Tensor):
         for layer in self.MLP:
@@ -80,16 +89,26 @@ class GraphLayer(nn.Module):
             self.layers = SimpleConv(aggr="mean")
 
         elif graph_config.layer_type == GraphLayerType.ConvGCN:
+            self.activation = torch.nn.PReLU()
             self.output_dim = graph_config.output_dim
             self.layers = torch.nn.ModuleList()
             hidden_dims = graph_config.hidden_dims
 
             self.layers.append(GCNConv(input_dim, hidden_dims[0]))
+            self.layers.append(self.activation)
+
             for i in range(1, len(hidden_dims)):
                 self.layers.append(GCNConv(hidden_dims[i - 1], hidden_dims[i]))
+                self.layers.append(self.activation)
 
             self.layers.append(GCNConv(hidden_dims[-1], graph_config.output_dim))
-            self.activation = torch.nn.PReLU()
+            if graph_config.use_layer_norm:
+                self.layers.append(
+                    LayerNorm(
+                        in_channels=graph_config.output_dim,
+                        mode=graph_config.layer_norm_mode,
+                    )
+                )
 
         else:
             raise NotImplementedError(
@@ -101,10 +120,11 @@ class GraphLayer(nn.Module):
             return self.layers(x=X, edge_index=edge_index)
 
         elif self.layer_type == GraphLayerType.ConvGCN:
-            for layer in self.layers[:-1]:
-                X = self.activation(layer(X, edge_index))
-
-            X = self.layers[-1](X, edge_index)
+            for layer in self.layers:
+                if type(layer) == GCNConv:
+                    X = layer(X, edge_index)
+                else:
+                    X = layer(X)
 
         return X
 
@@ -159,15 +179,20 @@ class WeatherPrediction(nn.Module):
         graph_config: GraphBuildingConfig,
         pipeline_config: PipelineConfig,
         data_config: DataConfig,
+        device,
     ):
         super().__init__()
 
-        self.timesteps = data_config.num_timesteps
-        self.num_features = data_config.num_features
-        self.total_feature_size = self.timesteps * self.num_features
+        self.residual_output = pipeline_config.residual_output
+        self.device = device
+        self.obs_window = data_config.obs_window_used
+        self.num_features = data_config.num_features_used
+        self.total_feature_size = self.obs_window * self.num_features
 
         self._init_grid_properties(grid_lat=cordinates[0], grid_lon=cordinates[1])
         self._init_mesh_properties(graph_config)
+
+        self._total_nodes = self._num_grid_nodes + self._num_mesh_nodes
 
         self.encoding_graph, self.init_grid_features, self.init_mesh_features = (
             create_encoding_graph(
@@ -180,6 +205,10 @@ class WeatherPrediction(nn.Module):
                 num_grid_nodes=self._num_grid_nodes,
             )
         )
+
+        self.init_grid_features, self.init_mesh_features = self.init_grid_features.to(
+            device
+        ), self.init_mesh_features.to(device)
 
         # The shape of the initial static features that are added to each node
         self._init_feature_size = self.init_grid_features.shape[1]
@@ -205,7 +234,14 @@ class WeatherPrediction(nn.Module):
         )
 
         self.decoder = Model(
-            model_config=pipeline_config.decoder, input_dim=self.processor.output_dim
+            model_config=pipeline_config.decoder,
+            input_dim=self.processor.output_dim,
+        )
+
+        self.encoding_graph, self.decoding_graph, self.processing_graph = (
+            self.encoding_graph.to(self.device),
+            self.decoding_graph.to(device),
+            self.processing_graph.to(device),
         )
 
     def _init_grid_properties(self, grid_lat: np.ndarray, grid_lon: np.ndarray):
@@ -247,7 +283,7 @@ class WeatherPrediction(nn.Module):
         # Initialise the mesh node features to 0s and append the initial mesh features
         mesh_node_features = torch.zeros(
             (batch_size, self._num_mesh_nodes, self.total_feature_size)
-        )
+        ).to(self.device)
 
         updated_mesh_node_features = torch.cat(
             (mesh_node_features, broadcasted_mesh_grid_features), dim=-1
@@ -281,6 +317,7 @@ class WeatherPrediction(nn.Module):
         )
 
         # Concatenating the grid feature again with the processed mesh features
+
         processed_features = torch.cat(
             (grid_node_features, processed_mesh_node_features), dim=1
         )
@@ -293,5 +330,9 @@ class WeatherPrediction(nn.Module):
         decoded_grid_node_features = decoded_grid_node_features[
             :, : self._num_grid_nodes, :
         ]
+
+        if self.residual_output:
+            # TODO: Support residual outputs
+            pass
 
         return decoded_grid_node_features

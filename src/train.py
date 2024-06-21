@@ -4,19 +4,22 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
 from tqdm import tqdm
-
+import wandb
 
 def train_epoch(
     model: WeatherPrediction,
     train_dataloader: DataLoader,
     optimiser: Optimizer,
     loss_fn,
-):
+    device,
+): 
+    model.train()
     total_loss = 0
     total_samples = 0
     optimiser.zero_grad()
     for batch in train_dataloader:
         X, y = batch
+        X, y = X.to(device), y.to(device)
         outs = model(X=X)
         batch_loss = loss_fn(outs, y)
         batch_loss.backward()
@@ -29,7 +32,7 @@ def train_epoch(
     return avg_loss
 
 
-def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn):
+def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device):
     model.eval()
 
     total_loss = 0
@@ -38,6 +41,7 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn):
     with torch.no_grad():
         for batch in test_dataloader:
             X, y = batch
+            X, y = X.to(device), y.to(device)
             outs = model(X=X)
             batch_loss = loss_fn(outs, y)
             total_loss += batch_loss.detach().item()
@@ -54,27 +58,43 @@ def train(
     test_dataloader: DataLoader,
     optimiser: Optimizer,
     num_epochs: int,
+    device: str,
+    config: dict,
+    print_losses: bool = True,
+    wandb_log: bool = True,
 ):
     # TODO: Make this configurable if we want to combine two losses later.
     loss_fn = nn.MSELoss()
 
     train_losses = []
     test_losses = []
+    
+    if wandb_log:
+        wandb.init(
+            entity="graphml-group4",
+            project="weather-prediction",
+            config=dict(config))
+
     for epoch in range(num_epochs):
         epoch_train_loss = train_epoch(
             model=model,
             optimiser=optimiser,
             train_dataloader=train_datalaoder,
             loss_fn=loss_fn,
+            device=device,
         )
-        print(f"Train loss after epoch {epoch+1}: {epoch_train_loss}")
+        if print_losses:
+            print(f"Train loss after epoch {epoch+1}: {epoch_train_loss}")
 
         epoch_test_loss = test(
-            model=model, test_dataloader=test_dataloader, loss_fn=loss_fn
+            model=model, test_dataloader=test_dataloader, loss_fn=loss_fn, device=device
         )
-        print(f"Test loss after epoch {epoch+1}: {epoch_test_loss}")
+        if print_losses:
+            print(f"Test loss after epoch {epoch+1}: {epoch_test_loss}")
 
-        train_losses.append(train_losses)
-        test_losses.append(test_losses)
+        train_losses.append(epoch_train_loss)
+        test_losses.append(epoch_test_loss)
+        wandb.log({"train_loss": epoch_train_loss, "test_loss": epoch_test_loss})
 
+    wandb.finish()
     return train_losses, test_losses
