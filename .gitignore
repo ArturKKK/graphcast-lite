@@ -170,3 +170,7 @@ cython_debug/
 
 # data files
 # *.nc
+/data/datasets
+
+# Wandb
+/wandb

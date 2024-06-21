@@ -19,6 +19,7 @@ class Mesh2GridEdgeCreation(str, Enum):
 class GraphLayerType(str, Enum):
     ConvGCN = "conv_gcn"
     SimpleConv = "simple_conv"
+    GATConv = "conv_gat"
 
 
 class GraphBuildingConfig(BaseModel):
@@ -60,16 +61,18 @@ class GraphBuildingConfig(BaseModel):
 
 
 class MLPBlock(BaseModel):
-    mlp_hidden_dims: List[int]
+    mlp_hidden_dims: Optional[List[int]] = None
     output_dim: int
-    use_layer_norm: bool = True
-    use_only_last_dim_for_normalisation: bool = False
+    use_layer_norm: bool
+    layer_norm_mode: Optional[str] = None
 
 
 class GraphBlock(BaseModel):
     layer_type: GraphLayerType
     hidden_dims: Optional[List[int]] = None
     output_dim: Optional[int] = None
+    use_layer_norm: Optional[bool] = None
+    layer_norm_mode: Optional[str] = None
 
 
 class ModelConfig(BaseModel):
@@ -81,20 +84,35 @@ class PipelineConfig(BaseModel):
     encoder: ModelConfig
     processor: ModelConfig
     decoder: ModelConfig
+    residual_output: bool = False
 
 
 class DataConfig(BaseModel):
     data_directory: str
+        
+    # metadata about the dataset
+    # because the dataset can take many forms
+    # feats_flattened means the features and observation windows are flattened together in one dim
+    feats_flattened: bool
     num_latitudes: int
     num_longitudes: int
     num_features: int
-    num_timesteps: int
+    obs_window: int
+    pred_window: int
+
+    # these are data for you to change in the config regardless of the dataset
+    num_features_used: int
+    obs_window_used: int
+    pred_window_used: int
+    
+    want_feats_flattened: bool
 
 
 class ExperimentConfig(BaseModel):
     batch_size: int
     learning_rate: float
     num_epochs: int
+    random_seed: Optional[int] = None
     graph: GraphBuildingConfig
     pipeline: PipelineConfig
     data: DataConfig
