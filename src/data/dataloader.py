@@ -38,8 +38,8 @@ def load_train_and_test_datasets(data_path: str, data_config: DataConfig):
     X_test = torch.load(X_test_path)
     y_test = torch.load(y_test_path)
 
-    print("X_train shape: ", X_train.shape)
-    print("y_train shape: ", y_train.shape)
+    print("X_train from dataset shape: ", X_train.shape)
+    print("y_train from dataset shape: ", y_train.shape)
 
 
     grid_dimension_size = num_longitudes * num_latitudes
@@ -77,10 +77,10 @@ def load_train_and_test_datasets(data_path: str, data_config: DataConfig):
     y_test = y_test.reshape(-1, grid_dimension_size, pred_window, num_features)
 
     # filter out the features we want to use
-    X_train = X_train[:, :, :obs_window_used, :num_features_used]
-    y_train = y_train[:, :, :pred_window_used, :num_features_used]
-    X_test = X_test[:, :, :obs_window_used, :num_features_used]
-    y_test = y_test[:, :, :pred_window_used, :num_features_used]
+    X_train = X_train[:, :, (obs_window_used - obs_window):, :num_features_used]
+    y_train = y_train[:, :, (pred_window_used - pred_window):, :num_features_used]
+    X_test = X_test[:, :, (obs_window_used - obs_window):, :num_features_used]
+    y_test = y_test[:, :, (pred_window_used - pred_window):, :num_features_used]
 
     # reshape the data back to the original shape if we want it that way
     if want_feats_flattened:
