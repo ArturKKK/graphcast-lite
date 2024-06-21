@@ -53,7 +53,7 @@
         }
     },
     "data": {
-        "data_directory": "/Users/chrys/Documents/CSE/MASTERS/Q4/ML for graph data/cyclone-tracking/data/datasets",
+        "data_directory": "\Users\chrys\Documents\CSE\MASTERS\Q4\MLG\cyclone-tracking\data\datasets",
         "num_latitudes": 32,
         "num_longitudes": 64,
         "num_features": 12,
