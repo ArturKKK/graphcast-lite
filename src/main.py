@@ -11,6 +11,7 @@ from torch.optim import Adam
 from src.train import train
 from src.data.dataloader import load_train_and_test_datasets
 import random
+import matplotlib.pyplot as plt
 
 
 def set_random_seeds(seed: int = 42):
@@ -44,6 +45,19 @@ def load_model_from_experiment_config(
     )
 
     return model
+
+
+def plot_results(results, results_filename: str):
+    train_losses = results["train_losses"]
+    test_losses = results["test_losses"]
+
+    plt.plot(train_losses, label="Train Loss")
+    plt.plot(test_losses, label="Test Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.savefig(results_filename)
+    plt.close()
 
 
 def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
@@ -81,13 +95,16 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
         device=device,
         config=experiment_config,
         print_losses=True,
-        wandb_log=True
+        wandb_log=False
     )
 
     results = {
         "train_losses": train_losses,
         "test_losses": test_losses,
     }
+
+    results_filename = os.path.join(results_save_dir, experiment_config.results_filename if experiment_config.results_filename is not None else "test_loss.png")
+    plot_results(results, results_filename)
 
     return results
 
@@ -99,7 +116,7 @@ def main():
         experiment_directory, FileNames.EXPERIMENT_CONFIG
     )
 
-    results_save_dir = os.path.join(experiment_directory, FolderNames.RESULTS)
+    results_save_dir = os.path.join(experiment_directory, "" if True else FolderNames.RESULTS)
 
     experiment_config = ExperimentConfig(**load_from_json_file(experiment_config_path))
 

@@ -18,6 +18,7 @@ def train_epoch(
     total_samples = 0
     optimiser.zero_grad()
     for batch in train_dataloader:
+        # print(batch)
         X, y = batch
         X, y = X.to(device), y.to(device)
         outs = model(X=X)
@@ -94,7 +95,9 @@ def train(
 
         train_losses.append(epoch_train_loss)
         test_losses.append(epoch_test_loss)
-        wandb.log({"train_loss": epoch_train_loss, "test_loss": epoch_test_loss})
+        if wandb_log:
+            wandb.log({"train_loss": epoch_train_loss, "test_loss": epoch_test_loss})
 
-    wandb.finish()
+    if wandb_log:
+        wandb.finish()
     return train_losses, test_losses

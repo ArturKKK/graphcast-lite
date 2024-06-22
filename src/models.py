@@ -2,7 +2,7 @@ from typing import Tuple, Optional
 
 import torch.nn as nn
 import torch
-from torch_geometric.nn import GCNConv, SimpleConv, GATConv, LayerNorm
+from torch_geometric.nn import GCNConv, SimpleConv, GATConv, GAT, GPSConv, LayerNorm, summary
 import numpy as np
 
 from src.config import (
@@ -106,14 +106,16 @@ class GraphLayer(nn.Module):
 
             elif graph_config.layer_type == GraphLayerType.GATConv:
                 print('GAT')
-                self.layers.append(GATConv(input_dim, hidden_dims[0]))
-                self.layers.append(self.activation)
+                # self.layers.append(GATConv(input_dim, hidden_dims[0], heads=1))
+                # self.layers.append(self.activation)
 
-                for i in range(1, len(hidden_dims)):
-                    self.layers.append(GATConv(hidden_dims[i - 1], hidden_dims[i]))
-                    self.layers.append(self.activation)
+                # for i in range(1, len(hidden_dims)):
+                #     self.layers.append(GATConv(hidden_dims[i - 1], hidden_dims[i]))
+                #     # , heads=1, concat=True
+                #     self.layers.append(self.activation)
 
-                self.layers.append(GATConv(hidden_dims[-1], graph_config.output_dim))
+                # self.layers.append(GATConv(hidden_dims[-1], graph_config.output_dim, heads=1))
+                self.layers.append(GAT(in_channels=input_dim, hidden_channels=hidden_dims[0], num_layers=len(hidden_dims), out_channels=self.output_dim, act=self.activation, heads=1))
 
             if graph_config.use_layer_norm:
                 self.layers.append(
@@ -139,6 +141,23 @@ class GraphLayer(nn.Module):
                     X = layer(X, edge_index)
                 else:
                     X = layer(X)
+
+        elif self.layer_type == GraphLayerType.GATConv:
+            attention_scores = []
+            batch_size, num_nodes, num_features = X.shape
+            print(batch_size, num_nodes, num_features)
+            # X_GAT = X.view(-1, num_features)
+            for layer in self.layers:
+                print('x shape: ', X.shape)
+                # if isinstance(layer, GATConv):
+                if type(layer) == GAT:
+                    print('GAT layers')
+                    # X, (_, attn_weights) = layer(X, edge_index, return_attention_weights=True)
+                    # attention_scores.append(attn_weights)
+                    X = layer(X, edge_index)
+                else:
+                    X = layer(X)
+            print('Attention scores:', attention_scores)
 
         return X
 
@@ -238,9 +257,10 @@ class WeatherPrediction(nn.Module):
             num_grid_nodes=self._num_grid_nodes,
         )
 
+        encoder_input_dim = self.total_feature_size + self._init_feature_size
         self.encoder = Model(
             model_config=pipeline_config.encoder,
-            input_dim=self.total_feature_size + self._init_feature_size,
+            input_dim=encoder_input_dim,
         )
 
         self.processor = Model(
@@ -258,6 +278,18 @@ class WeatherPrediction(nn.Module):
             self.decoding_graph.to(device),
             self.processing_graph.to(device),
         )
+
+        print('Encoder summary: ')
+        print(summary(self.encoder, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, encoder_input_dim), self.encoding_graph))
+        print()
+
+        print('Processor summary: ')
+        print(summary(self.processor, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, self.encoder.output_dim), self.processing_graph))
+        print()
+
+        print('Decoder summary: ')
+        print(summary(self.decoder, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, self.processor.output_dim), self.decoding_graph))
+        print()
 
     def _init_grid_properties(self, grid_lat: np.ndarray, grid_lon: np.ndarray):
         self._grid_lat = grid_lat.astype(np.float32)

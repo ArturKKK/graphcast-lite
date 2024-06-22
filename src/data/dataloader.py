@@ -90,6 +90,8 @@ def load_train_and_test_datasets(data_path: str, data_config: DataConfig):
         y_test = y_test.reshape(-1, grid_dimension_size, pred_window_used * num_features_used)
 
 
+    print("X_train for use shape: ", X_train.shape)
+    print("y_train for use shape: ", y_train.shape)
 
     train_dataset = WeatherDataset(X=X_train, y=y_train)
     test_dataset = WeatherDataset(X=X_test, y=y_test)

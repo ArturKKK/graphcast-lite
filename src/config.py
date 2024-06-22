@@ -113,6 +113,7 @@ class ExperimentConfig(BaseModel):
     learning_rate: float
     num_epochs: int
     random_seed: Optional[int] = None
+    results_filename: Optional[str] = None
     graph: GraphBuildingConfig
     pipeline: PipelineConfig
     data: DataConfig
