@@ -46,7 +46,7 @@
         }
     },
     "data": {
-        "data_directory": "data/datasets",
+        "data_directory": "data/datasets/Data_Adit",
         "feats_flattened": true,
         "num_latitudes": 32,
         "num_longitudes": 64,
