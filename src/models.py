@@ -3,6 +3,9 @@ from typing import Tuple, Optional
 import torch.nn as nn
 import torch
 from torch_geometric.nn import GCNConv, SimpleConv, GATConv, GAT, GPSConv, LayerNorm, summary
+from torch_geometric.loader import DataLoader
+from torch_geometric.data import Batch, Dataset
+from torch_geometric.data import Data
 import numpy as np
 
 from src.config import (
@@ -106,16 +109,16 @@ class GraphLayer(nn.Module):
 
             elif graph_config.layer_type == GraphLayerType.GATConv:
                 print('GAT')
-                # self.layers.append(GATConv(input_dim, hidden_dims[0], heads=1))
-                # self.layers.append(self.activation)
+                self.layers.append(GATConv(input_dim, hidden_dims[0], heads=1))
+                self.layers.append(self.activation)
 
-                # for i in range(1, len(hidden_dims)):
-                #     self.layers.append(GATConv(hidden_dims[i - 1], hidden_dims[i]))
-                #     # , heads=1, concat=True
-                #     self.layers.append(self.activation)
+                for i in range(1, len(hidden_dims)):
+                    self.layers.append(GATConv(hidden_dims[i - 1], hidden_dims[i]))
+                    # , heads=1, concat=True
+                    self.layers.append(self.activation)
 
-                # self.layers.append(GATConv(hidden_dims[-1], graph_config.output_dim, heads=1))
-                self.layers.append(GAT(in_channels=input_dim, hidden_channels=hidden_dims[0], num_layers=len(hidden_dims), out_channels=self.output_dim, act=self.activation, heads=1))
+                self.layers.append(GATConv(hidden_dims[-1], graph_config.output_dim, heads=1))
+                # self.layers.append(GAT(in_channels=input_dim, hidden_channels=hidden_dims[0], num_layers=len(hidden_dims), out_channels=self.output_dim, act=self.activation, heads=1))
 
             if graph_config.use_layer_norm:
                 self.layers.append(
@@ -132,32 +135,47 @@ class GraphLayer(nn.Module):
             )
 
     def forward(self, X: torch.Tensor, edge_index: torch.Tensor):
+        batch_size, num_nodes, num_features = X.shape
+        data = [Data(x=sample, edge_index=edge_index) for sample in X]
+        # Issue of non-convergence likely stems from here
+        loader = DataLoader(data, batch_size=16, shuffle=True)
+
         if self.layer_type == GraphLayerType.SimpleConv:
             return self.layers(x=X, edge_index=edge_index)
 
         elif self.layer_type == GraphLayerType.ConvGCN:
-            for layer in self.layers:
-                if type(layer) == GCNConv:
-                    X = layer(X, edge_index)
-                else:
-                    X = layer(X)
+            # for layer in self.layers:
+            #     if type(layer) == GCNConv:
+            #         X = layer(X, edge_index)
+            #     else:
+            #         X = layer(X)
+            x = None
+            for batch in loader:
+                x = batch.x
+                for layer in self.layers:
+                    if type(layer) == GCNConv:
+                        x = layer(x, edge_index)
+                    # If it is an activation function
+                    else:
+                        x = layer(x)
+            X = x.reshape(batch_size, num_nodes, num_features)
 
         elif self.layer_type == GraphLayerType.GATConv:
-            attention_scores = []
-            batch_size, num_nodes, num_features = X.shape
-            print(batch_size, num_nodes, num_features)
-            # X_GAT = X.view(-1, num_features)
-            for layer in self.layers:
-                print('x shape: ', X.shape)
-                # if isinstance(layer, GATConv):
-                if type(layer) == GAT:
-                    print('GAT layers')
-                    # X, (_, attn_weights) = layer(X, edge_index, return_attention_weights=True)
-                    # attention_scores.append(attn_weights)
-                    X = layer(X, edge_index)
-                else:
-                    X = layer(X)
-            print('Attention scores:', attention_scores)
+            x = None
+            # attention_scores = []
+            for batch in loader:
+                x = batch.x
+                for layer in self.layers:
+                    if type(layer) == GATConv:
+                        x, (attn_edge_index, attn_weights) = layer(x, edge_index, return_attention_weights=True)
+                        # HOW TO INTERPRET ATTENTION SCORES?
+                        # ANSWER: The edge index returned is the edge index of the attention scores and give the score of (src, dst) pair
+                        # print('edge index shape: ', edge_index.shape)
+                        # print('Attention scores:', attn_weights.shape)
+                    # If it is an activation function
+                    else:
+                        x = layer(x)
+            X = x.reshape(batch_size, num_nodes, num_features)
 
         return X
 
@@ -280,15 +298,15 @@ class WeatherPrediction(nn.Module):
         )
 
         print('Encoder summary: ')
-        print(summary(self.encoder, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, encoder_input_dim), self.encoding_graph))
+        print(summary(self.encoder, torch.randn(1, self._num_grid_nodes + self._num_mesh_nodes, encoder_input_dim), self.encoding_graph))
         print()
 
         print('Processor summary: ')
-        print(summary(self.processor, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, self.encoder.output_dim), self.processing_graph))
+        print(summary(self.processor, torch.randn(1, self._num_grid_nodes + self._num_mesh_nodes, self.encoder.output_dim), self.processing_graph))
         print()
 
         print('Decoder summary: ')
-        print(summary(self.decoder, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, self.processor.output_dim), self.decoding_graph))
+        print(summary(self.decoder, torch.randn(1, self._num_grid_nodes + self._num_mesh_nodes, self.processor.output_dim), self.decoding_graph))
         print()
 
     def _init_grid_properties(self, grid_lat: np.ndarray, grid_lon: np.ndarray):
@@ -364,6 +382,8 @@ class WeatherPrediction(nn.Module):
         )
 
         # Concatenating the grid feature again with the processed mesh features
+        # print('grid node features shape: ', grid_node_features.shape)
+        # print('processed_mesh_node_features shape: ', processed_mesh_node_features.shape)
 
         processed_features = torch.cat(
             (grid_node_features, processed_mesh_node_features), dim=1
