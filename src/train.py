@@ -1,7 +1,7 @@
-from src.models import WeatherPrediction
+from src.models_geometric import WeatherPrediction
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch_geometric.loader import DataLoader
 from torch.optim import Optimizer
 from tqdm import tqdm
 import wandb
@@ -15,20 +15,18 @@ def train_epoch(
 ): 
     model.train()
     total_loss = 0
-    total_samples = 0
     optimiser.zero_grad()
     for batch in train_dataloader:
-        # print(batch)
-        X, y = batch
-        X, y = X.to(device), y.to(device)
-        outs = model(X=X)
-        batch_loss = loss_fn(outs, y)
+        print(batch)
+        outs = model(batch)
+        print('outs shape:', outs.shape)
+        print('batch.y shape:', batch.y.shape)
+        batch_loss = loss_fn(outs, batch.y)
         batch_loss.backward()
         optimiser.step()
         total_loss += batch_loss.detach().item()
-        total_samples += X.shape[0]
 
-    avg_loss = total_loss / total_samples
+    avg_loss = total_loss / len(train_dataloader)
 
     return avg_loss
 
@@ -37,18 +35,16 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device)
     model.eval()
 
     total_loss = 0
-    total_samples = 0
 
     with torch.no_grad():
         for batch in test_dataloader:
-            X, y = batch
-            X, y = X.to(device), y.to(device)
-            outs = model(X=X)
+            x, y = batch.x, batch.y
+            x, y = x.to(device), y.to(device)
+            outs = model(batch)
             batch_loss = loss_fn(outs, y)
             total_loss += batch_loss.detach().item()
-            total_samples += X.shape[0]
 
-    avg_loss = total_loss / total_samples
+    avg_loss = total_loss / len(test_dataloader)
 
     return avg_loss
 

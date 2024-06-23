@@ -1,10 +1,10 @@
 {
-  "batch_size": 1,
+  "batch_size": 32,
   "learning_rate": 1e-5,
   "num_epochs": 15,
-  "results_filename": "",
+  "results_filename": "letemin32",
   "graph": {
-    "mesh_size": 4,
+    "mesh_size": 0,
     "grid2mesh_edge_creation": "radius",
     "mesh2grid_edge_creation": "contained",
     "grid2mesh_radius_query": 0.5,

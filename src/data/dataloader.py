@@ -2,7 +2,6 @@ import os
 from src.config import DataConfig
 from src.constants import FileNames
 import torch
-from data.data_loading import WeatherDataset
 
 
 def load_train_and_test_datasets(data_path: str, data_config: DataConfig):
@@ -93,7 +92,4 @@ def load_train_and_test_datasets(data_path: str, data_config: DataConfig):
     print("X_train for use shape: ", X_train.shape)
     print("y_train for use shape: ", y_train.shape)
 
-    train_dataset = WeatherDataset(X=X_train, y=y_train)
-    test_dataset = WeatherDataset(X=X_test, y=y_test)
-
-    return train_dataset, test_dataset
+    return X_train, y_train, X_test, y_test

@@ -2,14 +2,16 @@ import sys
 import os
 from src.constants import FileNames, FolderNames
 from src.config import ExperimentConfig
+from src.data.MultiEdgeData import create_multi_edge_data
+from src.models_geometric import WeatherPrediction
 from src.utils import load_from_json_file
-from torch.utils.data import DataLoader
+from torch_geometric.loader import DataLoader
 import torch
-from src.models import WeatherPrediction
 import numpy as np
 from torch.optim import Adam
 from src.train import train
 from src.data.dataloader import load_train_and_test_datasets
+from data.data_loading import WeatherDataset
 import random
 import matplotlib.pyplot as plt
 
@@ -66,23 +68,33 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
     set_random_seeds(seed=experiment_config.random_seed)
 
-    train_dataset, test_dataset = load_train_and_test_datasets(
+    X_train, y_train, X_test, y_test = load_train_and_test_datasets(
         data_path=experiment_config.data.data_directory,
         data_config=experiment_config.data,
     )
 
-    train_dataloader = DataLoader(
-        train_dataset, batch_size=experiment_config.batch_size, shuffle=True
-    )
-    test_dataloader = DataLoader(
-        test_dataset, batch_size=experiment_config.batch_size, shuffle=False
-    )
+    # train_dataloader = DataLoader(
+    #     train_dataset, batch_size=experiment_config.batch_size, shuffle=True
+    # )
+    # test_dataloader = DataLoader(
+    #     test_dataset, batch_size=experiment_config.batch_size, shuffle=False
+    # )
 
     model: WeatherPrediction = load_model_from_experiment_config(
         experiment_config=experiment_config, device=device
     )
 
     model = model.to(device)
+
+    # set up data loaders
+    edge_index_encoder, edge_index_processor, edge_index_decoder = model.get_edge_indices()
+
+    train_data_list = create_multi_edge_data(X_train, y_train, edge_index_encoder, edge_index_processor, edge_index_decoder)
+    train_dataloader = DataLoader(train_data_list, batch_size=experiment_config.batch_size, shuffle=True)
+
+    test_data_list = create_multi_edge_data(X_test, y_test, edge_index_encoder, edge_index_processor, edge_index_decoder)
+    test_dataloader = DataLoader(test_data_list, batch_size=experiment_config.batch_size, shuffle=False)
+
 
     optimizer = Adam(params=model.parameters(), lr=experiment_config.learning_rate)
 
