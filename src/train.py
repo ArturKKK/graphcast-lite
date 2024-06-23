@@ -17,11 +17,13 @@ def train_epoch(
     total_loss = 0
     optimiser.zero_grad()
     for batch in train_dataloader:
-        print(batch)
-        outs = model(batch)
-        print('outs shape:', outs.shape)
-        print('batch.y shape:', batch.y.shape)
-        batch_loss = loss_fn(outs, batch.y)
+        # print(batch)
+        x, y = batch
+        x, y = x.to(device), y.to(device)
+        outs = model(x)
+        # print('outs shape:', outs.shape)
+        # print('batch.y shape:', batch.y.shape)
+        batch_loss = loss_fn(outs, y)
         batch_loss.backward()
         optimiser.step()
         total_loss += batch_loss.detach().item()
@@ -38,9 +40,10 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device)
 
     with torch.no_grad():
         for batch in test_dataloader:
-            x, y = batch.x, batch.y
+            # x, y = batch.x, batch.y
+            x, y = batch
             x, y = x.to(device), y.to(device)
-            outs = model(batch)
+            outs = model(x)
             batch_loss = loss_fn(outs, y)
             total_loss += batch_loss.detach().item()
 

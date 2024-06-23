@@ -3,7 +3,7 @@ import os
 from src.constants import FileNames, FolderNames
 from src.config import ExperimentConfig
 from src.data.MultiEdgeData import create_multi_edge_data
-from src.models_geometric import WeatherPrediction
+from src.models import WeatherPrediction
 from src.utils import load_from_json_file
 from torch_geometric.loader import DataLoader
 import torch
@@ -73,12 +73,15 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
         data_config=experiment_config.data,
     )
 
-    # train_dataloader = DataLoader(
-    #     train_dataset, batch_size=experiment_config.batch_size, shuffle=True
-    # )
-    # test_dataloader = DataLoader(
-    #     test_dataset, batch_size=experiment_config.batch_size, shuffle=False
-    # )
+    train_dataset = WeatherDataset(X_train, y_train)
+    test_dataset = WeatherDataset(X_test, y_test)
+
+    train_dataloader = DataLoader(
+        train_dataset, batch_size=experiment_config.batch_size, shuffle=True
+    )
+    test_dataloader = DataLoader(
+        test_dataset, batch_size=experiment_config.batch_size, shuffle=False
+    )
 
     model: WeatherPrediction = load_model_from_experiment_config(
         experiment_config=experiment_config, device=device
@@ -86,14 +89,17 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
     model = model.to(device)
 
-    # set up data loaders
-    edge_index_encoder, edge_index_processor, edge_index_decoder = model.get_edge_indices()
+    # # set up data loaders
+    # edge_index_encoder, edge_index_processor, edge_index_decoder = model.get_edge_indices()
+    # num_grid_nodes, num_mesh_nodes = model.get_num_grid_mesh_nodes()
+    # print('num_grid_nodes', num_grid_nodes)
+    # print('num_mesh_nodes', num_mesh_nodes)
 
-    train_data_list = create_multi_edge_data(X_train, y_train, edge_index_encoder, edge_index_processor, edge_index_decoder)
-    train_dataloader = DataLoader(train_data_list, batch_size=experiment_config.batch_size, shuffle=True)
+    # train_data_list = create_multi_edge_data(X_train, y_train, edge_index_encoder, edge_index_processor, edge_index_decoder, num_grid_nodes, num_mesh_nodes)
+    # train_dataloader = DataLoader(train_data_list, batch_size=experiment_config.batch_size, shuffle=True)
 
-    test_data_list = create_multi_edge_data(X_test, y_test, edge_index_encoder, edge_index_processor, edge_index_decoder)
-    test_dataloader = DataLoader(test_data_list, batch_size=experiment_config.batch_size, shuffle=False)
+    # test_data_list = create_multi_edge_data(X_test, y_test, edge_index_encoder, edge_index_processor, edge_index_decoder, num_grid_nodes, num_mesh_nodes)
+    # test_dataloader = DataLoader(test_data_list, batch_size=experiment_config.batch_size, shuffle=False)
 
 
     optimizer = Adam(params=model.parameters(), lr=experiment_config.learning_rate)

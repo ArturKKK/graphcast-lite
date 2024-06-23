@@ -138,7 +138,7 @@ class GraphLayer(nn.Module):
         batch_size, num_nodes, num_features = X.shape
         data = [Data(x=sample, edge_index=edge_index) for sample in X]
         # Issue of non-convergence likely stems from here
-        loader = DataLoader(data, batch_size=16, shuffle=True)
+        loader = DataLoader(data, batch_size=batch_size, shuffle=True)
 
         if self.layer_type == GraphLayerType.SimpleConv:
             return self.layers(x=X, edge_index=edge_index)

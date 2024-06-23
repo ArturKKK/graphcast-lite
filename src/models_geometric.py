@@ -7,6 +7,7 @@ from torch_geometric.loader import DataLoader
 from torch_geometric.data import Batch, Dataset
 from torch_geometric.data import Data
 from torch_geometric.data.batch import Batch
+from torch_geometric.utils import sort_edge_index
 import numpy as np
 
 from src.config import (
@@ -254,7 +255,7 @@ class WeatherPrediction(nn.Module):
         self._init_grid_properties(grid_lat=cordinates[0], grid_lon=cordinates[1])
         self._init_mesh_properties(graph_config)
 
-        self._total_nodes = self._num_grid_nodes + self._num_mesh_nodes
+        self._num_nodes = self._num_grid_nodes + self._num_mesh_nodes
 
         self.encoding_graph, self.init_grid_features, self.init_mesh_features = (
             create_encoding_graph(
@@ -309,15 +310,15 @@ class WeatherPrediction(nn.Module):
         )
 
         print('Encoder summary: ')
-        print(summary(self.encoder, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, encoder_input_dim), self.encoding_graph))
+        print(summary(self.encoder, torch.randn(self._num_nodes, encoder_input_dim), self.encoding_graph))
         print()
 
         print('Processor summary: ')
-        print(summary(self.processor, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, self.encoder.output_dim), self.processing_graph))
+        print(summary(self.processor, torch.randn(self._num_nodes, self.encoder.output_dim), self.processing_graph))
         print()
 
         print('Decoder summary: ')
-        print(summary(self.decoder, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, self.processor.output_dim), self.decoding_graph))
+        print(summary(self.decoder, torch.randn(self._num_nodes, self.processor.output_dim), self.decoding_graph))
         print()
 
     def _init_grid_properties(self, grid_lat: np.ndarray, grid_lon: np.ndarray):
@@ -374,6 +375,10 @@ class WeatherPrediction(nn.Module):
     def get_edge_indices(self):
         """Returns the edge indices of the three graphs that are used in the model."""
         return self.encoding_graph, self.processing_graph, self.decoding_graph
+    
+    def get_num_grid_mesh_nodes(self):
+        """Returns the number of grid and mesh nodes."""
+        return self._num_grid_nodes, self._num_mesh_nodes
 
     def forward(self, data: Batch):
         """The forward method takes the features of the grid nodes and passes them through the three graphs defined above.
@@ -384,27 +389,38 @@ class WeatherPrediction(nn.Module):
         X : torch.Tensor
           The input data of the shape [batch, num_grid_nodes, num_features].
         """
-        # print('batch size, num nodes, num features: ', data.batch_size, data.num_nodes, data.num_features)
+        # print('data.x shape: ', data.x.shape)
+        # print('edge index encoder: ', sort_edge_index(data.edge_index_encoder).max(dim=1))
+        # print("edge index processor: ", sort_edge_index(data.edge_index_processor))
+        # print('edge index decoder: ', sort_edge_index(data.edge_index_decoder).max(dim=1))
+
+        # print('batch size, num mesh nodes, num features: ', data.batch_size, data.num_mesh_nodes, data.num_features)
+        # print('batch size, num grid nodes, num features: ', data.batch_size, data.num_grid_nodes, data.num_features)
+        B = data.batch_size
         X = data.x.reshape(data.batch_size, data.num_nodes // data.batch_size, data.num_features)
+        # print('X shape: ', X.shape)
         X = self._preprocess_input(grid_node_features=X)
-        B, N, F = X.shape
-        print('X shape: ', X.shape)
+        X = X.reshape(B * self._num_nodes, -1)
+        # print('X shape: ', X.shape)
 
-        X = X.reshape(B * N, F)
-        print('X shape: ', X.shape)
-        encoded_features = self.encoder(X=X, edge_index=data.edge_index_encoder)
-        print('Encoded features shape: ', encoded_features.shape)
+        
+        # print('X shape: ', X.shape)
+        encoded_features = self.encoder(X=data.x, edge_index=data.edge_index_encoder)
+        # print('Encoded features shape: ', encoded_features.shape)
 
-        grid_node_features = encoded_features[: self._num_grid_nodes, :]
-        mesh_node_features = encoded_features[self._num_grid_nodes :, :]
-        print('Grid node features shape: ', grid_node_features.shape)
-        print('Mesh node features shape: ', mesh_node_features.shape)
+        encoded_features = encoded_features.reshape(B, self._num_nodes, -1)
+        grid_node_features = encoded_features[:, :self._num_grid_nodes]
+        mesh_node_features = encoded_features[:, self._num_grid_nodes:]
+        # print('Grid node features shape: ', grid_node_features.shape)
+        # print('Mesh node features shape: ', mesh_node_features.shape)
+        grid_node_features = grid_node_features.reshape(B * self._num_grid_nodes, -1)
+        mesh_node_features = mesh_node_features.reshape(B * self._num_mesh_nodes, -1)
 
         # Processing the mesh node features
         processed_mesh_node_features = self.processor(
             X=mesh_node_features, edge_index=data.edge_index_processor
         )
-        print('Processed mesh node features shape: ', processed_mesh_node_features.shape)
+        # print('Processed mesh node features shape: ', processed_mesh_node_features.shape)
 
         # Concatenating the grid feature again with the processed mesh features
         processed_features = torch.cat(
@@ -415,10 +431,10 @@ class WeatherPrediction(nn.Module):
             X=processed_features,
             edge_index=data.edge_index_decoder,
         )
-
-        decoded_grid_node_features = decoded_grid_node_features[
-            : self._num_grid_nodes, :
-        ]
+        # print('Decoded grid node features shape: ', decoded_grid_node_features.shape)
+        decoded_grid_node_features = decoded_grid_node_features.reshape(B, self._num_nodes, -1)
+        decoded_grid_node_features = decoded_grid_node_features[:, :self._num_grid_nodes]
+        decoded_grid_node_features = decoded_grid_node_features.reshape(B * self._num_grid_nodes, -1)
 
         if self.residual_output:
             # TODO: Support residual outputs
