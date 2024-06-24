@@ -130,6 +130,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+mlg-env/
 
 # Spyder project settings
 .spyderproject
@@ -174,3 +175,6 @@ cython_debug/
 
 # Wandb
 /wandb
+
+# virtualenv
+mlg-env/

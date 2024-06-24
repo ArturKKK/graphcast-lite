@@ -46,7 +46,7 @@ def load_model_from_experiment_config(
     return model
 
 
-def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
+def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str, wandb_log=True):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
