@@ -432,9 +432,11 @@ class WeatherPrediction(nn.Module):
         mesh_node_features = encoded_features[self._num_grid_nodes :, :]
 
         # Processing the mesh node features
-        processed_mesh_node_features = self.processor.forward(
-            X=mesh_node_features, edge_index=self.processing_graph
-        )
+        # processed_mesh_node_features = self.processor.forward(
+        #     X=mesh_node_features, edge_index=self.processing_graph
+        # )
+
+        processed_mesh_node_features = mesh_node_features
 
         # Concatenating the grid feature again with the processed mesh features
         processed_features = torch.cat(
