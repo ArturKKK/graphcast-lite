@@ -12,10 +12,7 @@ gcsfs==2022.5.0
 cartopy==0.23.0
 dask_ml==2024.4.4
 rtree==1.2.0
-<<<<<<< Updated upstream
 plotly==5.22.0
 nbformat==5.10.4
 wandb
-=======
 tabulate==0.8.9
->>>>>>> Stashed changes
