@@ -107,6 +107,12 @@ class DataConfig(BaseModel):
     want_feats_flattened: bool
 
 
+class ProductGraphConfig(BaseModel):
+    use_product_graph: bool
+    kronecker: bool
+    cartesian: bool
+    strong: bool
+
 class ExperimentConfig(BaseModel):
     batch_size: int
     learning_rate: float
@@ -115,3 +121,4 @@ class ExperimentConfig(BaseModel):
     graph: GraphBuildingConfig
     pipeline: PipelineConfig
     data: DataConfig
+    product_graph: ProductGraphConfig
