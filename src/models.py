@@ -4,6 +4,8 @@ import torch.nn as nn
 import torch
 from torch_geometric.nn import GCNConv, SimpleConv, GATConv, LayerNorm
 import numpy as np
+from sklearn.neighbors import kneighbors_graph
+from torch_geometric.utils import dense_to_sparse
 
 from src.config import (
     ModelConfig,
@@ -13,6 +15,8 @@ from src.config import (
     GraphBuildingConfig,
     DataConfig,
     PipelineConfig,
+    ProductGraphConfig,
+    ProductGraphType,
 )
 from src.create_graphs import (
     create_decoding_graph,
@@ -88,12 +92,15 @@ class GraphLayer(nn.Module):
             self.output_dim = input_dim
             self.layers = SimpleConv(aggr="mean")
 
-        elif graph_config.layer_type in [GraphLayerType.ConvGCN, GraphLayerType.GATConv]:
+        elif graph_config.layer_type in [
+            GraphLayerType.ConvGCN,
+            GraphLayerType.GATConv,
+        ]:
             self.activation = torch.nn.PReLU()
             self.output_dim = graph_config.output_dim
             self.layers = torch.nn.ModuleList()
             hidden_dims = graph_config.hidden_dims
-            
+
             if graph_config.layer_type == GraphLayerType.ConvGCN:
                 self.layers.append(GCNConv(input_dim, hidden_dims[0]))
                 self.layers.append(self.activation)
@@ -105,7 +112,6 @@ class GraphLayer(nn.Module):
                 self.layers.append(GCNConv(hidden_dims[-1], graph_config.output_dim))
 
             elif graph_config.layer_type == GraphLayerType.GATConv:
-                print('GAT')
                 self.layers.append(GATConv(input_dim, hidden_dims[0]))
                 self.layers.append(self.activation)
 
@@ -122,7 +128,6 @@ class GraphLayer(nn.Module):
                         mode=graph_config.layer_norm_mode,
                     )
                 )
-
 
         else:
             raise NotImplementedError(
@@ -201,12 +206,21 @@ class WeatherPrediction(nn.Module):
         self.device = device
         self.obs_window = data_config.obs_window_used
         self.num_features = data_config.num_features_used
-        self.total_feature_size = self.obs_window * self.num_features
+        self.use_product_graph = pipeline_config.product_graph is not None
 
         self._init_grid_properties(grid_lat=cordinates[0], grid_lon=cordinates[1])
         self._init_mesh_properties(graph_config)
 
         self._total_nodes = self._num_grid_nodes + self._num_mesh_nodes
+
+        if self.use_product_graph:
+            self.product_graph = self._create_product_graph(
+                product_graph_config=pipeline_config.product_graph
+            ).to(self.device)
+            self.product_graph_model = Model(
+                model_config=pipeline_config.product_graph.model,
+                input_dim=self.num_features,
+            )
 
         self.encoding_graph, self.init_grid_features, self.init_mesh_features = (
             create_encoding_graph(
@@ -238,13 +252,17 @@ class WeatherPrediction(nn.Module):
             num_grid_nodes=self._num_grid_nodes,
         )
 
+        encoder_input_dim = (
+            self.num_features + self._init_feature_size
+            if self.use_product_graph
+            else self.total_feature_size + self._init_feature_size
+        )
         self.encoder = Model(
-            model_config=pipeline_config.encoder,
-            input_dim=self.total_feature_size + self._init_feature_size,
+            model_config=pipeline_config.encoder, input_dim=encoder_input_dim
         )
 
         self.processor = Model(
-            model_config=pipeline_config.processor, 
+            model_config=pipeline_config.processor,
             input_dim=self.encoder.output_dim,
         )
 
@@ -279,6 +297,98 @@ class WeatherPrediction(nn.Module):
             np.float32
         ), self._mesh_nodes_lon.astype(np.float32)
 
+    def _product_graph_wrapper(self, grid_node_features: torch.Tensor):
+
+        # Flatten the grid node features to apply the message passing
+        batch_size, lat_index, lon_index, obs_window, num_features = (
+            grid_node_features.shape
+        )
+        grid_node_features = grid_node_features.view(
+            batch_size * lat_index * lon_index * obs_window, num_features
+        )
+
+        # Move the grid node features and edge index to the device
+        grid_node_features = grid_node_features.to(self.device)
+        edge_index = edge_index.to(self.device)
+
+        # Apply message passing for each time step
+        for t in range(self.obs_window):
+            grid_node_features = self.product_message_passing(
+                grid_node_features, edge_index
+            )
+
+        # Reshape back to the original dimensions
+        grid_node_features = grid_node_features.view(
+            batch_size, lat_index, lon_index, obs_window, num_features
+        )
+
+        # Convert the grid node features back to the original shape
+        last_observation_window = grid_node_features[
+            :, :, :, -1:, :
+        ]  # [16, 32, 64, 2, 2]
+
+        # Return the data to the original shape
+        last_observation_window = last_observation_window.view(
+            initial_shape[0], initial_shape[1], self.num_features
+        )
+
+        return last_observation_window
+
+    def _create_product_graph(self, product_graph_config: ProductGraphConfig):
+
+        def _construct_temporal_graph(T):
+            # We want a simple chain graph
+            temporal_graph = np.zeros((T, T))
+
+            for i in range(T - 1):
+                temporal_graph[i, i + 1] = 1
+
+            return temporal_graph
+
+        def _construct_adjacency_matrix(grid_lat, grid_lon, k):
+            lat_lon_grid = np.array(
+                [[lat, lon] for lat in grid_lat for lon in grid_lon]
+            )
+            adjacency = kneighbors_graph(
+                lat_lon_grid,
+                n_neighbors=k,
+                mode="connectivity",
+                include_self=False,
+            ).toarray()
+
+            # Maybe fix transpose of adjacency matrix
+
+            return adjacency
+
+        T = self.obs_window
+        N = self._num_grid_nodes
+        s00 = 0
+        if product_graph_config.type == ProductGraphType.KRONECKER:
+            s00, s01, s10, s11 = s00, 0, 0, 1
+        elif product_graph_config.type == ProductGraphType.CARTESIAN:
+            s00, s01, s10, s11 = s00, 1, 1, 0
+        elif product_graph_config.type == ProductGraphType.STRONG:
+            s00, s01, s10, s11 = s00, 1, 1, 1
+
+        temporal_graph = _construct_temporal_graph(T)
+
+        adjacency = _construct_adjacency_matrix(
+            grid_lat=self._grid_lat,
+            grid_lon=self._grid_lon,
+            k=product_graph_config.num_k,
+        )
+
+        product_graph = (
+            s00 * np.kron(np.eye(T), np.eye(N))
+            + s01 * np.kron(np.eye(T), adjacency)
+            + s10 * np.kron(temporal_graph, np.eye(N))
+            + s11 * np.kron(temporal_graph, adjacency)
+        )
+
+        edge_index, _ = dense_to_sparse(torch.tensor(product_graph, dtype=torch.float))
+
+        return edge_index
+
     def _preprocess_input(self, grid_node_features: torch.Tensor):
         batch_size, _, _ = grid_node_features.shape
 
@@ -295,9 +405,17 @@ class WeatherPrediction(nn.Module):
             (grid_node_features, broadcasted_init_grid_features), dim=-1
         )
 
+        total_feature_size = (
+            self.num_features if self.use_product_graph else self.total_feature_size
+        )
+
         # Initialise the mesh node features to 0s and append the initial mesh features
         mesh_node_features = torch.zeros(
-            (batch_size, self._num_mesh_nodes, self.total_feature_size)
+            (
+                batch_size,
+                self._num_mesh_nodes,
+                total_feature_size,
+            )
         ).to(self.device)
 
         updated_mesh_node_features = torch.cat(
@@ -318,8 +436,13 @@ class WeatherPrediction(nn.Module):
         X : torch.Tensor
           The input data of the shape [batch, num_grid_nodes, num_features].
         """
+        
+        if self.use_product_graph:
+            X = X.view(-1, self._num_grid_nodes * self.obs_window, self.num_features)
+            X = self.product_graph_model(X=X, edge_index=self.product_graph)
+            X = X[:, -self._num_grid_nodes :, :]
 
-        X = self._preprocess_input(grid_node_features=X)
+        X = self._preprocess_input(grid_node_features=X)    
 
         encoded_features = self.encoder(X=X, edge_index=self.encoding_graph)
 

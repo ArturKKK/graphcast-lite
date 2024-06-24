@@ -18,6 +18,9 @@ def train_epoch(
 
     for batch in train_dataloader:
         X, y = batch
+        if len(y.shape) == 4:
+            # Removing the extra timestep dimension from y
+            y = y.squeeze(2)
         X, y = X.to(device), y.to(device)
         optimiser.zero_grad()
         outs = model(X=X)
@@ -39,6 +42,9 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device)
     with torch.no_grad():
         for batch in test_dataloader:
             X, y = batch
+            if len(y.shape) == 4:
+                # Removing the extra timestep dimension from y
+                y = y.squeeze(2)
             X, y = X.to(device), y.to(device)
             outs = model(X=X)
             batch_loss = loss_fn(outs, y)
@@ -66,11 +72,11 @@ def train(
     train_losses = []
     test_losses = []
     
-    if wandb_log:
-        wandb.init(
-            entity="graphml-group4",
-            project="weather-prediction",
-            config=dict(config))
+    # if wandb_log:
+    #     wandb.init(
+    #         entity="graphml-group4",
+    #         project="weather-prediction",
+    #         config=dict(config))
 
     for epoch in range(num_epochs):
         epoch_train_loss = train_epoch(

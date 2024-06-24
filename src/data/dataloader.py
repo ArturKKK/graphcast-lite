@@ -38,8 +38,8 @@ def load_train_and_test_datasets(data_path: str, data_config: DataConfig):
     X_test = torch.load(X_test_path)
     y_test = torch.load(y_test_path)
 
-    print("X_train from dataset shape: ", X_train.shape)
-    print("y_train from dataset shape: ", y_train.shape)
+    # print("X_train from dataset shape: ", X_train.shape)
+    # print("y_train from dataset shape: ", y_train.shape)
 
 
     grid_dimension_size = num_longitudes * num_latitudes
