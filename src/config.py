@@ -78,8 +78,14 @@ class MLPBlock(BaseModel):
     layer_norm_mode: Optional[str] = None
 
 
+class GATProps(BaseModel):
+    num_heads: int
+    sparsity_thresholds: List[float]
+
+
 class GraphBlock(BaseModel):
     layer_type: GraphLayerType
+    gat_props: Optional[GATProps] = None
     hidden_dims: Optional[List[int]] = None
     output_dim: Optional[int] = None
     use_layer_norm: Optional[bool] = None
