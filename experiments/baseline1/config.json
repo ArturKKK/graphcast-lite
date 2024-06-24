@@ -1,5 +1,5 @@
 {
-    "batch_size": 16,
+    "batch_size": 1,
     "learning_rate": 1e-5,
     "num_epochs": 30,
     "graph": {
@@ -11,6 +11,7 @@
             -1
         ]
     },
+    
     "pipeline": {
         "product_graph": {
             "model": {
@@ -63,7 +64,7 @@
         }
     },
     "data": {
-        "dataset_name": "64x32_10f_5y_3obs",
+        "dataset_name": "64x32_33f_5y_5obs_uns",
         "num_features_used": 10,
         "obs_window_used": 3,
         "pred_window_used": 1,
