@@ -244,7 +244,7 @@ class WeatherPrediction(nn.Module):
             self.product_graph_model = Model(
                 model_config=pipeline_config.product_graph.model,
                 input_dim=self.num_features,
-            )
+            ).to(self.device)
 
         self.encoding_graph, self.init_grid_features, self.init_mesh_features = (
             create_encoding_graph(
@@ -283,17 +283,17 @@ class WeatherPrediction(nn.Module):
         )
         self.encoder = Model(
             model_config=pipeline_config.encoder, input_dim=encoder_input_dim
-        )
+        ).to(device)
 
         self.processor = Model(
             model_config=pipeline_config.processor,
             input_dim=self.encoder.output_dim,
-        )
+        ).to(device)
 
         self.decoder = Model(
             model_config=pipeline_config.decoder,
             input_dim=self.processor.output_dim,
-        )
+        ).to(device)
 
         self.encoding_graph, self.decoding_graph, self.processing_graph = (
             self.encoding_graph.to(self.device),
@@ -308,7 +308,7 @@ class WeatherPrediction(nn.Module):
                     self.product_graph_model,
                     torch.randn(
                         self._num_grid_nodes * self.obs_window, self.num_features
-                    ),
+                    ).to(device),
                     self.product_graph,
                 )
             )
@@ -320,7 +320,7 @@ class WeatherPrediction(nn.Module):
                 self.encoder,
                 torch.randn(
                     self._num_grid_nodes + self._num_mesh_nodes, encoder_input_dim
-                ),
+                ).to(device),
                 self.encoding_graph,
             )
         )
@@ -330,7 +330,7 @@ class WeatherPrediction(nn.Module):
         print(
             summary(
                 self.processor,
-                torch.randn(self._num_mesh_nodes, self.encoder.output_dim),
+                torch.randn(self._num_mesh_nodes, self.encoder.output_dim).to(device),
                 self.processing_graph,
             )
         )
@@ -343,7 +343,7 @@ class WeatherPrediction(nn.Module):
                 torch.randn(
                     self._num_grid_nodes + self._num_mesh_nodes,
                     self.processor.output_dim,
-                ),
+                ).to(device),
                 self.decoding_graph,
             )
         )
