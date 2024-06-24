@@ -248,7 +248,16 @@ def get_edges_from_faces(faces) -> np.ndarray:
     edges = []
     for face in faces:
         edges.extend([[face[0], face[1]], [face[1], face[2]], [face[2], face[0]]])
-    edges = np.array(edges)
-    edges = np.unique(edges, axis=0)
-    edges = np.sort(edges, axis=1)
-    return edges.T
+    edges = np.array(edges).T
+    edges = np.sort(edges, axis=0)  # Sort the edges from smaller number to larger number, so node pairs don't have both directions for the edges
+    edges = np.unique(edges, axis=1)    # remove duplicates (due to sorting, every node pair has only one direction)
+
+    
+    # interleave edges with swapped edges to have undirected graph
+    swapped_edges = np.flip(edges, axis=0)
+    interleaved_edges = np.zeros((2, 2 * edges.shape[1]), dtype=edges.dtype)
+
+    interleaved_edges[:, 0::2] = edges
+    interleaved_edges[:, 1::2] = swapped_edges
+
+    return interleaved_edges
