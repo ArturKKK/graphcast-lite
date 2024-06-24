@@ -2,7 +2,7 @@
     "batch_size": 1,
     "learning_rate": 1e-5,
     "num_epochs": 30,
-    "wandb_log": "true",
+    "wandb_log": true,
     "wandb_name": null,
     "graph": {
         "grid2mesh_edge_creation": "radius",
@@ -22,18 +22,18 @@
                         10
                     ],
                     "output_dim": 10,
-                    "use_layer_norm": "true",
+                    "use_layer_norm": true,
                     "layer_norm_mode": "node"
                 }
             },
             "num_k": 4,
-            "self_loop": "true",
+            "self_loop": true,
             "type": "strong"
         },
         "encoder": {
             "mlp": {
                 "output_dim": 32,
-                "use_layer_norm": "true",
+                "use_layer_norm": true,
                 "layer_norm_mode": "node"
             },
             "gcn": {
@@ -48,14 +48,14 @@
                     32
                 ],
                 "output_dim": 32,
-                "use_layer_norm": "true",
+                "use_layer_norm": true,
                 "layer_norm_mode": "node"
             }
         },
         "decoder": {
             "mlp": {
                 "output_dim": 10,
-                "use_layer_norm": "false"
+                "use_layer_norm": false
             },
             "gcn": {
                 "layer_type": "simple_conv"
