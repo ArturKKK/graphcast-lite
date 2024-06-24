@@ -130,16 +130,27 @@ class GraphLayer(nn.Module):
             )
 
     def forward(self, X: torch.Tensor, edge_index: torch.Tensor):
+        # print("Forward Started")
         if self.layer_type == GraphLayerType.SimpleConv:
+            # print("SimpleConv Forward")
             return self.layers(x=X, edge_index=edge_index)
 
         elif self.layer_type == GraphLayerType.ConvGCN:
+            # print("GCN Forward")
             for layer in self.layers:
                 if type(layer) == GCNConv:
                     X = layer(X, edge_index)
                 else:
                     X = layer(X)
-
+        elif self.layer_type == GraphLayerType.GATConv:
+            # print("GAT forward")
+            for layer in self.layers:
+                if type(layer) == GATConv:
+                    # print('if GATConv forward')
+                    X = layer(X, edge_index)
+                else:
+                    X = layer(X)
+        # print("Forward complete")
         return X
 
 
@@ -321,15 +332,21 @@ class WeatherPrediction(nn.Module):
 
         X = self._preprocess_input(grid_node_features=X)
 
-        encoded_features = self.encoder(X=X, edge_index=self.encoding_graph)
+        encoded_features = self.encoder.forward(X=X, edge_index=self.encoding_graph)
 
         grid_node_features = encoded_features[:, : self._num_grid_nodes, :]
         mesh_node_features = encoded_features[:, self._num_grid_nodes :, :]
 
         # Processing the mesh node features
-        processed_mesh_node_features = self.processor(
+        # print(f'Shape before squeeze {mesh_node_features.shape}')
+        mesh_node_features = mesh_node_features.squeeze()
+        # print(f' Shape after squeeze {mesh_node_features.shape}')
+        processed_mesh_node_features = self.processor.forward(
             X=mesh_node_features, edge_index=self.processing_graph
         )
+        # print(f'Shape before unsqueeze {processed_mesh_node_features.shape}')
+        processed_mesh_node_features = processed_mesh_node_features.unsqueeze(0)
+        # print(f'Shape after unsqueeze {processed_mesh_node_features.shape}')
 
         # Concatenating the grid feature again with the processed mesh features
 
@@ -337,7 +354,7 @@ class WeatherPrediction(nn.Module):
             (grid_node_features, processed_mesh_node_features), dim=1
         )
 
-        decoded_grid_node_features = self.decoder(
+        decoded_grid_node_features = self.decoder.forward(
             X=processed_features,
             edge_index=self.decoding_graph,
         )

@@ -91,7 +91,7 @@ def train(
 
         train_losses.append(epoch_train_loss)
         test_losses.append(epoch_test_loss)
-        wandb.log({"train_loss": epoch_train_loss, "test_loss": epoch_test_loss})
+        # wandb.log({"train_loss": epoch_train_loss, "test_loss": epoch_test_loss})
 
-    wandb.finish()
+    # wandb.finish()
     return train_losses, test_losses

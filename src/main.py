@@ -81,7 +81,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
         device=device,
         config=experiment_config,
         print_losses=True,
-        wandb_log=True
+        wandb_log=False
     )
 
     results = {
