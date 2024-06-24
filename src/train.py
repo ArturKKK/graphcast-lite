@@ -119,7 +119,7 @@ def train(
         val_losses.append(epoch_val_loss)
         test_losses.append(epoch_test_loss)
         if wandb_log:
-            wandb.log({"train_loss": epoch_train_loss, "test_loss": epoch_test_loss})
+            wandb.log({"train_loss": epoch_train_loss, "test_loss": epoch_test_loss, "val_loss": epoch_val_loss})
 
     if wandb_log:
         wandb.finish()
