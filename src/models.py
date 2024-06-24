@@ -297,43 +297,6 @@ class WeatherPrediction(nn.Module):
             np.float32
         ), self._mesh_nodes_lon.astype(np.float32)
 
-    def _product_graph_wrapper(self, grid_node_features: torch.Tensor):
-
-        # Flatten the grid node features to apply the message passing
-        batch_size, lat_index, lon_index, obs_window, num_features = (
-            grid_node_features.shape
-        )
-        grid_node_features = grid_node_features.view(
-            batch_size * lat_index * lon_index * obs_window, num_features
-        )
-
-        # Move the grid node features and edge index to the device
-        grid_node_features = grid_node_features.to(self.device)
-        edge_index = edge_index.to(self.device)
-
-        # Apply message passing for each time step
-        for t in range(self.obs_window):
-            grid_node_features = self.product_message_passing(
-                grid_node_features, edge_index
-            )
-
-        # Reshape back to the original dimensions
-        grid_node_features = grid_node_features.view(
-            batch_size, lat_index, lon_index, obs_window, num_features
-        )
-
-        # Convert the grid node features back to the original shape
-        last_observation_window = grid_node_features[
-            :, :, :, -1:, :
-        ]  # [16, 32, 64, 2, 2]
-
-        # Return the data to the original shape
-        last_observation_window = last_observation_window.view(
-            initial_shape[0], initial_shape[1], self.num_features
-        )
-
-        return last_observation_window
-
     def _create_product_graph(self, product_graph_config: ProductGraphConfig):
 
         def _construct_temporal_graph(T):
