@@ -56,13 +56,16 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
     set_random_seeds(seed=experiment_config.random_seed)
 
-    train_dataset, test_dataset, dataset_metadata = load_train_and_test_datasets(
+    train_dataset, val_dataset, test_dataset, dataset_metadata = load_train_and_test_datasets(
         data_path=os.path.join("data", "datasets", experiment_config.data.dataset_name),
         data_config=experiment_config.data,
     )
 
     train_dataloader = DataLoader(
         train_dataset, batch_size=experiment_config.batch_size, shuffle=True
+    )
+    val_dataloader = DataLoader(
+        val_dataset, batch_size=experiment_config.batch_size, shuffle=False
     )
     test_dataloader = DataLoader(
         test_dataset, batch_size=experiment_config.batch_size, shuffle=False
@@ -78,9 +81,10 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
     optimizer = Adam(params=model.parameters(), lr=experiment_config.learning_rate)
 
-    train_losses, test_losses = train(
+    train_losses, val_losses, test_losses = train(
         model=model,
         train_datalaoder=train_dataloader,
+        val_dataloader=val_dataloader,
         test_dataloader=test_dataloader,
         optimiser=optimizer,
         num_epochs=experiment_config.num_epochs,
@@ -92,6 +96,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
     results = {
         "train_losses": train_losses,
+        "val_losses": val_losses,
         "test_losses": test_losses,
     }
 

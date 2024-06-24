@@ -97,7 +97,18 @@ def load_train_and_test_datasets(data_path: str, data_config: DataConfig):
             -1, grid_dimension_size, pred_window_used * num_features_used
         )
 
+    # Create the validation set from the test set
+    # We will use the last 50% of the test set as the validation set
+    test_size = X_test.shape[0]
+    val_size = test_size // 2
+    
+    X_val = X_test[:val_size]
+    y_val = y_test[:val_size]
+    X_test = X_test[val_size:]
+    y_test = y_test[val_size:]
+
     train_dataset = WeatherDataset(X=X_train, y=y_train)
+    val_dataset = WeatherDataset(X=X_val, y=y_val)
     test_dataset = WeatherDataset(X=X_test, y=y_test)
 
-    return train_dataset, test_dataset, dataset_metadata
+    return train_dataset, val_dataset, test_dataset, dataset_metadata

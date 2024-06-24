@@ -65,6 +65,7 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device)
 def train(
     model: WeatherPrediction,
     train_datalaoder: DataLoader,
+    val_dataloader: DataLoader,
     test_dataloader: DataLoader,
     optimiser: Optimizer,
     num_epochs: int,
@@ -77,6 +78,7 @@ def train(
     loss_fn = nn.MSELoss()
 
     train_losses = []
+    val_losses = []
     test_losses = []
     
     if wandb_log:
@@ -99,13 +101,22 @@ def train(
         if print_losses:
             print(f"Train loss after epoch {epoch+1}: {epoch_train_loss}")
 
+        epoch_val_loss = test(
+            model=model, test_dataloader=val_dataloader, loss_fn=loss_fn, device=device
+        )
+        if print_losses:
+            print(f"Validation loss after epoch {epoch+1}: {epoch_val_loss}")
+        
+
         epoch_test_loss = test(
             model=model, test_dataloader=test_dataloader, loss_fn=loss_fn, device=device
         )
         if print_losses:
             print(f"Test loss after epoch {epoch+1}: {epoch_test_loss}")
-
+            print()
+             
         train_losses.append(epoch_train_loss)
+        val_losses.append(epoch_val_loss)
         test_losses.append(epoch_test_loss)
         if wandb_log:
             wandb.log({"train_loss": epoch_train_loss, "test_loss": epoch_test_loss})

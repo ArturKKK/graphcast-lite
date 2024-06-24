@@ -31,6 +31,7 @@ class ProductGraphType(str, Enum):
 class DatasetNames(str, Enum):
     _64x32_10f_5y_3obs = "64x32_10f_5y_3obs"
     _64x32_33f_5y_5obs_uns = "64x32_33f_5y_5obs_uns"
+    _64x32_12f_2y_2obs_1pred_uns = "64x32_12f_2y_2obs_1pred_uns"
     
     
 class GraphBuildingConfig(BaseModel):

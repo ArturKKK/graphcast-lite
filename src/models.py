@@ -221,6 +221,7 @@ class WeatherPrediction(nn.Module):
         self.device = device
         self.obs_window = data_config.obs_window_used
         self.num_features = data_config.num_features_used
+        self.total_feature_size = self.num_features * self.obs_window
         self.use_product_graph = pipeline_config.product_graph is not None
 
         self._init_grid_properties(grid_lat=cordinates[0], grid_lon=cordinates[1])
