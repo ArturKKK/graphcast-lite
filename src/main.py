@@ -87,7 +87,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str, w
         device=device,
         config=experiment_config,
         print_losses=True,
-        wandb_log=wandb_log,
+        wandb_log=False
     )
 
     results = {
@@ -110,7 +110,7 @@ def main():
     experiment_config = ExperimentConfig(**load_from_json_file(experiment_config_path))
 
     run_experiment(
-        experiment_config=experiment_config, results_save_dir=results_save_dir
+        experiment_config=experiment_config, results_save_dir=results_save_dir, wandb_log=False
     )
 
 

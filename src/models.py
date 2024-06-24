@@ -112,14 +112,24 @@ class GraphLayer(nn.Module):
                 self.layers.append(GCNConv(hidden_dims[-1], graph_config.output_dim))
 
             elif graph_config.layer_type == GraphLayerType.GATConv:
-                self.layers.append(GATConv(input_dim, hidden_dims[0]))
+                self.layers.append(
+                    GATConv(input_dim, hidden_dims[0], heads=4, concat=False)
+                )
                 self.layers.append(self.activation)
 
                 for i in range(1, len(hidden_dims)):
-                    self.layers.append(GATConv(hidden_dims[i - 1], hidden_dims[i]))
+                    self.layers.append(
+                        GATConv(
+                            hidden_dims[i - 1], hidden_dims[i], heads=4, concat=False
+                        )
+                    )
                     self.layers.append(self.activation)
 
-                self.layers.append(GATConv(hidden_dims[-1], graph_config.output_dim))
+                self.layers.append(
+                    GATConv(
+                        hidden_dims[-1], graph_config.output_dim, heads=4, concat=False
+                    )
+                )
 
             if graph_config.use_layer_norm:
                 self.layers.append(
@@ -144,7 +154,12 @@ class GraphLayer(nn.Module):
                     X = layer(X, edge_index)
                 else:
                     X = layer(X)
-
+        elif self.layer_type == GraphLayerType.GATConv:
+            for layer in self.layers:
+                if type(layer) == GATConv:
+                    X = layer(X, edge_index)
+                else:
+                    X = layer(X)
         return X
 
 
@@ -353,19 +368,9 @@ class WeatherPrediction(nn.Module):
         return edge_index
 
     def _preprocess_input(self, grid_node_features: torch.Tensor):
-        batch_size, _, _ = grid_node_features.shape
-
-        # Repeat initial features across all batches
-        broadcasted_init_grid_features = self.init_grid_features.broadcast_to(
-            (batch_size, self._num_grid_nodes, self._init_feature_size)
-        )
-        broadcasted_mesh_grid_features = self.init_mesh_features.broadcast_to(
-            (batch_size, self._num_mesh_nodes, self._init_feature_size)
-        )
-
         # Concatenate the initial grid node features with the incoming input
         updated_grid_node_features = torch.cat(
-            (grid_node_features, broadcasted_init_grid_features), dim=-1
+            (grid_node_features, self.init_grid_features), dim=-1
         )
 
         total_feature_size = (
@@ -375,18 +380,17 @@ class WeatherPrediction(nn.Module):
         # Initialise the mesh node features to 0s and append the initial mesh features
         mesh_node_features = torch.zeros(
             (
-                batch_size,
                 self._num_mesh_nodes,
                 total_feature_size,
             )
         ).to(self.device)
 
         updated_mesh_node_features = torch.cat(
-            (mesh_node_features, broadcasted_mesh_grid_features), dim=-1
+            (mesh_node_features, self.init_mesh_features), dim=-1
         )
 
         # Concatenate them into one single tensor so that they can be passed through graph layers
-        X = torch.cat((updated_grid_node_features, updated_mesh_node_features), dim=1)
+        X = torch.cat((updated_grid_node_features, updated_mesh_node_features), dim=0)
 
         return X
 
@@ -399,37 +403,36 @@ class WeatherPrediction(nn.Module):
         X : torch.Tensor
           The input data of the shape [batch, num_grid_nodes, num_features].
         """
-        
+        X = X.squeeze()
         if self.use_product_graph:
-            X = X.view(-1, self._num_grid_nodes * self.obs_window, self.num_features)
+            X = X.view(self._num_grid_nodes * self.obs_window, self.num_features)
             X = self.product_graph_model(X=X, edge_index=self.product_graph)
-            X = X[:, -self._num_grid_nodes :, :]
+            X = X[-self._num_grid_nodes :, :]
 
-        X = self._preprocess_input(grid_node_features=X)    
+        X = self._preprocess_input(grid_node_features=X)
 
-        encoded_features = self.encoder(X=X, edge_index=self.encoding_graph)
+        encoded_features = self.encoder.forward(X=X, edge_index=self.encoding_graph)
 
-        grid_node_features = encoded_features[:, : self._num_grid_nodes, :]
-        mesh_node_features = encoded_features[:, self._num_grid_nodes :, :]
+        grid_node_features = encoded_features[: self._num_grid_nodes, :]
+        mesh_node_features = encoded_features[self._num_grid_nodes :, :]
 
         # Processing the mesh node features
-        processed_mesh_node_features = self.processor(
+        processed_mesh_node_features = self.processor.forward(
             X=mesh_node_features, edge_index=self.processing_graph
         )
 
         # Concatenating the grid feature again with the processed mesh features
-
         processed_features = torch.cat(
-            (grid_node_features, processed_mesh_node_features), dim=1
+            (grid_node_features, processed_mesh_node_features), dim=0
         )
 
-        decoded_grid_node_features = self.decoder(
+        decoded_grid_node_features = self.decoder.forward(
             X=processed_features,
             edge_index=self.decoding_graph,
         )
 
         decoded_grid_node_features = decoded_grid_node_features[
-            :, : self._num_grid_nodes, :
+            : self._num_grid_nodes, :
         ]
 
         if self.residual_output:

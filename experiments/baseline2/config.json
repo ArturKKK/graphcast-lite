@@ -1,5 +1,6 @@
 {
-    "batch_size": 2,
+    "batch_size": 1,
+    "batch_size": 1,
     "learning_rate": 1e-5,
     "num_epochs": 30,
     "graph": {
@@ -14,11 +15,7 @@
     "pipeline": {
         "encoder": {
             "mlp": {
-                "mlp_hidden_dims": [
-                    36,
-                    72
-                ],
-                "output_dim": 128,
+                "output_dim": 32,
                 "use_layer_norm": "true",
                 "layer_norm_mode": "node"
             },
@@ -30,21 +27,17 @@
             "gcn": {
                 "layer_type": "conv_gcn",
                 "hidden_dims": [
-                    128,
-                    128
+                    32,
+                    32
                 ],
-                "output_dim": 128,
+                "output_dim": 32,
                 "use_layer_norm": "true",
                 "layer_norm_mode": "node"
             }
         },
         "decoder": {
             "mlp": {
-                "mlp_hidden_dims": [
-                    72,
-                    36
-                ],
-                "output_dim": 12,
+                "output_dim": 10,
                 "use_layer_norm": "false"
             },
             "gcn": {
