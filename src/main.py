@@ -10,7 +10,10 @@ import numpy as np
 from torch.optim import Adam
 from src.train import train
 from src.data.dataloader import load_train_and_test_datasets
+from src.data.data_configs import DatasetMetadata
 import random
+
+CURRENT_WORKING_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def set_random_seeds(seed: int = 42):
@@ -20,18 +23,19 @@ def set_random_seeds(seed: int = 42):
 
 
 def load_model_from_experiment_config(
-    experiment_config: ExperimentConfig, device
+    experiment_config: ExperimentConfig, device, dataset_metadata: DatasetMetadata
 ) -> WeatherPrediction:
+
     lats = np.linspace(
         start=-90,
         stop=90,
-        num=experiment_config.data.num_latitudes,
+        num=dataset_metadata.num_latitudes,
         endpoint=True,
     )
     longs = np.linspace(
         start=0,
         stop=360,
-        num=experiment_config.data.num_longitudes,
+        num=dataset_metadata.num_longitudes,
         endpoint=False,
     )
 
@@ -46,14 +50,14 @@ def load_model_from_experiment_config(
     return model
 
 
-def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
+def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str, wandb_log=True):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     set_random_seeds(seed=experiment_config.random_seed)
 
-    train_dataset, test_dataset = load_train_and_test_datasets(
-        data_path=experiment_config.data.data_directory,
+    train_dataset, test_dataset, dataset_metadata = load_train_and_test_datasets(
+        data_path=os.path.join("data", "datasets", experiment_config.data.dataset_name),
         data_config=experiment_config.data,
     )
 
@@ -65,7 +69,9 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
     )
 
     model: WeatherPrediction = load_model_from_experiment_config(
-        experiment_config=experiment_config, device=device
+        experiment_config=experiment_config,
+        device=device,
+        dataset_metadata=dataset_metadata,
     )
 
     model = model.to(device)
@@ -81,7 +87,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
         device=device,
         config=experiment_config,
         print_losses=True,
-        wandb_log=True
+        wandb_log=wandb_log,
     )
 
     results = {
@@ -106,6 +112,7 @@ def main():
     run_experiment(
         experiment_config=experiment_config, results_save_dir=results_save_dir
     )
+
 
 if __name__ == "__main__":
     main()
