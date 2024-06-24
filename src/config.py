@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Literal, Union, List
+from typing import Optional, List
 from enum import Enum
 
     
@@ -30,6 +30,7 @@ class ProductGraphType(str, Enum):
 
 class DatasetNames(str, Enum):
     _64x32_10f_5y_3obs = "64x32_10f_5y_3obs"
+    _64x32_33f_5y_5obs_uns = "64x32_33f_5y_5obs_uns"
     
     
 class GraphBuildingConfig(BaseModel):
