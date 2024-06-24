@@ -59,7 +59,6 @@ class GraphBuildingConfig(BaseModel):
     """
 
     # grid-to-mesh graph configs
-    mesh_size: int
     grid2mesh_edge_creation: Grid2MeshEdgeCreation
     grid2mesh_radius_query: Optional[float] = None
     grid2mesh_k: Optional[int] = None

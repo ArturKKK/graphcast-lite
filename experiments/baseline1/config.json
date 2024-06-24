@@ -3,12 +3,11 @@
     "learning_rate": 1e-5,
     "num_epochs": 30,
     "graph": {
-        "mesh_size": 3,
         "grid2mesh_edge_creation": "radius",
         "mesh2grid_edge_creation": "contained",
         "grid2mesh_radius_query": 0.5,
         "mesh_levels": [
-            -1
+            1,0,2
         ]
     },
     "pipeline": {

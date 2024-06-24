@@ -213,13 +213,13 @@ def filter_mesh(meshes: List[TriangularMesh], mesh_levels: list[int]):
         
         Lower levels have less faces.
     """
+    mesh_levels = sorted(mesh_levels, reverse=True)
     faces: np.array = meshes[mesh_levels[0]].faces
     for level_desired in mesh_levels[1:]:
         level_mesh = meshes[level_desired]
         faces = np.concatenate((faces, level_mesh.faces), axis=0)
 
     mesh_we_want = TriangularMesh(vertices=meshes[mesh_levels[0]].vertices, faces=faces)
-        
     return mesh_we_want
 
 def get_edges_from_faces(faces) -> np.ndarray:

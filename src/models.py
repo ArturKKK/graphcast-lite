@@ -259,6 +259,7 @@ class WeatherPrediction(nn.Module):
         self.processing_graph = create_processing_graph(
             meshes=self._meshes, mesh_levels=graph_config.mesh_levels
         )
+        import pdb; pdb.set_trace()
 
         self.decoding_graph = create_decoding_graph(
             cordinates=cordinates,
@@ -299,7 +300,7 @@ class WeatherPrediction(nn.Module):
 
     def _init_mesh_properties(self, graph_config: GraphBuildingConfig):
         self._meshes = get_hierarchy_of_triangular_meshes_for_sphere(
-            splits=graph_config.mesh_size
+            splits=max(graph_config.mesh_levels)
         )
         self._finest_mesh = self._meshes[-1]
         self._num_mesh_nodes = len(self._finest_mesh.vertices)
