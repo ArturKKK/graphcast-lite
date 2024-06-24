@@ -106,14 +106,14 @@ class GraphLayer(nn.Module):
 
             elif graph_config.layer_type == GraphLayerType.GATConv:
                 print('GAT')
-                self.layers.append(GATConv(input_dim, hidden_dims[0]))
+                self.layers.append(GATConv(input_dim, hidden_dims[0], heads=4,  concat=False))
                 self.layers.append(self.activation)
 
                 for i in range(1, len(hidden_dims)):
-                    self.layers.append(GATConv(hidden_dims[i - 1], hidden_dims[i]))
+                    self.layers.append(GATConv(hidden_dims[i - 1], hidden_dims[i], heads=4, concat=False))
                     self.layers.append(self.activation)
 
-                self.layers.append(GATConv(hidden_dims[-1], graph_config.output_dim))
+                self.layers.append(GATConv(hidden_dims[-1], graph_config.output_dim, heads=4, concat=False))
 
             if graph_config.use_layer_norm:
                 self.layers.append(
