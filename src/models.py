@@ -6,6 +6,7 @@ from torch_geometric.nn import GCNConv, SimpleConv, GATConv, LayerNorm
 import numpy as np
 from sklearn.neighbors import kneighbors_graph
 from torch_geometric.utils import dense_to_sparse
+from torch_geometric.nn import summary
 
 from src.config import (
     ModelConfig,
@@ -112,22 +113,23 @@ class GraphLayer(nn.Module):
                 self.layers.append(GCNConv(hidden_dims[-1], graph_config.output_dim))
 
             elif graph_config.layer_type == GraphLayerType.GATConv:
+                num_heads = graph_config.gat_props.num_heads
                 self.layers.append(
-                    GATConv(input_dim, hidden_dims[0], heads=4, concat=False)
+                    GATConv(input_dim, hidden_dims[0], heads=num_heads, concat=False)
                 )
                 self.layers.append(self.activation)
 
                 for i in range(1, len(hidden_dims)):
                     self.layers.append(
                         GATConv(
-                            hidden_dims[i - 1], hidden_dims[i], heads=4, concat=False
+                            hidden_dims[i - 1], hidden_dims[i], heads=num_heads, concat=False
                         )
                     )
                     self.layers.append(self.activation)
 
                 self.layers.append(
                     GATConv(
-                        hidden_dims[-1], graph_config.output_dim, heads=4, concat=False
+                        hidden_dims[-1], graph_config.output_dim, heads=num_heads, concat=False
                     )
                 )
 
@@ -292,6 +294,18 @@ class WeatherPrediction(nn.Module):
             self.decoding_graph.to(device),
             self.processing_graph.to(device),
         )
+
+        print('Encoder summary: ')
+        print(summary(self.encoder, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, encoder_input_dim), self.encoding_graph))
+        print()
+
+        print('Processor summary: ')
+        print(summary(self.processor, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, self.encoder.output_dim), self.processing_graph))
+        print()
+
+        print('Decoder summary: ')
+        print(summary(self.decoder, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, self.processor.output_dim), self.decoding_graph))
+        print()
 
     def _init_grid_properties(self, grid_lat: np.ndarray, grid_lon: np.ndarray):
         self._grid_lat = grid_lat.astype(np.float32)
