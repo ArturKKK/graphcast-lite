@@ -207,27 +207,18 @@ def _two_split_unit_sphere_triangle_faces(
     )
 
 
-def filter_mesh(meshes, mesh_levels: int):
+def filter_mesh(meshes: List[TriangularMesh], mesh_levels: list[int]):
     """ Remove the faces of lower level meshes from the mesh that we want.
         Needed as graphcast creates a hierarchy of meshes and we only want the specific level.
         
         Lower levels have less faces.
     """
+    faces: np.array = meshes[mesh_levels[0]].faces
+    for level_desired in mesh_levels[1:]:
+        level_mesh = meshes[level_desired]
+        faces = np.concatenate((faces, level_mesh.faces), axis=0)
 
-    #TODO: This now has to handle lists of mesh levels
-    level_desired = mesh_levels[0]
-    
-    mesh_we_want = meshes[level_desired]
-    face_set = set()
-    for face in mesh_we_want.faces:
-        face_set.add(tuple(face))
-
-    for mesh in meshes[:level_desired]:
-        for face in mesh.faces:
-            face_set.discard(tuple(face))
-
-    faces = np.array(list(face_set))
-    mesh_we_want = TriangularMesh(vertices=mesh_we_want.vertices, faces=faces)
+    mesh_we_want = TriangularMesh(vertices=meshes[mesh_levels[0]].vertices, faces=faces)
         
     return mesh_we_want
 

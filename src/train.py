@@ -72,11 +72,11 @@ def train(
     train_losses = []
     test_losses = []
     
-    # if wandb_log:
-    #     wandb.init(
-    #         entity="graphml-group4",
-    #         project="weather-prediction",
-    #         config=dict(config))
+    if wandb_log:
+        wandb.init(
+            entity="graphml-group4",
+            project="weather-prediction",
+            config=dict(config))
 
     for epoch in range(num_epochs):
         epoch_train_loss = train_epoch(
