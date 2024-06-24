@@ -22,6 +22,12 @@ class GraphLayerType(str, Enum):
     GATConv = "conv_gat"
 
 
+class ProductGraphType(str, Enum):
+    KRONECKER = "kronecker"
+    CARTESIAN = "cartesian"
+    STRONG = "strong"
+
+
 class GraphBuildingConfig(BaseModel):
     """This defines the parameters for building the graph.
 
@@ -55,7 +61,7 @@ class GraphBuildingConfig(BaseModel):
 
     # mesh graph configs
     mesh_levels: List[int]
-    
+
     # mesh-to-grid graph configs
     mesh2grid_edge_creation: Mesh2GridEdgeCreation
 
@@ -80,7 +86,15 @@ class ModelConfig(BaseModel):
     gcn: GraphBlock
 
 
+class ProductGraphConfig(BaseModel):
+    model: ModelConfig
+    num_k: int
+    self_loop: bool
+    type: ProductGraphType
+
+
 class PipelineConfig(BaseModel):
+    product_graph: Optional[ProductGraphConfig] = None
     encoder: ModelConfig
     processor: ModelConfig
     decoder: ModelConfig
@@ -89,7 +103,7 @@ class PipelineConfig(BaseModel):
 
 class DataConfig(BaseModel):
     data_directory: str
-        
+
     # metadata about the dataset
     # because the dataset can take many forms
     # feats_flattened means the features and observation windows are flattened together in one dim
@@ -104,15 +118,9 @@ class DataConfig(BaseModel):
     num_features_used: int
     obs_window_used: int
     pred_window_used: int
-    
+
     want_feats_flattened: bool
 
-
-class ProductGraphConfig(BaseModel):
-    use_product_graph: bool
-    kronecker: bool
-    cartesian: bool
-    strong: bool
 
 class ExperimentConfig(BaseModel):
     batch_size: int
@@ -122,4 +130,3 @@ class ExperimentConfig(BaseModel):
     graph: GraphBuildingConfig
     pipeline: PipelineConfig
     data: DataConfig
-    product_graph: ProductGraphConfig
