@@ -121,3 +121,6 @@ class ExperimentConfig(BaseModel):
     graph: GraphBuildingConfig
     pipeline: PipelineConfig
     data: DataConfig
+    wandb_log: bool = True
+    wandb_name: Optional[str] = None
+    wandb_key: str = "3a59363c20cd4fdf2b95dfd7a9cd72398d15321e"

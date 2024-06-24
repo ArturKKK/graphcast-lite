@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from torch.optim import Optimizer
 from tqdm import tqdm
 import wandb
+from src.config import ExperimentConfig
 
 def train_epoch(
     model: WeatherPrediction,
@@ -68,7 +69,7 @@ def train(
     optimiser: Optimizer,
     num_epochs: int,
     device: str,
-    config: dict,
+    config: ExperimentConfig,
     print_losses: bool = True,
     wandb_log: bool = True,
 ):
@@ -79,10 +80,13 @@ def train(
     test_losses = []
     
     if wandb_log:
+        wandb.login(key=config.wandb_key)
         wandb.init(
             entity="graphml-group4",
             project="weather-prediction",
-            config=dict(config))
+            config=dict(config),
+            name=config.wandb_name
+            )
 
     for epoch in range(num_epochs):
         epoch_train_loss = train_epoch(

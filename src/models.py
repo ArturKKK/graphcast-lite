@@ -259,7 +259,6 @@ class WeatherPrediction(nn.Module):
         self.processing_graph = create_processing_graph(
             meshes=self._meshes, mesh_levels=graph_config.mesh_levels
         )
-        import pdb; pdb.set_trace()
 
         self.decoding_graph = create_decoding_graph(
             cordinates=cordinates,

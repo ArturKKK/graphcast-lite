@@ -50,7 +50,7 @@ def load_model_from_experiment_config(
     return model
 
 
-def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str, wandb_log=True):
+def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -87,7 +87,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str, w
         device=device,
         config=experiment_config,
         print_losses=True,
-        wandb_log=False
+        wandb_log=experiment_config.wandb_log,
     )
 
     results = {
@@ -110,7 +110,7 @@ def main():
     experiment_config = ExperimentConfig(**load_from_json_file(experiment_config_path))
 
     run_experiment(
-        experiment_config=experiment_config, results_save_dir=results_save_dir, wandb_log=False
+        experiment_config=experiment_config, results_save_dir=results_save_dir
     )
 
 
