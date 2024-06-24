@@ -99,7 +99,34 @@ def train(
     # Early stopping variables
     best_val_loss = float("inf")
     patience_counter = 0
+    
+    # Getting initial performance before training
+    intial_train_loss = test(
+        model=model, test_dataloader=train_dataloader, loss_fn=loss_fn, device=device
+    )
 
+    intial_val_loss = test(
+        model=model, test_dataloader=val_dataloader, loss_fn=loss_fn, device=device
+    )
+
+    intial_test_loss = test(
+        model=model, test_dataloader=test_dataloader, loss_fn=loss_fn, device=device
+    )
+    
+    train_losses.append(intial_train_loss)
+    val_losses.append(intial_val_loss)
+    test_losses.append(intial_test_loss)
+        
+    if wandb_log:
+        wandb.log(
+            {
+                "train_loss": intial_train_loss,
+                "val_loss": intial_val_loss,
+                "test_loss": intial_test_loss,
+            }
+            )
+
+    # Running training
     for epoch in range(num_epochs):
         epoch_train_loss = train_epoch(
             model=model,
