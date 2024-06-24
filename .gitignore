@@ -178,3 +178,6 @@ mlg-env/
 
 # Wandb
 /wandb
+
+# virtualenv
+mlg-env/

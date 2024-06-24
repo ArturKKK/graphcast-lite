@@ -93,7 +93,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
     return results
 
 
-if __name__ == "__main__":
+def main():
     experiment_directory = sys.argv[1]
 
     experiment_config_path = os.path.join(
@@ -107,3 +107,6 @@ if __name__ == "__main__":
     run_experiment(
         experiment_config=experiment_config, results_save_dir=results_save_dir
     )
+
+if __name__ == "__main__":
+    main()

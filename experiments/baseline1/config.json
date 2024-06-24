@@ -12,6 +12,23 @@
         ]
     },
     "pipeline": {
+        "product_graph": {
+            "model": {
+                "gcn": {
+                    "layer_type": "conv_gcn",
+                    "hidden_dims": [
+                        10,
+                        10
+                    ],
+                    "output_dim": 10,
+                    "use_layer_norm": "true",
+                    "layer_norm_mode": "node"
+                }
+            },
+            "num_k": 4,
+            "self_loop": "true",
+            "type": "strong"
+        },
         "encoder": {
             "mlp": {
                 "output_dim": 32,
@@ -36,7 +53,7 @@
         },
         "decoder": {
             "mlp": {
-                "output_dim": 2,
+                "output_dim": 10,
                 "use_layer_norm": "true",
                 "layer_norm_mode": "node"
             },
@@ -50,19 +67,12 @@
         "feats_flattened": true,
         "num_latitudes": 32,
         "num_longitudes": 64,
-        "num_features": 3,
-        "obs_window": 4,
+        "num_features": 10,
+        "obs_window": 3,
         "pred_window": 1,
-
-        "num_features_used": 2,
-        "obs_window_used": 4,
+        "num_features_used": 10,
+        "obs_window_used": 3,
         "pred_window_used": 1,
-        "want_feats_flattened": true
-    }, 
-    "product_graph": {
-        "use_product_graph": true,
-        "kronecker": false,
-        "cartesian": false,
-        "strong": true
+        "want_feats_flattened": false
     }
 }
