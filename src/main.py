@@ -56,9 +56,13 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
     set_random_seeds(seed=experiment_config.random_seed)
 
-    train_dataset, val_dataset, test_dataset, dataset_metadata = load_train_and_test_datasets(
-        data_path=os.path.join("data", "datasets", experiment_config.data.dataset_name),
-        data_config=experiment_config.data,
+    train_dataset, val_dataset, test_dataset, dataset_metadata = (
+        load_train_and_test_datasets(
+            data_path=os.path.join(
+                "data", "datasets", experiment_config.data.dataset_name
+            ),
+            data_config=experiment_config.data,
+        )
     )
 
     train_dataloader = DataLoader(
@@ -83,13 +87,14 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
     train_losses, val_losses, test_losses = train(
         model=model,
-        train_datalaoder=train_dataloader,
+        train_dataloader=train_dataloader,
         val_dataloader=val_dataloader,
         test_dataloader=test_dataloader,
         optimiser=optimizer,
         num_epochs=experiment_config.num_epochs,
         device=device,
         config=experiment_config,
+        results_save_dir=results_save_dir,
         print_losses=True,
         wandb_log=experiment_config.wandb_log,
     )
@@ -111,6 +116,9 @@ def main():
     )
 
     results_save_dir = os.path.join(experiment_directory, FolderNames.RESULTS)
+
+    if not os.path.exists(results_save_dir):
+        os.makedirs(results_save_dir)
 
     experiment_config = ExperimentConfig(**load_from_json_file(experiment_config_path))
 

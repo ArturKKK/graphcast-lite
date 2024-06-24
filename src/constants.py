@@ -8,3 +8,5 @@ class FileNames:
     TRAIN_Y = "y_train.pt"
     TEST_X = "X_test.pt"
     TEST_Y = "y_test.pt"
+    SAVED_MODEL = "best_model.pth"
+    SAVED_RESULTS = "results.json"

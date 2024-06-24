@@ -178,3 +178,8 @@ cython_debug/
 
 # virtualenv
 mlg-env/
+
+
+#Model files
+experiments/*/results.json
+experiments/*/best_model.pth

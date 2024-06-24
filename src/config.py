@@ -121,10 +121,12 @@ class DataConfig(BaseModel):
 
 
 class ExperimentConfig(BaseModel):
-    batch_size: int
-    learning_rate: float
-    num_epochs: int
-    random_seed: Optional[int] = None
+    batch_size: int = 1
+    learning_rate: float = 1e-5
+    early_stopping_patience: int = 5
+    early_stopping_delta: float = 1
+    num_epochs: int = 100
+    random_seed: Optional[int] = 42
     graph: GraphBuildingConfig
     pipeline: PipelineConfig
     data: DataConfig
