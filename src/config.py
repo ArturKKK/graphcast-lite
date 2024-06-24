@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Literal, Union, List
 from enum import Enum
 
-
+    
 class Grid2MeshEdgeCreation(str, Enum):
     """The different strategies to create grid to mesh edges."""
 
@@ -28,6 +28,10 @@ class ProductGraphType(str, Enum):
     STRONG = "strong"
 
 
+class DatasetNames(str, Enum):
+    _64x32_10f_5y_3obs = "64x32_10f_5y_3obs"
+    
+    
 class GraphBuildingConfig(BaseModel):
     """This defines the parameters for building the graph.
 
@@ -102,23 +106,10 @@ class PipelineConfig(BaseModel):
 
 
 class DataConfig(BaseModel):
-    data_directory: str
-
-    # metadata about the dataset
-    # because the dataset can take many forms
-    # feats_flattened means the features and observation windows are flattened together in one dim
-    feats_flattened: bool
-    num_latitudes: int
-    num_longitudes: int
-    num_features: int
-    obs_window: int
-    pred_window: int
-
-    # these are data for you to change in the config regardless of the dataset
+    dataset_name: DatasetNames
     num_features_used: int
     obs_window_used: int
     pred_window_used: int
-
     want_feats_flattened: bool
 
 

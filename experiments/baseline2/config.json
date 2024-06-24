@@ -53,16 +53,9 @@
         }
     },
     "data": {
-        "data_directory": "data/datasets/64x32_12f_2y_2obs_1pred_uns",
-        "feats_flattened": false,
-        "num_latitudes": 32,
-        "num_longitudes": 64,
-        "num_features": 12,
-        "obs_window": 2,
-        "pred_window": 1,
-
-        "num_features_used": 12,
-        "obs_window_used": 2,
+        "dataset_name": "64x32_10f_5y_3obs",
+        "num_features_used": 10,
+        "obs_window_used": 3,
         "pred_window_used": 1,
         "want_feats_flattened": true
     }
