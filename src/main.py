@@ -41,7 +41,6 @@ def load_model_from_experiment_config(
         pipeline_config=experiment_config.pipeline,
         data_config=experiment_config.data,
         device=device,
-        product_graph_config=experiment_config.product_graph
     )
 
     return model

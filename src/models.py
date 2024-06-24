@@ -199,7 +199,6 @@ class WeatherPrediction(nn.Module):
         pipeline_config: PipelineConfig,
         data_config: DataConfig,
         device,
-        product_graph_config: ProductGraphConfig
     ):
         super().__init__()
 
@@ -400,10 +399,6 @@ class WeatherPrediction(nn.Module):
         broadcasted_mesh_grid_features = self.init_mesh_features.broadcast_to(
             (batch_size, self._num_mesh_nodes, self._init_feature_size)
         )
-
-        if self.product_graph_config.use_product_graph:
-            temporal_grid_features = self._product_graph_wrapper(grid_node_features)
-            grid_node_features = temporal_grid_features
 
         # Concatenate the initial grid node features with the incoming input
         updated_grid_node_features = torch.cat(

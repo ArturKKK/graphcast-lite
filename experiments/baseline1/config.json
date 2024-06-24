@@ -63,7 +63,7 @@
         }
     },
     "data": {
-        "data_directory": "data/datasets/Data_Adit",
+        "data_directory": "data/datasets/64x32_10f_5y_3obs",
         "feats_flattened": true,
         "num_latitudes": 32,
         "num_longitudes": 64,
