@@ -110,7 +110,7 @@ def main():
     experiment_config = ExperimentConfig(**load_from_json_file(experiment_config_path))
 
     run_experiment(
-        experiment_config=experiment_config, results_save_dir=results_save_dir
+        experiment_config=experiment_config, results_save_dir=results_save_dir, wandb_log=False
     )
 
 

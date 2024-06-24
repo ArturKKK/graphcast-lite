@@ -37,7 +37,7 @@
         },
         "decoder": {
             "mlp": {
-                "output_dim": 12,
+                "output_dim": 10,
                 "use_layer_norm": "false"
             },
             "gcn": {
