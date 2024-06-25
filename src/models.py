@@ -81,6 +81,41 @@ class MLP(nn.Module):
 
         return X
 
+class SparseGATConv(GATConv):
+    def __init__(self, in_channels, out_channels, heads=1, concat=True,
+                 dropout=0.0, bias=True, **kwargs):
+        super(SparseGATConv, self).__init__(in_channels, out_channels, heads, concat,
+                                                      dropout, bias, **kwargs)
+
+    def forward(self, x, edge_index, attention_threshold=0.0):
+        # Apply linear transformation and compute attention scores
+        x, attention_scores = super().forward(x, edge_index, return_attention_weights=True)
+
+        # Apply threshold to attention scores and remove edges with scores below the threshold
+        mask = attention_scores >= attention_threshold
+        edge_index = edge_index[:, mask]
+        attention_scores = attention_scores[mask]
+
+        # Normalize attention scores
+        attention_scores = softmax(attention_scores, edge_index[0], num_nodes=x.size(0))
+
+        # Dropout on attention scores
+        # attention_scores = F.dropout(attention_scores, p=self.dropout, training=self.training)
+
+        # Compute the weighted sum of neighbor features
+        out = self.propagate(edge_index, x=x, alpha=attention_scores)
+
+        if self.concat:
+            out = out.view(-1, self.heads * self.out_channels)
+        else:
+            out = out.mean(dim=1)
+
+        if self.bias is not None:
+            out += self.bias
+
+        return out, edge_index, attention_scores
+
+
 
 class GraphLayer(nn.Module):
     def __init__(self, graph_config: GraphBlock, input_dim):
@@ -138,6 +173,31 @@ class GraphLayer(nn.Module):
                         concat=False,
                     )
                 )
+            elif graph_config.layer_type == GraphLayerType.SparseGATConv:
+                self.layers.append(
+                    SparseGATConv(input_dim, hidden_dims[0], heads=num_heads, concat=False)
+                )
+                self.layers.append(self.activation)
+                for i in range(1, len(hidden_dims)):
+                    self.layers.append(
+                        SparseGATConv(
+                            hidden_dims[i - 1],
+                            hidden_dims[i],
+                            heads=num_heads,
+                            concat=False,
+                        )
+                    )
+                    self.layers.append(self.activation)
+
+                self.layers.append(
+                    SparseGATConv(
+                        hidden_dims[-1],
+                        graph_config.output_dim,
+                        heads=num_heads,
+                        concat=False,
+                    )
+                )
+
 
             if graph_config.use_layer_norm:
                 self.layers.append(

@@ -10,6 +10,11 @@ from src.constants import FileNames
 from src.utils import save_to_json_file
 import os
 
+def update_attention_threshold(epoch, max_epochs=100, start_epoch=5, final_threshold=0.6):
+    if epoch < start_epoch:
+        return 0.0
+    progress = (epoch - start_epoch) / (max_epochs - start_epoch)
+    return min(final_threshold, progress * final_threshold)
 
 def train_epoch(
     model: WeatherPrediction,
@@ -17,6 +22,7 @@ def train_epoch(
     optimiser: Optimizer,
     loss_fn,
     device,
+    threshold
 ):
     model.train()
     total_loss = 0
@@ -128,12 +134,14 @@ def train(
 
     # Running training
     for epoch in range(num_epochs):
+        epoch_threshold = update_attention_threshold(epoch, num_epochs,final_threshold=0.6)
         epoch_train_loss = train_epoch(
             model=model,
             optimiser=optimiser,
             train_dataloader=train_dataloader,
             loss_fn=loss_fn,
             device=device,
+            threshold=epoch_threshold,
         )
 
         epoch_val_loss = test(
