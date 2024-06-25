@@ -2,13 +2,13 @@
   "batch_size": 1,
   "learning_rate": 1e-5,
   "num_epochs": 100,
-  "wandb_log": true,
+  "wandb_log": false,
   "wandb_name": null,
   "graph": {
     "grid2mesh_edge_creation": "radius",
     "mesh2grid_edge_creation": "contained",
     "grid2mesh_radius_query": 0.5,
-    "mesh_levels": [0]
+    "mesh_levels": [3, 4]
   },
   "pipeline": {
     "encoder": {
@@ -35,10 +35,9 @@
         "layer_type": "sparse_gat",
         "gat_props": {
           "num_heads": 1,
-          "sparsity_thresholds": [0.0, 0.6]
+          "sparsity_thresholds": [0.0, 0.33]
         },
-        "hidden_dims": [
-        ],
+        "hidden_dims": [],
         "output_dim": 64,
         "use_layer_norm": true,
         "layer_norm_mode": "node"

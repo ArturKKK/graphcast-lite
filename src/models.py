@@ -82,43 +82,31 @@ class MLP(nn.Module):
         return X
 
 class SparseGATConv(GATConv):
-    def __init__(self, in_channels, out_channels, heads=1, concat=True,
+    def __init__(self, in_channels, out_channels, heads=1, concat=False,
                  dropout=0.0, bias=True, **kwargs):
-        super(SparseGATConv, self).__init__(in_channels, out_channels, heads, concat,
-                                                      dropout, bias, **kwargs)
+        super().__init__(in_channels, out_channels, heads, concat=concat,
+                                                      dropout=dropout, bias=bias, **kwargs)
 
-    def forward(self, x, edge_index, attention_threshold=0.0):
+    def forward(self, x, edge_index, attention_threshold=0.0, **kwargs):
+
+        batch_num = kwargs.get('batch_num', 1)
+
         # Apply linear transformation and compute attention scores
-        x, (edge_index, attention_scores) = super().forward(x, edge_index, return_attention_weights=True)
+        out, (edge_index, attention_scores) = super().forward(x, edge_index, return_attention_weights=True)
+        attention_scores = attention_scores.squeeze()
 
-        # Apply threshold to attention scores and remove edges with scores below the threshold
-        mask = attention_scores >= attention_threshold
-        # print(mask.shape)
-        if mask.dim() > 1:
-            mask = mask.squeeze()
-        mask = mask.type(torch.bool)
-        
-        edge_index = edge_index[:, mask]
-        print('edge_index', edge_index.shape)
-        # print(torch.count_nonzero(edge_index))
-        attention_scores = attention_scores[mask]
+        if batch_num == 0:
 
-        # Normalize attention scores
-        attention_scores = softmax(attention_scores, edge_index[0], num_nodes=x.size(0))
+            # Apply threshold to attention scores and remove edges with scores below the threshold
+            mask = attention_scores >= attention_threshold
+            mask = mask.type(torch.bool)
 
-        # Dropout on attention scores
-        # attention_scores = F.dropout(attention_scores, p=self.dropout, training=self.training)
-
-        # Compute the weighted sum of neighbor features
-        out = self.propagate(edge_index, x=x, alpha=attention_scores)
-
-        if self.concat:
-            out = out.view(-1, self.heads * self.out_channels)
-        else:
-            out = out.mean(dim=1)
-
-        if self.bias is not None:
-            out += self.bias
+            print('attention threshold: ', attention_threshold)
+            print('edge_index', edge_index.shape)
+            print('avg attn score: ', torch.mean(attention_scores))
+            
+            edge_index = edge_index[:, mask]
+            attention_scores = attention_scores[mask]
 
         return out, (edge_index, attention_scores)
 
@@ -144,6 +132,7 @@ class GraphLayer(nn.Module):
             self.output_dim = graph_config.output_dim
             self.layers = torch.nn.ModuleList()
             hidden_dims = graph_config.hidden_dims
+            self.num_heads = num_heads = graph_config.gat_props.num_heads
 
             if graph_config.layer_type == GraphLayerType.ConvGCN:
                 self.layers.append(GCNConv(input_dim, hidden_dims[0]))
@@ -156,7 +145,6 @@ class GraphLayer(nn.Module):
                 self.layers.append(GCNConv(hidden_dims[-1], graph_config.output_dim))
 
             elif graph_config.layer_type == GraphLayerType.GATConv:
-                num_heads = graph_config.gat_props.num_heads
                 self.layers.append(
                     GATConv(input_dim, hidden_dims[0], heads=num_heads, concat=False)
                 )
@@ -184,29 +172,8 @@ class GraphLayer(nn.Module):
             elif graph_config.layer_type == GraphLayerType.SparseGATConv:
                 print(graph_config.layer_type)
                 self.layers.append(
-                    SparseGATConv(input_dim, graph_config.output_dim, heads=1, concat=False)
+                    SparseGATConv(input_dim, graph_config.output_dim, heads=num_heads, concat=False)
                 )
-                # self.layers.append(self.activation)
-                # for i in range(1, len(hidden_dims)):
-                #     self.layers.append(
-                #         SparseGATConv(
-                #             hidden_dims[i - 1],
-                #             hidden_dims[i],
-                #             heads=1,
-                #             concat=False,
-                #         )
-                #     )
-                #     self.layers.append(self.activation)
-
-                # self.layers.append(
-                #     SparseGATConv(
-                #         hidden_dims[-1],
-                #         graph_config.output_dim,
-                #         heads=1,
-                #         concat=False,
-                #     )
-                # )
-
 
             if graph_config.use_layer_norm:
                 self.layers.append(
@@ -222,7 +189,7 @@ class GraphLayer(nn.Module):
                 f"Layer type {graph_config.layer_type} not supported."
             )
 
-    def forward(self, X: torch.Tensor, edge_index: torch.Tensor, attention_threshold=0.0):
+    def forward(self, X: torch.Tensor, edge_index: torch.Tensor, attention_threshold=0.0, **kwargs):
         if self.layer_type == GraphLayerType.SimpleConv:
             return self.layers(x=X, edge_index=edge_index)
 
@@ -241,7 +208,7 @@ class GraphLayer(nn.Module):
         elif self.layer_type == GraphLayerType.SparseGATConv:
             for layer in self.layers:
                 if type(layer) == SparseGATConv:
-                    X, (edge_index, _ )= layer.forward(X, edge_index, attention_threshold)
+                    X, (edge_index, _) = layer.forward(X, edge_index, attention_threshold, **kwargs)
                 else:
                     X = layer(X)
             return X, edge_index
@@ -263,12 +230,12 @@ class Model(nn.Module):
         )
         self.output_dim = self.graph_layer.output_dim
 
-    def forward(self, X: torch.Tensor, edge_index: torch.Tensor, attention_threshold=0.0):
+    def forward(self, X: torch.Tensor, edge_index: torch.Tensor, attention_threshold=0.0, **kwargs):
 
         if self.mlp:
             X = self.mlp(X=X)
 
-        out = self.graph_layer(X=X, edge_index=edge_index, attention_threshold=attention_threshold)
+        out = self.graph_layer(X=X, edge_index=edge_index, attention_threshold=attention_threshold, **kwargs)
 
         return out
 
@@ -529,7 +496,7 @@ class WeatherPrediction(nn.Module):
 
         return X
 
-    def forward(self, X: torch.Tensor, attention_threshold):
+    def forward(self, X: torch.Tensor, attention_threshold, **kwargs):
         """The forward method takes the features of the grid nodes and passes them through the three graphs defined above.
         Grid2Mesh performs the encoding and calculates the
 
@@ -538,6 +505,7 @@ class WeatherPrediction(nn.Module):
         X : torch.Tensor
           The input data of the shape [batch, num_grid_nodes, num_features].
         """
+
         X = X.squeeze()
         if self.use_product_graph:
             X = X.view(self._num_grid_nodes * self.obs_window, self.num_features)
@@ -554,7 +522,7 @@ class WeatherPrediction(nn.Module):
         # Processing the mesh node features
         if self.using_sparse_gat:
             processed_mesh_node_features, new_processor_edge_index = self.processor.forward(
-                X=mesh_node_features, edge_index=self.processing_graph, attention_threshold=attention_threshold
+                X=mesh_node_features, edge_index=self.processing_graph, attention_threshold=attention_threshold, **kwargs
             )
             self.processing_graph = new_processor_edge_index
         else:
