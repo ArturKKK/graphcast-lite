@@ -8,7 +8,7 @@
         "mesh2grid_edge_creation": "contained",
         "grid2mesh_radius_query": 0.5,
         "mesh_levels": [
-            6
+            0
         ]
     },
     "pipeline": {
@@ -28,7 +28,7 @@
         },
         "processor": {
             "gcn": {
-                "layer_type": "conv_gcn",
+                "layer_type": "sparse_gat",
                 "hidden_dims": [
                     128,
                     128
