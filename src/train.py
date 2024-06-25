@@ -10,7 +10,7 @@ from src.constants import FileNames
 from src.utils import save_to_json_file
 import os
 
-def update_attention_threshold(epoch, max_epochs=30, start_epoch=5, final_threshold=0.1177):
+def update_attention_threshold(epoch, max_epochs=30, start_epoch=5, final_threshold=0.1356):
     if epoch < start_epoch:
         return 0.0
     if epoch > max_epochs + start_epoch:

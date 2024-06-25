@@ -101,9 +101,9 @@ class SparseGATConv(GATConv):
             mask = attention_scores >= attention_threshold
             mask = mask.type(torch.bool)
 
-            print('attention threshold: ', attention_threshold)
+            # print('attention threshold: ', attention_threshold)
             print('edge_index', edge_index.shape)
-            print('avg attn score: ', torch.mean(attention_scores))
+            # print('avg attn score: ', torch.mean(attention_scores))
             
             edge_index = edge_index[:, mask]
             attention_scores = attention_scores[mask]
@@ -132,7 +132,6 @@ class GraphLayer(nn.Module):
             self.output_dim = graph_config.output_dim
             self.layers = torch.nn.ModuleList()
             hidden_dims = graph_config.hidden_dims
-            self.num_heads = num_heads = graph_config.gat_props.num_heads
 
             if graph_config.layer_type == GraphLayerType.ConvGCN:
                 self.layers.append(GCNConv(input_dim, hidden_dims[0]))
@@ -145,6 +144,7 @@ class GraphLayer(nn.Module):
                 self.layers.append(GCNConv(hidden_dims[-1], graph_config.output_dim))
 
             elif graph_config.layer_type == GraphLayerType.GATConv:
+                self.num_heads = num_heads = graph_config.gat_props.num_heads
                 self.layers.append(
                     GATConv(input_dim, hidden_dims[0], heads=num_heads, concat=False)
                 )
@@ -170,6 +170,7 @@ class GraphLayer(nn.Module):
                     )
                 )
             elif graph_config.layer_type == GraphLayerType.SparseGATConv:
+                self.num_heads = num_heads = graph_config.gat_props.num_heads
                 print(graph_config.layer_type)
                 self.layers.append(
                     SparseGATConv(input_dim, graph_config.output_dim, heads=num_heads, concat=False)

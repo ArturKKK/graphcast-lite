@@ -8,7 +8,7 @@
     "grid2mesh_edge_creation": "radius",
     "mesh2grid_edge_creation": "contained",
     "grid2mesh_radius_query": 0.5,
-    "mesh_levels": [3, 4]
+    "mesh_levels": [3, 5]
   },
   "pipeline": {
     "encoder": {
