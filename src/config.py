@@ -123,7 +123,7 @@ class DataConfig(BaseModel):
 class ExperimentConfig(BaseModel):
     batch_size: int = 1
     learning_rate: float = 1e-5
-    early_stopping_patience: int = 5
+    early_stopping_patience: int = 10
     early_stopping_delta: float = 1e-4
     num_epochs: int = 100
     random_seed: Optional[int] = 42

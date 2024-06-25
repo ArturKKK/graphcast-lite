@@ -10,7 +10,7 @@ from src.constants import FileNames
 from src.utils import save_to_json_file
 import os
 
-def update_attention_threshold(epoch, max_epochs=100, start_epoch=5, final_threshold=0.6):
+def update_attention_threshold(epoch, max_epochs=100, start_epoch=5, final_threshold=0.33):
     if epoch < start_epoch:
         return 0.0
     progress = (epoch - start_epoch) / (max_epochs - start_epoch)
@@ -22,10 +22,11 @@ def train_epoch(
     optimiser: Optimizer,
     loss_fn,
     device,
-    threshold
+    threshold,
 ):
     model.train()
     total_loss = 0
+    print(threshold)
 
     for batch in train_dataloader:
         X, y = batch
@@ -37,7 +38,7 @@ def train_epoch(
             y = y.squeeze(-2)
         X, y = X.to(device), y.to(device)
         optimiser.zero_grad()
-        outs = model(X=X)
+        outs = model(X=X, attention_threshold=threshold)
         batch_loss = loss_fn(outs, y)
         batch_loss.backward()
         optimiser.step()
@@ -63,7 +64,7 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device)
                 # Removing the extra timestep dimension from y
                 y = y.squeeze(-2)
             X, y = X.to(device), y.to(device)
-            outs = model(X=X)
+            outs = model(X=X, attention_threshold=0.0)
             batch_loss = loss_fn(outs, y)
             total_loss += batch_loss.detach().item()
 
@@ -134,7 +135,7 @@ def train(
 
     # Running training
     for epoch in range(num_epochs):
-        epoch_threshold = update_attention_threshold(epoch, num_epochs,final_threshold=0.6)
+        epoch_threshold = update_attention_threshold(epoch, num_epochs,final_threshold=0.33)
         epoch_train_loss = train_epoch(
             model=model,
             optimiser=optimiser,
