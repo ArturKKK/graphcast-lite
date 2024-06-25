@@ -122,14 +122,20 @@ class GraphLayer(nn.Module):
                 for i in range(1, len(hidden_dims)):
                     self.layers.append(
                         GATConv(
-                            hidden_dims[i - 1], hidden_dims[i], heads=num_heads, concat=False
+                            hidden_dims[i - 1],
+                            hidden_dims[i],
+                            heads=num_heads,
+                            concat=False,
                         )
                     )
                     self.layers.append(self.activation)
 
                 self.layers.append(
                     GATConv(
-                        hidden_dims[-1], graph_config.output_dim, heads=num_heads, concat=False
+                        hidden_dims[-1],
+                        graph_config.output_dim,
+                        heads=num_heads,
+                        concat=False,
                     )
                 )
 
@@ -238,7 +244,7 @@ class WeatherPrediction(nn.Module):
             self.product_graph_model = Model(
                 model_config=pipeline_config.product_graph.model,
                 input_dim=self.num_features,
-            )
+            ).to(self.device)
 
         self.encoding_graph, self.init_grid_features, self.init_mesh_features = (
             create_encoding_graph(
@@ -277,17 +283,17 @@ class WeatherPrediction(nn.Module):
         )
         self.encoder = Model(
             model_config=pipeline_config.encoder, input_dim=encoder_input_dim
-        )
+        ).to(device)
 
         self.processor = Model(
             model_config=pipeline_config.processor,
             input_dim=self.encoder.output_dim,
-        )
+        ).to(device)
 
         self.decoder = Model(
             model_config=pipeline_config.decoder,
             input_dim=self.processor.output_dim,
-        )
+        ).to(device)
 
         self.encoding_graph, self.decoding_graph, self.processing_graph = (
             self.encoding_graph.to(self.device),
@@ -295,16 +301,52 @@ class WeatherPrediction(nn.Module):
             self.processing_graph.to(device),
         )
 
-        print('Encoder summary: ')
-        print(summary(self.encoder, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, encoder_input_dim), self.encoding_graph))
+        if self.use_product_graph:
+            print("Product Graph summary: ")
+            print(
+                summary(
+                    self.product_graph_model,
+                    torch.randn(
+                        self._num_grid_nodes * self.obs_window, self.num_features
+                    ).to(device),
+                    self.product_graph,
+                )
+            )
+            print()
+
+        print("Encoder summary: ")
+        print(
+            summary(
+                self.encoder,
+                torch.randn(
+                    self._num_grid_nodes + self._num_mesh_nodes, encoder_input_dim
+                ).to(device),
+                self.encoding_graph,
+            )
+        )
         print()
 
-        print('Processor summary: ')
-        print(summary(self.processor, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, self.encoder.output_dim), self.processing_graph))
+        print("Processor summary: ")
+        print(
+            summary(
+                self.processor,
+                torch.randn(self._num_mesh_nodes, self.encoder.output_dim).to(device),
+                self.processing_graph,
+            )
+        )
         print()
 
-        print('Decoder summary: ')
-        print(summary(self.decoder, torch.randn(self._num_grid_nodes + self._num_mesh_nodes, self.processor.output_dim), self.decoding_graph))
+        print("Decoder summary: ")
+        print(
+            summary(
+                self.decoder,
+                torch.randn(
+                    self._num_grid_nodes + self._num_mesh_nodes,
+                    self.processor.output_dim,
+                ).to(device),
+                self.decoding_graph,
+            )
+        )
         print()
 
     def _init_grid_properties(self, grid_lat: np.ndarray, grid_lon: np.ndarray):
