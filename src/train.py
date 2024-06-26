@@ -10,6 +10,16 @@ from src.constants import FileNames
 from src.utils import save_to_json_file
 import os
 
+def update_attention_threshold(epoch, max_epochs=30, start_epoch=5, final_threshold=0.1356):
+    if epoch < start_epoch:
+        return 0.0
+    if epoch > max_epochs + start_epoch:
+        return final_threshold
+    
+    # progress = (epoch - start_epoch) / (max_epochs - start_epoch)
+    # return min(final_threshold, progress * final_threshold)
+
+    return min(final_threshold, (epoch - start_epoch) * final_threshold / (max_epochs - start_epoch))
 
 def train_epoch(
     model: WeatherPrediction,
@@ -17,11 +27,14 @@ def train_epoch(
     optimiser: Optimizer,
     loss_fn,
     device,
+    threshold,
+    epoch
 ):
     model.train()
     total_loss = 0
+    print(threshold)
 
-    for batch in train_dataloader:
+    for i, batch in enumerate(train_dataloader):
         X, y = batch
         # Removing the batch dimension
         y = y.squeeze(0)
@@ -31,7 +44,13 @@ def train_epoch(
             y = y.squeeze(-2)
         X, y = X.to(device), y.to(device)
         optimiser.zero_grad()
-        outs = model(X=X)
+
+        kwargs = {
+            # "attention_threshold": threshold,
+            "epoch": epoch,
+            "batch_num": i,
+        }
+        outs = model(X=X, attention_threshold=threshold, **kwargs)
         batch_loss = loss_fn(outs, y)
         batch_loss.backward()
         optimiser.step()
@@ -57,7 +76,7 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device)
                 # Removing the extra timestep dimension from y
                 y = y.squeeze(-2)
             X, y = X.to(device), y.to(device)
-            outs = model(X=X)
+            outs = model(X=X, attention_threshold=0.0)
             batch_loss = loss_fn(outs, y)
             total_loss += batch_loss.detach().item()
 
@@ -128,12 +147,18 @@ def train(
 
     # Running training
     for epoch in range(num_epochs):
+        print()
+        epoch_threshold = update_attention_threshold(epoch)
+        print(f"Epoch {epoch} with attention threshold {epoch_threshold}")
+
         epoch_train_loss = train_epoch(
             model=model,
             optimiser=optimiser,
             train_dataloader=train_dataloader,
             loss_fn=loss_fn,
             device=device,
+            threshold=epoch_threshold,
+            epoch=epoch,
         )
 
         epoch_val_loss = test(

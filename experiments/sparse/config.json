@@ -1,0 +1,72 @@
+{
+  "batch_size": 1,
+  "learning_rate": 1e-5,
+  "num_epochs": 100,
+  "wandb_log": false,
+  "wandb_name": null,
+  "graph": {
+    "grid2mesh_edge_creation": "radius",
+    "mesh2grid_edge_creation": "contained",
+    "grid2mesh_radius_query": 0.5,
+    "mesh_levels": [3, 5]
+  },
+  "pipeline": {
+    "encoder": {
+      "mlp": {
+        "mlp_hidden_dims": [
+          48,
+          48
+        ],
+        "output_dim": 64,
+        "use_layer_norm": true,
+        "layer_norm_mode": "node"
+      },
+      "gcn": {
+        "layer_type": "simple_conv",
+        "hidden_dims": [
+          64,
+          64
+        ],
+        "output_dim": 64
+      }
+    },
+    "processor": {
+      "gcn": {
+        "layer_type": "sparse_gat",
+        "gat_props": {
+          "num_heads": 1,
+          "sparsity_thresholds": [0.0, 0.33]
+        },
+        "hidden_dims": [],
+        "output_dim": 64,
+        "use_layer_norm": true,
+        "layer_norm_mode": "node"
+      }
+    },
+    "decoder": {
+      "mlp": {
+        "mlp_hidden_dims": [
+          64,
+          64
+        ],
+        "output_dim": 12,
+        "use_layer_norm": false
+      },
+      "gcn": {
+        "layer_type": "simple_conv",
+        "hidden_dims": [
+          48,
+          48
+        ],
+        "output_dim": 12
+      }
+    }
+  },
+  "data": {
+    "dataset_name": "64x32_12f_2y_2obs_1pred_uns",
+    "num_features_used": 12,
+    "obs_window_used": 2,
+    "pred_window_used": 1,
+    "want_feats_flattened": true
+}
+}

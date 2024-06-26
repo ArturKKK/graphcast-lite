@@ -5,7 +5,7 @@ import torch
 from torch_geometric.nn import GCNConv, SimpleConv, GATConv, LayerNorm
 import numpy as np
 from sklearn.neighbors import kneighbors_graph
-from torch_geometric.utils import dense_to_sparse
+from torch_geometric.utils import dense_to_sparse, softmax
 from torch_geometric.nn import summary
 
 from src.config import (
@@ -81,6 +81,36 @@ class MLP(nn.Module):
 
         return X
 
+class SparseGATConv(GATConv):
+    def __init__(self, in_channels, out_channels, heads=1, concat=False,
+                 dropout=0.0, bias=True, **kwargs):
+        super().__init__(in_channels, out_channels, heads, concat=concat,
+                                                      dropout=dropout, bias=bias, **kwargs)
+
+    def forward(self, x, edge_index, attention_threshold=0.0, **kwargs):
+
+        batch_num = kwargs.get('batch_num', 1)
+
+        # Apply linear transformation and compute attention scores
+        out, (edge_index, attention_scores) = super().forward(x, edge_index, return_attention_weights=True)
+        attention_scores = attention_scores.squeeze()
+
+        if batch_num == 0:
+
+            # Apply threshold to attention scores and remove edges with scores below the threshold
+            mask = attention_scores >= attention_threshold
+            mask = mask.type(torch.bool)
+
+            # print('attention threshold: ', attention_threshold)
+            print('edge_index', edge_index.shape)
+            # print('avg attn score: ', torch.mean(attention_scores))
+            
+            edge_index = edge_index[:, mask]
+            attention_scores = attention_scores[mask]
+
+        return out, (edge_index, attention_scores)
+
+
 
 class GraphLayer(nn.Module):
     def __init__(self, graph_config: GraphBlock, input_dim):
@@ -96,6 +126,7 @@ class GraphLayer(nn.Module):
         elif graph_config.layer_type in [
             GraphLayerType.ConvGCN,
             GraphLayerType.GATConv,
+            GraphLayerType.SparseGATConv,
         ]:
             self.activation = torch.nn.PReLU()
             self.output_dim = graph_config.output_dim
@@ -113,7 +144,7 @@ class GraphLayer(nn.Module):
                 self.layers.append(GCNConv(hidden_dims[-1], graph_config.output_dim))
 
             elif graph_config.layer_type == GraphLayerType.GATConv:
-                num_heads = graph_config.gat_props.num_heads
+                self.num_heads = num_heads = graph_config.gat_props.num_heads
                 self.layers.append(
                     GATConv(input_dim, hidden_dims[0], heads=num_heads, concat=False)
                 )
@@ -138,6 +169,12 @@ class GraphLayer(nn.Module):
                         concat=False,
                     )
                 )
+            elif graph_config.layer_type == GraphLayerType.SparseGATConv:
+                self.num_heads = num_heads = graph_config.gat_props.num_heads
+                print(graph_config.layer_type)
+                self.layers.append(
+                    SparseGATConv(input_dim, graph_config.output_dim, heads=num_heads, concat=False)
+                )
 
             if graph_config.use_layer_norm:
                 self.layers.append(
@@ -148,11 +185,12 @@ class GraphLayer(nn.Module):
                 )
 
         else:
+            print(graph_config.layer_type)
             raise NotImplementedError(
                 f"Layer type {graph_config.layer_type} not supported."
             )
 
-    def forward(self, X: torch.Tensor, edge_index: torch.Tensor):
+    def forward(self, X: torch.Tensor, edge_index: torch.Tensor, attention_threshold=0.0, **kwargs):
         if self.layer_type == GraphLayerType.SimpleConv:
             return self.layers(x=X, edge_index=edge_index)
 
@@ -168,6 +206,13 @@ class GraphLayer(nn.Module):
                     X = layer(X, edge_index)
                 else:
                     X = layer(X)
+        elif self.layer_type == GraphLayerType.SparseGATConv:
+            for layer in self.layers:
+                if type(layer) == SparseGATConv:
+                    X, (edge_index, _) = layer.forward(X, edge_index, attention_threshold, **kwargs)
+                else:
+                    X = layer(X)
+            return X, edge_index
         return X
 
 
@@ -186,14 +231,14 @@ class Model(nn.Module):
         )
         self.output_dim = self.graph_layer.output_dim
 
-    def forward(self, X: torch.Tensor, edge_index: torch.Tensor):
+    def forward(self, X: torch.Tensor, edge_index: torch.Tensor, attention_threshold=0.0, **kwargs):
 
         if self.mlp:
             X = self.mlp(X=X)
 
-        X = self.graph_layer(X=X, edge_index=edge_index)
+        out = self.graph_layer(X=X, edge_index=edge_index, attention_threshold=attention_threshold, **kwargs)
 
-        return X
+        return out
 
 
 class WeatherPrediction(nn.Module):
@@ -234,6 +279,7 @@ class WeatherPrediction(nn.Module):
 
         self._init_grid_properties(grid_lat=cordinates[0], grid_lon=cordinates[1])
         self._init_mesh_properties(graph_config)
+        self.using_sparse_gat = pipeline_config.processor.gcn.layer_type == GraphLayerType.SparseGATConv
 
         self._total_nodes = self._num_grid_nodes + self._num_mesh_nodes
 
@@ -451,7 +497,7 @@ class WeatherPrediction(nn.Module):
 
         return X
 
-    def forward(self, X: torch.Tensor):
+    def forward(self, X: torch.Tensor, attention_threshold, **kwargs):
         """The forward method takes the features of the grid nodes and passes them through the three graphs defined above.
         Grid2Mesh performs the encoding and calculates the
 
@@ -460,6 +506,7 @@ class WeatherPrediction(nn.Module):
         X : torch.Tensor
           The input data of the shape [batch, num_grid_nodes, num_features].
         """
+
         X = X.squeeze()
         if self.use_product_graph:
             X = X.view(self._num_grid_nodes * self.obs_window, self.num_features)
@@ -474,9 +521,15 @@ class WeatherPrediction(nn.Module):
         mesh_node_features = encoded_features[self._num_grid_nodes :, :]
 
         # Processing the mesh node features
-        processed_mesh_node_features = self.processor.forward(
-            X=mesh_node_features, edge_index=self.processing_graph
-        )
+        if self.using_sparse_gat:
+            processed_mesh_node_features, new_processor_edge_index = self.processor.forward(
+                X=mesh_node_features, edge_index=self.processing_graph, attention_threshold=attention_threshold, **kwargs
+            )
+            self.processing_graph = new_processor_edge_index
+        else:
+            processed_mesh_node_features = self.processor.forward(
+                X=mesh_node_features, edge_index=self.processing_graph, attention_threshold=attention_threshold
+            )
 
         # Concatenating the grid feature again with the processed mesh features
         processed_features = torch.cat(

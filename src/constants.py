@@ -1,5 +1,5 @@
 class FolderNames:
-    RESULTS = "results"
+    RESULTS = ""
 
 
 class FileNames:

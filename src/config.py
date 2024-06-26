@@ -20,7 +20,7 @@ class GraphLayerType(str, Enum):
     ConvGCN = "conv_gcn"
     SimpleConv = "simple_conv"
     GATConv = "conv_gat"
-
+    SparseGATConv = "sparse_gat"
 
 class ProductGraphType(str, Enum):
     KRONECKER = "kronecker"
