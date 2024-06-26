@@ -200,4 +200,7 @@ def train(
     )
     print(f"Training results saved to {results_save_dir}")
 
+    if wandb_log:
+        wandb.finish()
+
     return training_results
