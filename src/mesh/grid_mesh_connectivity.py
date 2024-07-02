@@ -1,3 +1,5 @@
+"""Defines some utility functions to create grid-mesh edges."""
+
 from .create_mesh import TriangularMesh
 import numpy as np
 import scipy

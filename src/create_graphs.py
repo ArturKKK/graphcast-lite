@@ -1,3 +1,5 @@
+"""Utility methods to create the encoding, processing and decoding graphs."""
+
 from typing import Tuple, List
 import numpy as np
 from src.mesh import (
@@ -21,14 +23,16 @@ def create_encoding_graph(
     mesh: TriangularMesh,
     graph_building_config: GraphBuildingConfig,
     num_grid_nodes: int,
-):
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Creates the edges between the grid and the mesh based on the strategy specified in the graph building config. Also contructs
         the initial static features of the grid and the mesh nodes like the latitudes, longitudes etc.
 
     Returns
     -------
-    GraphStructure
-        TODO: Update this - Returns a numpy array of shape [2, num_edges] which defines the edges between the grid nodes and the mesh nodes.
+    Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        Returns a tuple of torch.Tensors where the first element is the edge index of the encoding graph of shape [2, num_edges] which defines the edges between
+        grid nodes and the mesh nodes. The second element is a tensor with the initial grid features. The third element is a tensor with the initial mesh features.
+
     """
     if graph_building_config.grid2mesh_edge_creation == Grid2MeshEdgeCreation.RADIUS:
         radius = (
@@ -74,7 +78,24 @@ def create_encoding_graph(
     )
 
 
-def create_processing_graph(meshes: List[TriangularMesh], mesh_levels: List[int]):
+def create_processing_graph(
+    meshes: List[TriangularMesh], mesh_levels: List[int]
+) -> torch.Tensor:
+    """Returns the edges within the mesh in the processing graph based on the mesh resolution levels.
+
+    Parameters
+    ----------
+    meshes : List[TriangularMesh]
+        All the meshes constructed using the mesh_levels specified
+    mesh_levels : List[int]
+        The mesh levels for the experiment.
+
+    Returns
+    -------
+    torch.Tensor
+        Returns the edges in the mesh based on the resolution levels. Returns tensor of shape [2, num_edges].
+
+    """
 
     # This will have to be updated on taking multiple levels of edges
     meshes_we_want = filter_mesh(meshes=meshes, mesh_levels=mesh_levels)
@@ -86,7 +107,7 @@ def create_decoding_graph(
     mesh: TriangularMesh,
     graph_building_config: GraphBuildingConfig,
     num_grid_nodes: int,
-):
+) -> torch.Tensor:
     """Creates the edges between the mesh and the grid based on the strategy specified for mesh to grid in the graph building config.
 
     Parameters
@@ -97,11 +118,13 @@ def create_decoding_graph(
         The mesh created over the grid nodes.
     graph_building_config : GraphBuildingConfig
         The graph building configuration for the experiment
+    num_grid_nodes: int
+        Number of grid nodes based on the resolution of the spatial grid.
 
     Returns
     -------
-    np.array
-        Returns a numpy array of shape [2, num_edges] which defines the edges between the mesh nodes and the grid nodes.
+    torch.Tensor
+        Returns a tensor of shape [2, num_edges] which defines the edges between the mesh nodes and the grid nodes.
     """
 
     if graph_building_config.mesh2grid_edge_creation == Mesh2GridEdgeCreation.CONTAINED:

@@ -1,3 +1,5 @@
+"""Utility script to visualise the mesh."""
+
 import networkx as nx
 import numpy as np
 import plotly.graph_objs as go

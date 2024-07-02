@@ -1,3 +1,4 @@
+"""Contains the training and testing logic for the Weather Prediction model."""
 from src.models import WeatherPrediction
 import torch
 import torch.nn as nn

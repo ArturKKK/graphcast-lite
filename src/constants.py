@@ -1,3 +1,4 @@
+"""Defines the constants in the codebase."""
 class FolderNames:
     RESULTS = ""
 

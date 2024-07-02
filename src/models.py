@@ -1,4 +1,6 @@
-from typing import Tuple, Optional
+"""Contains all the torch model definitions."""
+
+from typing import Tuple
 
 import torch.nn as nn
 import torch
@@ -270,7 +272,6 @@ class WeatherPrediction(nn.Module):
     ):
         super().__init__()
 
-        self.residual_output = pipeline_config.residual_output
         self.device = device
         self.obs_window = data_config.obs_window_used
         self.num_features = data_config.num_features_used
@@ -544,9 +545,5 @@ class WeatherPrediction(nn.Module):
         decoded_grid_node_features = decoded_grid_node_features[
             : self._num_grid_nodes, :
         ]
-
-        if self.residual_output:
-            # TODO: Support residual outputs
-            pass
 
         return decoded_grid_node_features

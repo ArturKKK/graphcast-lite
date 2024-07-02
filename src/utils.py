@@ -1,23 +1,11 @@
+"""Utility scripts for the project and from GraphCast."""
+
 import torch
 import json
 from typing import Dict, Any, Optional, Tuple
 import numpy as np
 from scipy.spatial import transform
 from src.mesh import TriangularMesh
-
-
-class GraphStructure:
-    def __init__(
-        self,
-        sender_features: np.ndarray,
-        receiver_features: np.ndarray,
-        edge_index: np.ndarray,
-        edge_weights: Optional[np.ndarray] = None,
-    ):
-        self.sender_features = sender_features
-        self.receiver_features = receiver_features
-        self.edge_index = edge_index
-        self.edge_weights = edge_weights
 
 
 def save_to_json_file(data_dict: Dict[str, Any], save_path: str):

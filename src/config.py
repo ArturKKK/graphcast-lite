@@ -1,8 +1,10 @@
-from pydantic import BaseModel, Field
+"""Defines the configuration for an experiment."""
+
+from pydantic import BaseModel
 from typing import Optional, List
 from enum import Enum
 
-    
+
 class Grid2MeshEdgeCreation(str, Enum):
     """The different strategies to create grid to mesh edges."""
 
@@ -17,28 +19,32 @@ class Mesh2GridEdgeCreation(str, Enum):
 
 
 class GraphLayerType(str, Enum):
+    """The different types of GNN layers we support."""
+
     ConvGCN = "conv_gcn"
     SimpleConv = "simple_conv"
     GATConv = "conv_gat"
     SparseGATConv = "sparse_gat"
 
 class ProductGraphType(str, Enum):
+    """The different types of product graph."""
+
     KRONECKER = "kronecker"
     CARTESIAN = "cartesian"
     STRONG = "strong"
 
 
 class DatasetNames(str, Enum):
+    """The different datasets to run the experiment on."""
+
     _64x32_10f_5y_3obs = "64x32_10f_5y_3obs"
     _64x32_33f_5y_5obs_uns = "64x32_33f_5y_5obs_uns"
     _64x32_12f_2y_2obs_1pred_uns = "64x32_12f_2y_2obs_1pred_uns"
-    
-    
+
+
 class GraphBuildingConfig(BaseModel):
     """This defines the parameters for building the graph.
 
-    mesh_size: int
-        How many refinements to do on the multi-mesh.
     grid2mesh_edge_creation: Grid2MeshEdgeCreation
         The strategy to create the Grid2Mesh edges for encoding.
     mesh2grid_edge_creation: Mesh2GridEdgeCreation
@@ -72,6 +78,18 @@ class GraphBuildingConfig(BaseModel):
 
 
 class MLPBlock(BaseModel):
+    """This defines the configuration for an MLPBlock.
+
+    mlp_hidden_dims: Optional[List[int]]
+        The hidden dimensions in the MLP. Can be empty for single layer. PReLU is applied after every hidden layer.
+    output_dim: int
+        The output dim for the MLP block
+    use_layer_norm: bool
+        Whether to use layer norm or not. It is applied after every layer in the MLP.
+    layer_norm_mode: Optional[str] = None
+        The mode of the layer norm. Can be either "node" or "graph".
+    """
+
     mlp_hidden_dims: Optional[List[int]] = None
     output_dim: int
     use_layer_norm: bool
@@ -79,11 +97,34 @@ class MLPBlock(BaseModel):
 
 
 class GATProps(BaseModel):
+    """This defines the configuration for Sparse Attention.
+
+    num_heads: int
+        The number of attention heads
+    sparsity_thresholds: List[float]
+        The sparsity thresholds for each layer.
+    """
+
     num_heads: int
     sparsity_thresholds: List[float]
 
 
 class GraphBlock(BaseModel):
+    """This defines the configuration for the graph block.
+    
+    layer_type: GraphLayerType
+        The type of GNN layer that is to be used.
+    gat_props: Optional[GATProps]
+        The configuration for sparse attention if sparse attention is to be used.
+    hidden_dims: Optional[List[int]]
+        Hidden dims in the GNN. Not passed for simple_conv.
+    output_dim: Optional[int]
+        Output dims in the GNN. Not passed for simple_conv.
+    use_layer_norm: Optional[bool]
+        Whether to use layer norm or not. Applied after every GNN layer. 
+    layer_norm_mode: Optional[str]
+         The mode of the layer norm. Can be either "node" or "graph".
+    """
     layer_type: GraphLayerType
     gat_props: Optional[GATProps] = None
     hidden_dims: Optional[List[int]] = None
@@ -93,11 +134,29 @@ class GraphBlock(BaseModel):
 
 
 class ModelConfig(BaseModel):
+    """A model is defined using an MLP block and a GraphBlock
+    
+    mlp: Optional[MLPBlock]
+        The MLP block for the model. Can be empty if no MLP is needed.
+    gcn: GraphBlock
+        The GraphBlock for the model.
+    """
     mlp: Optional[MLPBlock] = None
     gcn: GraphBlock
 
 
 class ProductGraphConfig(BaseModel):
+    """Defines the configuration of the product graph.
+    
+    model: ModelConfig
+        The model for the product graph message passing.
+    num_k: int
+        The number of edges for each grid node created using k-nearest-neighbours
+    self_loop: bool
+        Whether a self loop is added in the product graph or not.
+    type: ProductGraphType
+        The type of the product graph.
+    """
     model: ModelConfig
     num_k: int
     self_loop: bool
@@ -105,11 +164,20 @@ class ProductGraphConfig(BaseModel):
 
 
 class PipelineConfig(BaseModel):
+    """ Defines the configuration of the entire pipeline.
+    product_graph: Optional[ProductGraphConfig]
+        Config for the product graph. This is optional and only needs to be set if experiment has product graph.
+    encoder: ModelConfig
+        Config for the encoder.
+    processor: ModelConfig
+        Config for the processor.
+    decoder:
+        Config of the decoder.    
+    """
     product_graph: Optional[ProductGraphConfig] = None
     encoder: ModelConfig
     processor: ModelConfig
     decoder: ModelConfig
-    residual_output: bool = False
 
 
 class DataConfig(BaseModel):

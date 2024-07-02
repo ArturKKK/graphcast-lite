@@ -1,3 +1,4 @@
+"""Main entrypoint to run training for Weather Prediciton"""
 import sys
 import os
 from src.constants import FileNames, FolderNames
