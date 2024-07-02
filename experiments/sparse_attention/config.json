@@ -2,7 +2,7 @@
   "batch_size": 1,
   "learning_rate": 1e-5,
   "num_epochs": 100,
-  "wandb_log": false,
+  "wandb_log": "False",
   "wandb_name": null,
   "graph": {
     "grid2mesh_edge_creation": "radius",
