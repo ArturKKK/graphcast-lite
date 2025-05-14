@@ -12,8 +12,7 @@ def load_train_and_test_datasets(data_path: str, data_config: DataConfig):
         dataset_name=data_config.dataset_name
     )
 
-    # feats_flattened = dataset_metadata.flattened
-    feats_flattened = True
+    feats_flattened = dataset_metadata.flattened
 
     num_longitudes = dataset_metadata.num_longitudes
     num_latitudes = dataset_metadata.num_latitudes
