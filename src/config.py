@@ -8,13 +8,14 @@ from enum import Enum
 class Grid2MeshEdgeCreation(str, Enum):
     """The different strategies to create grid to mesh edges."""
 
-    K_NEAREST = "k_nearest"
-    RADIUS = "radius"
+    K_NEAREST = "k_nearest" # K ближайших соседей
+    RADIUS = "radius" # Берутся все mesh-вершины в определенном радиусе
 
 
 class Mesh2GridEdgeCreation(str, Enum):
     """The different strategies to create mesh to grid edges."""
 
+    # для каждого узла grid находятся 3 узла mesh – вершины треугольника, внутри которого находится данная точка
     CONTAINED = "contained"
 
 
@@ -191,6 +192,8 @@ class DataConfig(BaseModel):
 class ExperimentConfig(BaseModel):
     batch_size: int = 1
     learning_rate: float = 1e-5
+    # Когда счетчик превышает patience (то есть нет улучшения в течение 10 эпох подряд), 
+    # цикл обучения преждевременно прекращается.
     early_stopping_patience: int = 10
     early_stopping_delta: float = 1e-4
     num_epochs: int = 100

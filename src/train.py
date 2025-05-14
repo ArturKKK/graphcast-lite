@@ -97,7 +97,7 @@ def train(
     config: ExperimentConfig,
     results_save_dir: str,
     print_losses: bool = True,
-    wandb_log: bool = True,
+    wandb_log: bool = True, # Whether to log to Weights & Biases. Зачем надо только?
 ):
     # Define the loss function
     loss_fn = nn.MSELoss()
