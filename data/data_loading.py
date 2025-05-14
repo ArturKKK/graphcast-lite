@@ -27,6 +27,7 @@ def get_xarray_dataset(url: str, chunk_size: int = 48):
         url,
         chunks={'time': chunk_size},
         consolidated=True,
+        storage_options={'token': 'anon'},
     )
     print("Model surface dataset size {} GiB".format(era5.nbytes/(1024**3)))
     return era5
