@@ -232,5 +232,13 @@ Run an experiment by providing the experiment directory that contains the `confi
 ```
 python -m src.main "<path-to-experinment-directory>"
 ```
+We have provided the configurations for our baseline and extensions in `/experiments`. To run the experiments, you can download the dataset from [here](https://drive.google.com/drive/folders/1-dVRgcIsj6sN62v4OUGWgKTSODRIiP44). Store the data files in `data/datasets/64x32_33f_5y_5obs_uns`.
 
-We have provided the configurations for our baseline and extensions in `/experiments`. To run the experiments, you can download the dataset from [here](https://drive.google.com/drive/folders/1-dVRgcIsj6sN62v4OUGWgKTSODRIiP44). Store the data files in `data/datasets/64x32_33f_5y_5obs_uns`
+For a lightweight sanity check without downloading the full dataset you can generate a tiny subset from the public WeatherBench2 bucket:
+
+```
+python scripts/download_sample_data.py
+python -m src.main experiments/demo
+```
+
+The script downloads only a few days and three variables, so training finishes quickly and saves model weights in `experiments/demo/results/`.
