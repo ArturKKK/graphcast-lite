@@ -2,9 +2,22 @@ import os
 from src.config import DataConfig
 from src.constants import FileNames
 import torch
-from data.data_loading import WeatherDataset
 from src.data.data_configs import DatasetMetadata, get_dataset_metadata
+from torch.utils.data import Dataset
 
+
+class WeatherDataset(Dataset):
+    """Simple tensor-based dataset used for training."""
+
+    def __init__(self, X, y):
+        self.X = X
+        self.y = y
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx]
 
 def load_train_and_test_datasets(data_path: str, data_config: DataConfig):
 
