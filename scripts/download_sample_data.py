@@ -58,25 +58,25 @@ def main():
     out_dir = Path("data/datasets/demo_era5_small")
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # try:
-    ds = xr.open_zarr(
-        DATA_URL,
-        consolidated=True,
-        chunks={"time": 10},
-        storage_options={"token": "anon", "asynchronous": False},
-    )
-    ds = ds[
-        [
-            "10m_u_component_of_wind",
-            "10m_v_component_of_wind",
-            "2m_temperature",
+    try:
+        ds = xr.open_zarr(
+            DATA_URL,
+            consolidated=True,
+            chunks={"time": 10},
+            storage_options={"token": "anon", "asynchronous": False},
+        )
+        ds = ds[
+            [
+                "10m_u_component_of_wind",
+                "10m_v_component_of_wind",
+                "2m_temperature",
+            ]
         ]
-    ]
-    ds = ds.sel(time=slice("2010-01-01", "2012-12-31"))
-    arr = ds.to_array().transpose("time", "longitude", "latitude", "variable").values
-    # except Exception as e:  # pragma: no cover - network failures
-    #     print(f"Dataset download failed ({e}); using random data instead.")
-    #     arr = np.random.randn(10, 64, 32, 3)
+        ds = ds.sel(time=slice("2010-01-01", "2010-12-31"))
+        arr = ds.to_array().transpose("time", "longitude", "latitude", "variable").values
+    except Exception as e:  # pragma: no cover - network failures
+        print(f"Dataset download failed ({e}); using random data instead.")
+        arr = np.random.randn(10, 64, 32, 3)
 
     obs_window, pred_window = 2, 1
     X, y = _build_samples(arr, obs_window, pred_window)
