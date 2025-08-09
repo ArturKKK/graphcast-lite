@@ -56,5 +56,14 @@ def get_dataset_metadata(dataset_name: DatasetNames) -> DatasetMetadata:
             obs_window=2,
             pred_window=1,
         )
+    if dataset_name == DatasetNames.wb2_64x32_11f_2obs_1pred:
+        return DatasetMetadata(
+            flattened=True,
+            num_latitudes=32,
+            num_longitudes=64,
+            num_features=11,
+            obs_window=2,
+            pred_window=1,
+        )
     else:
         raise NotImplementedError(f"Dataset {dataset_name} is not supported.")
