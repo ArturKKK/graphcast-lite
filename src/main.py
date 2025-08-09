@@ -62,6 +62,7 @@ def load_model_from_experiment_config(
 def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
 
     set_random_seeds(seed=experiment_config.random_seed)
 
