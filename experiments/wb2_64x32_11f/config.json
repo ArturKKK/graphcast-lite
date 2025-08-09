@@ -12,16 +12,38 @@
   },
   "pipeline": {
     "encoder": {
-      "mlp": { "mlp_hidden_dims": [64, 64], "output_dim": 64, "use_layer_norm": false },
-      "graph": { "layer_type": "conv_gcn", "hidden_dims": [128, 128], "output_dim": 128 }
+      "mlp": {
+        "mlp_hidden_dims": [48, 48],
+        "output_dim": 64,
+        "use_layer_norm": true,
+        "layer_norm_mode": "node"
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [64, 64],
+        "output_dim": 64
+      }
     },
     "processor": {
-      "mlp":   { "mlp_hidden_dims": [128], "output_dim": 128, "use_layer_norm": false },
-      "graph": { "layer_type": "conv_gcn", "hidden_dims": [128, 128], "output_dim": 128 }
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [64, 64, 64],
+        "output_dim": 64,
+        "use_layer_norm": true,
+        "layer_norm_mode": "node"
+      }
     },
     "decoder": {
-      "mlp":   { "mlp_hidden_dims": [128], "output_dim": 128, "use_layer_norm": false },
-      "graph": { "layer_type": "conv_gcn", "hidden_dims": [64, 64], "output_dim": 11 }
+      "mlp": {
+        "mlp_hidden_dims": [64, 64],
+        "output_dim": 64,
+        "use_layer_norm": false
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [48, 48],
+        "output_dim": 3
+      }
     }
   },
   "data": {
