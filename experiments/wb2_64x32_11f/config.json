@@ -42,7 +42,7 @@
       "gcn": {
         "layer_type": "conv_gcn",
         "hidden_dims": [48, 48],
-        "output_dim": 3
+        "output_dim": 11
       }
     }
   },
