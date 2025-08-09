@@ -17,12 +17,20 @@ import random
 CURRENT_WORKING_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
+# Синхронизирует случайности (random, numpy, torch) для воспроизводимости.
 def set_random_seeds(seed: int = 42):
     random.seed(42)
     np.random.seed(42)
     torch.manual_seed(42)
 
 
+# Создаёт регулярную широтно-долготную сетку
+# Затем инициализирует WeatherPrediction, передавая:
+# координаты сетки,
+# graph_config (как строим рёбра иерархии mesh, grid→mesh/mesh→grid),
+# pipeline_config (архитектура encoder/processor/decoder),
+# data_config (сколько фич/окон реально использовать),
+# device.
 def load_model_from_experiment_config(
     experiment_config: ExperimentConfig, device, dataset_metadata: DatasetMetadata
 ) -> WeatherPrediction:
@@ -57,6 +65,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
     set_random_seeds(seed=experiment_config.random_seed)
 
+    # Загружает датасеты
     train_dataset, val_dataset, test_dataset, dataset_metadata = (
         load_train_and_test_datasets(
             data_path=os.path.join(
@@ -66,6 +75,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
         )
     )
 
+    # shuffle в DataLoader — это «перемешивать ли порядок сэмплов при формировании батчей».
     train_dataloader = DataLoader(
         train_dataset, batch_size=experiment_config.batch_size, shuffle=True
     )
@@ -84,6 +94,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
     model = model.to(device)
 
+    # Создание оптимизатора — алгоритма, который меняет веса модели по градиентам, чтобы минимизировать loss.
     optimizer = Adam(params=model.parameters(), lr=experiment_config.learning_rate)
 
     train_losses, val_losses, test_losses = train(

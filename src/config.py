@@ -15,16 +15,25 @@ class Grid2MeshEdgeCreation(str, Enum):
 class Mesh2GridEdgeCreation(str, Enum):
     """The different strategies to create mesh to grid edges."""
 
-    # для каждого узла grid находятся 3 узла mesh – вершины треугольника, внутри которого находится данная точка
+    # привязка узла grid к трём вершинам треугольника mesh, в котором он лежит
     CONTAINED = "contained"
 
 
+# какие бывают блоки GNN и чем они различаются.
 class GraphLayerType(str, Enum):
     """The different types of GNN layers we support."""
 
+	# Классическая свёртка Kipf-Welling: смешиваем соседей взвешенной матрицей
+    # https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.nn.conv.GCNConv.html
     ConvGCN = "conv_gcn"
+    # Вообще без обучаемых весов: просто агрегируем (sum/mean) соседей
+    # https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.nn.conv.SimpleConv.html
     SimpleConv = "simple_conv"
+    # Graph Attention: учимся α-коэффициентам между парами узлов
+    # https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.nn.conv.GATConv.html
     GATConv = "conv_gat"
+    # То же, но после первой итерации отбрасываем рёбра с α < threshold → граф редеет
+    # Ускорить последующие эпохи
     SparseGATConv = "sparse_gat"
 
 class ProductGraphType(str, Enum):
@@ -72,6 +81,9 @@ class GraphBuildingConfig(BaseModel):
     grid2mesh_radius_query: Optional[float] = None
     grid2mesh_k: Optional[int] = None
 
+    # Берём икосаэдр (20 треугольников) и каждый треугольник делим на 4 (проводим отрезки через середины рёбер), 
+    # а потом «выталкиваем» новые вершины на сферу.
+    # Повторяем k раз → получаем Level-k сетку:
     # mesh graph configs
     mesh_levels: List[int]
 
