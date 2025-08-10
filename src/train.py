@@ -11,6 +11,23 @@ from src.constants import FileNames
 from src.utils import save_to_json_file
 import os
 
+def spatial_corr(pred: torch.Tensor, true: torch.Tensor) -> float:
+    """
+    pred, true: [num_nodes, num_features] или [batch?, num_nodes, num_features]
+    Возвращает среднюю по фичам корреляцию по полю (ACC).
+    """
+    if pred.dim() == 3:      # [B, N, F] -> усредним по батчу
+        pred = pred.mean(dim=0)
+        true = true.mean(dim=0)
+
+    # нормируем каждую фичу по полю (по узлам)
+    p = (pred - pred.mean(dim=0, keepdim=True)) / (pred.std(dim=0, keepdim=True) + 1e-8)
+    t = (true - true.mean(dim=0, keepdim=True)) / (true.std(dim=0, keepdim=True) + 1e-8)
+
+    # ACC по каждой фиче, потом среднее
+    acc_per_feat = (p * t).mean(dim=0)
+    return acc_per_feat.mean().item()
+
 def update_attention_threshold(epoch, max_epochs=30, start_epoch=5, final_threshold=0.1356):
     if epoch < start_epoch:
         return 0.0
@@ -66,6 +83,7 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device)
     model.eval()
 
     total_loss = 0
+    acc_values = []
 
     with torch.no_grad():
         for batch in test_dataloader:
@@ -80,10 +98,12 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device)
             outs = model(X=X, attention_threshold=0.0)
             batch_loss = loss_fn(outs, y)
             total_loss += batch_loss.detach().item()
+            acc_values.append(spatial_corr(outs, y))
 
     avg_loss = total_loss / len(test_dataloader)
+    avg_acc  = sum(acc_values) / max(1, len(acc_values))
 
-    return avg_loss
+    return avg_loss, avg_acc
 
 
 def train(
@@ -121,15 +141,15 @@ def train(
     patience_counter = 0
     
     # Getting initial performance before training
-    intial_train_loss = test(
+    intial_train_loss, initial_train_acc = test(
         model=model, test_dataloader=train_dataloader, loss_fn=loss_fn, device=device
     )
 
-    intial_val_loss = test(
+    intial_val_loss, initial_val_acc = test(
         model=model, test_dataloader=val_dataloader, loss_fn=loss_fn, device=device
     )
 
-    intial_test_loss = test(
+    intial_test_loss, initial_test_acc = test(
         model=model, test_dataloader=test_dataloader, loss_fn=loss_fn, device=device
     )
     
@@ -137,12 +157,19 @@ def train(
     val_losses.append(intial_val_loss)
     test_losses.append(intial_test_loss)
         
+    if print_losses:
+        print(f"[Init] train_loss={intial_train_loss:.5f}  val_loss={intial_val_loss:.5f}  test_loss={intial_test_loss:.5f}")
+        print(f"[Init] train_ACC={initial_train_acc:.4f}  val_ACC={initial_val_acc:.4f}  test_ACC={initial_test_acc:.4f}")
+
     if wandb_log:
         wandb.log(
             {
                 "train_loss": intial_train_loss,
                 "val_loss": intial_val_loss,
                 "test_loss": intial_test_loss,
+                "train_acc": initial_train_acc,
+                "val_acc": initial_val_acc,
+                "test_acc": initial_test_acc,
             }
             )
 
@@ -162,18 +189,17 @@ def train(
             epoch=epoch,
         )
 
-        epoch_val_loss = test(
+        epoch_val_loss, epoch_val_acc = test(
             model=model, test_dataloader=val_dataloader, loss_fn=loss_fn, device=device
         )
 
-        epoch_test_loss = test(
+        epoch_test_loss, epoch_test_acc = test(
             model=model, test_dataloader=test_dataloader, loss_fn=loss_fn, device=device
         )
 
         if print_losses:
-            print(f"Train loss after epoch {epoch+1}: {epoch_train_loss}")
-            print(f"Validation loss after epoch {epoch+1}: {epoch_val_loss}")
-            print(f"Test loss after epoch {epoch+1}: {epoch_test_loss}")
+            print(f"[Epoch {epoch+1}] train_loss={epoch_train_loss:.5f}  val_loss={epoch_val_loss:.5f}  test_loss={epoch_test_loss:.5f}")
+            print(f"[Epoch {epoch+1}] val_ACC={epoch_val_acc:.4f}  test_ACC={epoch_test_acc:.4f}")
 
         train_losses.append(epoch_train_loss)
         val_losses.append(epoch_val_loss)
@@ -185,6 +211,9 @@ def train(
                     "train_loss": epoch_train_loss,
                     "val_loss": epoch_val_loss,
                     "test_loss": epoch_test_loss,
+                    "val_acc": epoch_val_acc,
+                    "test_acc": epoch_test_acc,
+                    "epoch": epoch + 1,
                 }
             )
 

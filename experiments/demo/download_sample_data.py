@@ -72,7 +72,7 @@ def main():
                 "2m_temperature",
             ]
         ]
-        ds = ds.sel(time=slice("2010-01-01", "2010-12-31"))
+        ds = ds.sel(time=slice("2000-01-01", "2020-12-31"))
         arr = ds.to_array().transpose("time", "longitude", "latitude", "variable").values
     except Exception as e:  # pragma: no cover - network failures
         print(f"Dataset download failed ({e}); using random data instead.")

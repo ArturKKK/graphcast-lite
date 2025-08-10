@@ -1,7 +1,7 @@
 {
   "batch_size": 1,
   "learning_rate": 1e-3,
-  "num_epochs": 30,
+  "num_epochs": 70,
   "wandb_log": false,
   "random_seed": 42,
   "graph": {
