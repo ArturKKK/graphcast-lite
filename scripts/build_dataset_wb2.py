@@ -15,7 +15,7 @@ WB2_ERA5_64x32 = "gs://weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equi
 
 SURF = ["2m_temperature","10m_u_component_of_wind","10m_v_component_of_wind",
         "mean_sea_level_pressure"]  # осадки детектируем отдельно (имя может отличаться)
-PLEV = ["temperature","u_component_of_wind","v_component_of_wind"]
+PLEV = ["temperature","u_component_of_wind","v_component_of_wind", "geopotential", "specific_humidity"]
 LEVELS = [850, 500]
 
 RENAME_SURF = {
@@ -24,13 +24,9 @@ RENAME_SURF = {
     "10m_v_component_of_wind": "10v",
     "mean_sea_level_pressure": "msl",
 }
-RENAME_PLEV = {"temperature":"t", "u_component_of_wind":"u", "v_component_of_wind":"v"}
-
-def variables_order():
-    order = ["t2m","10u","10v","msl","tp"]
-    for lev in LEVELS:
-        order += [f"t@{lev}", f"u@{lev}", f"v@{lev}"]
-    return order
+# ДОБАВИЛ z и q
+RENAME_PLEV = {"temperature":"t", "u_component_of_wind":"u", "v_component_of_wind":"v",
+               "geopotential":"z", "specific_humidity":"q"}
 
 def _open_wb2(time_start: str, time_end: str):
     fs = gcsfs.GCSFileSystem(token="anon")
@@ -63,7 +59,7 @@ def _drop_nonindex_coords(da: xr.DataArray) -> xr.DataArray:
         da = da.reset_coords(non_index, drop=True)
     return da
 
-def _stack_channels(ds: xr.Dataset) -> xr.DataArray:
+def _stack_channels(ds: xr.Dataset) -> (xr.DataArray, list):
     parts = {}
     # surface
     for v in SURF:
@@ -77,27 +73,41 @@ def _stack_channels(ds: xr.Dataset) -> xr.DataArray:
     # upper air @ levels
     for v in PLEV:
         if v not in ds.data_vars:
-            raise RuntimeError(f"Missing pressure-level var in WB2: {v}")
+            # geopotential/specific_humidity могут отсутствовать в некоторых сторах — просто пропустим
+            print(f"[INFO] skip (no WB2 var): {v}")
+            continue
         for lev in LEVELS:
             if "level" not in ds[v].dims:
-                raise RuntimeError(f"Variable {v} has no 'level' dim")
+                print(f"[INFO] skip {v} (no 'level' dim)")
+                continue
             if lev not in ds.level.values:
-                raise RuntimeError(f"Level {lev} not in ds.level")
+                print(f"[INFO] skip {v}@{lev} (level not in ds)")
+                continue
             key = f"{RENAME_PLEV[v]}@{lev}"
             arr = ds[v].sel(level=lev).reset_coords("level", drop=True)
             arr = _drop_nonindex_coords(arr)
             parts[key] = arr
 
-    ordered = variables_order()
+    base = ["t2m","10u","10v","msl","tp"]
+    for lev in LEVELS:
+        base += [f"t@{lev}", f"u@{lev}", f"v@{lev}"]
+    extras = []
+    for lev in LEVELS:
+        if f"z@{lev}" in parts: extras.append(f"z@{lev}")
+    for lev in LEVELS:
+        if f"q@{lev}" in parts: extras.append(f"q@{lev}")
+    ordered = base + extras
+
     arrs = [parts[k].transpose("time","longitude","latitude") for k in ordered]
-    # Важно: coords='minimal' + compat='override' + убрать конфликтующие attrs
     da = xr.concat(
         arrs, dim="feature",
         coords="minimal",
         compat="override",
         combine_attrs="drop_conflicts",
     ).transpose("time","longitude","latitude","feature")
-    return da
+
+    print(f"[VARS] using {len(ordered)} channels: {ordered}")
+    return da, ordered
 
 def _build_samples(arr: np.ndarray, obs: int, pred: int):
     X_list, Y_list = [], []
@@ -117,7 +127,7 @@ def build_dataset(out_dir: Path, start_date: str, end_date: str,
 
     ds = _open_wb2(start_date, end_date)
 
-    da = _stack_channels(ds)                           # (time, lon, lat, feat)
+    da, var_order = _stack_channels(ds)                # (time, lon, lat, feat)
     arr = da.values.astype(np.float32)
 
     X, Y = _build_samples(arr, obs_window, pred_window)
@@ -137,7 +147,7 @@ def build_dataset(out_dir: Path, start_date: str, end_date: str,
     torch.save(torch.tensor(Y_tr, dtype=torch.float32), out_dir/"y_train.pt")
     torch.save(torch.tensor(X_te, dtype=torch.float32), out_dir/"X_test.pt")
     torch.save(torch.tensor(Y_te, dtype=torch.float32), out_dir/"y_test.pt")
-    (out_dir/"variables.json").write_text(json.dumps(variables_order(), ensure_ascii=False, indent=2))
+    (out_dir/"variables.json").write_text(json.dumps(var_order, ensure_ascii=False, indent=2))
 
     print(f"Saved tensors to {out_dir}")
     print(f"X_train: {tuple(torch.load(out_dir/'X_train.pt').shape)}  (lon={lon}, lat={lat}, obs*feat={obs*feat})")
@@ -145,10 +155,10 @@ def build_dataset(out_dir: Path, start_date: str, end_date: str,
 
 def parse_args():
     p = argparse.ArgumentParser(description="Build 2.5D dataset from WeatherBench2 ERA5 Zarr (6h, 64x32).")
-    p.add_argument("--out-dir", type=str, default="data/datasets/wb2_64x32_11f_2obs_1pred")
+    p.add_argument("--out-dir", type=str, default="data/datasets/wb2_64x32_zq_15f_4obs_1pred")
     p.add_argument("--start-date", type=str, default="2010-01-01")
-    p.add_argument("--end-date", type=str, default="2020-12-31")
-    p.add_argument("--obs-window", type=int, default=2)
+    p.add_argument("--end-date", type=str, default="2020-01-01")
+    p.add_argument("--obs-window", type=int, default=4)
     p.add_argument("--pred-window", type=int, default=1)
     p.add_argument("--test-size", type=float, default=0.2)
     return p.parse_args()

@@ -52,6 +52,7 @@ class DatasetNames(str, Enum):
     _64x32_12f_2y_2obs_1pred_uns = "64x32_12f_2y_2obs_1pred_uns"
     demo_era5_small = "demo_era5_small"
     wb2_64x32_11f_2obs_1pred = "wb2_64x32_11f_2obs_1pred"
+    wb2_64x32_zq_15f_4obs_1pred = "wb2_64x32_zq_15f_4obs_1pred"
 
 
 class GraphBuildingConfig(BaseModel):
