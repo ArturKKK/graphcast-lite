@@ -1,5 +1,9 @@
 """Utility methods to create the encoding, processing and decoding graphs."""
 
+# Бипартиный граф: узлы разбиты на два множества, рёбра идут только между ними (у нас Grid↔Mesh).
+# TriangularMesh: структура с координатами вершин (широты/долготы на сфере)
+# faces (треугольники по индексам вершин). Из faces легко получить список рёбер.
+
 from typing import Tuple, List
 import numpy as np
 from src.mesh import (
@@ -15,6 +19,8 @@ from src.mesh.create_mesh import filter_mesh, get_edges_from_faces
 from src.utils import get_bipartite_graph_spatial_features
 
 
+# Задача. Построить рёбра от узлов Grid к узлам Mesh, чтобы «залить» исходные признаки с Grid в ближайшие Mesh-узлы.
+# Плюс — посчитать статические фичи узлов (широты/долготы и т.п.), которые модель будет знать всегда.
 def create_encoding_graph(
     grid_node_lats: np.ndarray,
     grid_node_longs: np.ndarray,

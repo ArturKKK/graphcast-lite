@@ -1,0 +1,56 @@
+{
+  "batch_size": 1,
+  "learning_rate": 1e-3,
+  "num_epochs": 50,
+  "wandb_log": false,
+  "random_seed": 42,
+  "graph": {
+    "grid2mesh_edge_creation": "radius",
+    "mesh2grid_edge_creation": "contained",
+    "grid2mesh_radius_query": 0.65,
+    "mesh_levels": [4, 6]
+  },
+  "pipeline": {
+    "encoder": {
+      "mlp": {
+        "mlp_hidden_dims": [64, 64],
+        "output_dim": 64,
+        "use_layer_norm": true,
+        "layer_norm_mode": "node"
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [96, 96],
+        "output_dim": 96
+      }
+    },
+    "processor": {
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [96, 96, 96],
+        "output_dim": 96,
+        "use_layer_norm": true,
+        "layer_norm_mode": "node"
+      }
+    },
+    "decoder": {
+      "mlp": {
+        "mlp_hidden_dims": [64, 64],
+        "output_dim": 64,
+        "use_layer_norm": false
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [48, 48],
+        "output_dim": 60
+      }
+    }
+  },
+  "data": {
+    "dataset_name": "wb2_64x32_zq_15f_4obs_1pred",
+    "num_features_used": 15,
+    "obs_window_used": 4,
+    "pred_window_used": 4,
+    "want_feats_flattened": true
+  }
+}

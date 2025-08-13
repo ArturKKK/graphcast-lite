@@ -143,10 +143,6 @@ def build_dataset(out_dir: Path, start_date: str, end_date: str,
     X_te = sx.transform(X_te.reshape(-1, X_te.shape[-1])).reshape(X_te.shape)
     Y_te = sy.transform(Y_te.reshape(-1, Y_te.shape[-1])).reshape(Y_te.shape)
 
-    np.savez(out_dir / "scalers.npz",
-            x_mean=sx.mean_, x_scale=sx.scale_,
-            y_mean=sy.mean_, y_scale=sy.scale_)
-
     torch.save(torch.tensor(X_tr, dtype=torch.float32), out_dir/"X_train.pt")
     torch.save(torch.tensor(Y_tr, dtype=torch.float32), out_dir/"y_train.pt")
     torch.save(torch.tensor(X_te, dtype=torch.float32), out_dir/"X_test.pt")

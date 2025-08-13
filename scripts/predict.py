@@ -43,6 +43,21 @@ def _metrics(y_true: torch.Tensor, y_pred: torch.Tensor):
     mae = torch.mean(torch.abs(err)).item()
     return mse, rmse, mae
 
+def _spatial_acc(y_true: torch.Tensor, y_pred: torch.Tensor):
+    # y_*: [N, G, C]
+    # Spatial ACC: по каждому сэмплу нормируем поле по узлам (аномации), считаем корреляцию, потом усредняем по времени.
+    eps = 1e-8
+    yt = y_true - y_true.mean(dim=1, keepdim=True)
+    yp = y_pred - y_pred.mean(dim=1, keepdim=True)
+    yt = yt / (y_true.std(dim=1, keepdim=True) + eps)
+    yp = yp / (y_pred.std(dim=1, keepdim=True) + eps)
+    # корреляция по полю → [N, C]
+    corr_t = (yp * yt).mean(dim=1)
+    # среднее по времени
+    acc_per_c = corr_t.mean(dim=0)            # [C]
+    acc_overall = acc_per_c.mean().item()     # float
+    return acc_overall, acc_per_c
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("experiment_dir", help="напр. experiments/demo")
@@ -110,6 +125,10 @@ def main():
     b_mse, b_rmse, b_mae = _metrics(truths, baseline)
     skill_rmse = 1.0 - (rmse / (b_rmse + 1e-12))
 
+    # ACC (anomaly correlation): ближе к 1 — лучше; инвариантен к масштабу/смещению
+    acc_overall, acc_pc = _spatial_acc(truths, preds)
+    b_acc_overall, b_acc_pc = _spatial_acc(truths, baseline)
+
     N, G, C = preds.shape
     print()
     print("=== Inference summary ===")
@@ -118,6 +137,7 @@ def main():
     print(f"Test samples: {N} | Channels (C): {C}")
     print(f"Overall: MSE={mse:.6f} | RMSE={rmse:.6f} | MAE={mae:.6f}")
     print(f"Baseline(persistence): RMSE={b_rmse:.6f} | MAE={b_mae:.6f} | Skill(1-RMSE/RMSE_base)={skill_rmse*100:.2f}%")
+    print(f"ACC (anomaly corr): overall={acc_overall:.3f} | baseline={b_acc_overall:.3f} | Δ={acc_overall - b_acc_overall:+.3f}")
 
     # Метрики по каждому каналу
     print("\nPer-channel metrics (channel index 0..C-1):")
@@ -125,7 +145,10 @@ def main():
         m, r, a = _metrics(truths[..., c], preds[..., c])
         m_b, r_b, a_b = _metrics(truths[..., c], baseline[..., c])
         skill_c = 1.0 - (r / (r_b + 1e-12))
-        print(f"  c={c}: MSE={m:.6f} RMSE={r:.6f} MAE={a:.6f} | base_RMSE={r_b:.6f} skill={skill_c*100:.2f}%")
+        # ACC по каналу
+        acc_c  = acc_pc[c].item()
+        bacc_c = b_acc_pc[c].item()
+        print(f"  c={c}: MSE={m:.6f} RMSE={r:.6f} MAE={a:.6f} | base_RMSE={r_b:.6f} skill={skill_c*100:.2f}% | ACC={acc_c:.3f} (base {bacc_c:.3f})")
 
     # 4) опционально — вырезка региона
     # --region 53 57 74 87 - Предсказания только для Новосибирской области
