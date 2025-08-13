@@ -108,7 +108,11 @@ def main():
                 y = y.squeeze(-2)
             # Персистентный базлайн: «следующий шаг = последний наблюдённый»
             # Для flattened входа: X: [1, G, T*F] -> последний шаг это последние F каналов
-            X_last = X.squeeze(0)[:, -exp_cfg.data.num_features_used:]
+            # X_last = X.squeeze(0)[:, -exp_cfg.data.num_features_used:]
+            C = exp_cfg.data.num_features_used
+            P = exp_cfg.data.pred_window_used
+            X_last_1 = X.squeeze(0)[:, -C:]                     # [G, C]
+            X_last = X_last_1.repeat(1, P)                       # [G, C*P]
 
             X = X.to(device)
             out = model(X=X, attention_threshold=0.0)   # [G, pred_window*num_features_used]
@@ -129,26 +133,35 @@ def main():
     acc_overall, acc_pc = _spatial_acc(truths, preds)
     b_acc_overall, b_acc_pc = _spatial_acc(truths, baseline)
 
-    N, G, C = preds.shape
+    N, G, CP = preds.shape
+    C = exp_cfg.data.num_features_used
+    P = exp_cfg.data.pred_window_used
+    assert CP == C * P
+
     print()
     print("=== Inference summary ===")
     print(f"Dataset dir: {data_dir}")
     print(f"Grid: {meta.num_longitudes}x{meta.num_latitudes} (G={G}) | Obs_used={exp_cfg.data.obs_window_used} | Pred_used={exp_cfg.data.pred_window_used} | Features_used={exp_cfg.data.num_features_used}")
-    print(f"Test samples: {N} | Channels (C): {C}")
+    print(f"Test samples: {N} | Features per step: {C} | Horizons: {P} (total targets dim={CP})")
     print(f"Overall: MSE={mse:.6f} | RMSE={rmse:.6f} | MAE={mae:.6f}")
     print(f"Baseline(persistence): RMSE={b_rmse:.6f} | MAE={b_mae:.6f} | Skill(1-RMSE/RMSE_base)={skill_rmse*100:.2f}%")
     print(f"ACC (anomaly corr): overall={acc_overall:.3f} | baseline={b_acc_overall:.3f} | Δ={acc_overall - b_acc_overall:+.3f}")
 
-    # Метрики по каждому каналу
-    print("\nPer-channel metrics (channel index 0..C-1):")
-    for c in range(C):
-        m, r, a = _metrics(truths[..., c], preds[..., c])
-        m_b, r_b, a_b = _metrics(truths[..., c], baseline[..., c])
-        skill_c = 1.0 - (r / (r_b + 1e-12))
-        # ACC по каналу
-        acc_c  = acc_pc[c].item()
-        bacc_c = b_acc_pc[c].item()
-        print(f"  c={c}: MSE={m:.6f} RMSE={r:.6f} MAE={a:.6f} | base_RMSE={r_b:.6f} skill={skill_c*100:.2f}% | ACC={acc_c:.3f} (base {bacc_c:.3f})")
+    # Секции по горизонтам
+    C = exp_cfg.data.num_features_used
+    P = exp_cfg.data.pred_window_used
+    if P > 1:
+        print("\nPer-horizon metrics (aggregated over channels):")
+        for p in range(P):
+            sl = slice(p*C, (p+1)*C)
+            m, r, a = _metrics(truths[..., sl], preds[..., sl])
+            m_b, r_b, a_b = _metrics(truths[..., sl], baseline[..., sl])
+            skill_p = 1.0 - (r / (r_b + 1e-12))
+            # ACC для горизонта:
+            acc_p, _ = _spatial_acc(truths[..., sl], preds[..., sl])
+            b_acc_p, _ = _spatial_acc(truths[..., sl], baseline[..., sl])
+            hours = (p+1) * 6
+            print(f"  +{hours:02d}h: RMSE={r:.6f} | MAE={a:.6f} | base_RMSE={r_b:.6f} | skill={skill_p*100:.2f}% | ACC={acc_p:.3f} (base {b_acc_p:.3f})")
 
     # 4) опционально — вырезка региона
     # --region 53 57 74 87 - Предсказания только для Новосибирской области

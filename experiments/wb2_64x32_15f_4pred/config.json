@@ -47,7 +47,7 @@
     }
   },
   "data": {
-    "dataset_name": "wb2_64x32_zq_15f_4obs_1pred",
+    "dataset_name": "wb2_64x32_zq_15f_4obs_4pred",
     "num_features_used": 15,
     "obs_window_used": 4,
     "pred_window_used": 4,
