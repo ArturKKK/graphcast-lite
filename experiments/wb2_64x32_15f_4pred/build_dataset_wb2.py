@@ -143,6 +143,10 @@ def build_dataset(out_dir: Path, start_date: str, end_date: str,
     X_te = sx.transform(X_te.reshape(-1, X_te.shape[-1])).reshape(X_te.shape)
     Y_te = sy.transform(Y_te.reshape(-1, Y_te.shape[-1])).reshape(Y_te.shape)
 
+    np.savez(out_dir / "scalers.npz",
+            x_mean=sx.mean_, x_scale=sx.scale_,
+            y_mean=sy.mean_, y_scale=sy.scale_)
+
     torch.save(torch.tensor(X_tr, dtype=torch.float32), out_dir/"X_train.pt")
     torch.save(torch.tensor(Y_tr, dtype=torch.float32), out_dir/"y_train.pt")
     torch.save(torch.tensor(X_te, dtype=torch.float32), out_dir/"X_test.pt")
@@ -155,11 +159,11 @@ def build_dataset(out_dir: Path, start_date: str, end_date: str,
 
 def parse_args():
     p = argparse.ArgumentParser(description="Build 2.5D dataset from WeatherBench2 ERA5 Zarr (6h, 64x32).")
-    p.add_argument("--out-dir", type=str, default="data/datasets/wb2_64x32_zq_15f_4obs_1pred")
+    p.add_argument("--out-dir", type=str, default="data/datasets/wb2_64x32_zq_15f_4obs_4pred")
     p.add_argument("--start-date", type=str, default="2010-01-01")
     p.add_argument("--end-date", type=str, default="2020-01-01")
     p.add_argument("--obs-window", type=int, default=4)
-    p.add_argument("--pred-window", type=int, default=1)
+    p.add_argument("--pred-window", type=int, default=4)
     p.add_argument("--test-size", type=float, default=0.2)
     return p.parse_args()
 

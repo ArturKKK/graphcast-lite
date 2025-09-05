@@ -1,4 +1,19 @@
-"""Utility methods to create the encoding, processing and decoding graphs."""
+"""Utility methods to create the encoding, processing and decoding graphs.
+
+РУССКИЕ ПОЯСНЕНИЯ:
+- В этом модуле строятся три типа графов, которые затем использует модель:
+  1) ENCODING (Grid → Mesh): как «заливать» признаки с регулярной сетки (grid) на триангуляционную сетку (mesh).
+  2) PROCESSING (Mesh ↔ Mesh): как соединены вершины внутри самой треугольной сетки для propagation/message passing.
+  3) DECODING (Mesh → Grid): как «снимать» обновлённые признаки с mesh обратно на grid, чтобы получить прогноз на исходной сетке.
+
+- В коде принята конвенция индексации узлов: сначала идут ВСЕ узлы Grid (индексы 0..N-1), а затем ВСЕ узлы Mesh (индексы N..N+M-1).
+  Поэтому каждый раз, когда мы формируем рёбра с участием Mesh, мы сдвигаем индексы Mesh на +num_grid_nodes.
+
+- Термины:
+  * Бипартиный граф: рёбра только между двумя множествами узлов (у нас Grid↔Mesh).
+  * TriangularMesh: структура с координатами вершин на сфере и списком треугольных граней (faces).
+  * edge_index: тензор формы [2, E] с парами (sender → receiver) для рёбер.
+"""
 
 # Бипартиный граф: узлы разбиты на два множества, рёбра идут только между ними (у нас Grid↔Mesh).
 # TriangularMesh: структура с координатами вершин (широты/долготы на сфере)
@@ -40,12 +55,19 @@ def create_encoding_graph(
         grid nodes and the mesh nodes. The second element is a tensor with the initial grid features. The third element is a tensor with the initial mesh features.
 
     """
+    # Вариант построения рёбер Grid→Mesh выбирается параметром grid2mesh_edge_creation в конфиге.
     if graph_building_config.grid2mesh_edge_creation == Grid2MeshEdgeCreation.RADIUS:
+        # 1) Вычисляем радиус поиска соседей Mesh для каждого узла Grid.
+        #    Берём максимальную длину ребра на выбранном mesh (характерный масштаб сетки)
+        #    и умножаем на коэффициент из конфига. Это даёт радиус в единицах той же метрики,
+        #    что внутри TriangularMesh (обычно chordal distance в 3D или геодезическая приближенка).
         radius = (
             get_max_edge_distance(mesh=mesh)
             * graph_building_config.grid2mesh_radius_query
         )
 
+        # 2) Находим пары индексов (grid_index, mesh_index) таких, что узел mesh находится в указанном радиусе
+        #    от узла grid. Возвращаются два параллельных массива одинаковой длины.
         grid_indices, mesh_indices = radius_query_indices(
             grid_latitude=grid_node_lats,
             grid_longitude=grid_node_longs,
@@ -53,21 +75,34 @@ def create_encoding_graph(
             radius=radius,
         )
 
+        # 3) Собираем edge_index формы [2, E], где первая строка — индексы отправителей (Grid),
+        #    вторая — получателей (Mesh). Пока индексы Mesh ещё «локальные» (0..M-1).
         edge_index = np.stack([grid_indices, mesh_indices], axis=0)
 
-        # Making sure the mesh indices start after the node_indices
+        # 4) Сдвигаем индексы Mesh на +num_grid_nodes, чтобы они попадали в диапазон [N, N+M-1]
+        #    при конкатенации узлов (Grid идёт первым блоком, Mesh — вторым).
         edge_index[1] += num_grid_nodes
         edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
     else:
+        # Сейчас реализован только сценарий RADIUS для Grid→Mesh.
         raise NotImplementedError(
             f"There is no support for {graph_building_config.grid2mesh_edge_creation} to create Grid2Mesh edges."
         )
 
+    # 5) Подготавливаем координаты узлов Grid в векторной форме.
+    #    Входные grid_node_lats/longs — это 1D массивы «осей». meshgrid даёт 2D сетку (ширина×высота),
+    #    затем мы её выравниваем (flatten) в длину N и приводим к float32.
     grid_nodes_lon, grid_nodes_lat = np.meshgrid(grid_node_longs, grid_node_lats)
     grid_nodes_lon = grid_nodes_lon.reshape([-1]).astype(np.float32)
     grid_nodes_lat = grid_nodes_lat.reshape([-1]).astype(np.float32)
 
+    # 6) Считаем статические пространственные признаки для бипартийного графа Grid→Mesh.
+    #    Функция вернёт:
+    #    - признаки узлов-отправителей (Grid),
+    #    - признаки узлов-получателей (Mesh),
+    #    - признаки рёбер (здесь не используются в возвращаемом значении этой функции, но внутри они также формируются).
+    #    Внутри обычно кодируются широта/долгота/xyz, а для рёбер — относительные смещения и нормированные расстояния.
     grid_node_features, mesh_node_features, _ = get_bipartite_graph_spatial_features(
         senders_node_lat=grid_nodes_lat,
         senders_node_lon=grid_nodes_lon,
@@ -77,6 +112,10 @@ def create_encoding_graph(
         receivers=edge_index[1],
     )
 
+    # Возвращаем:
+    # - edge_index: тензор [2, E] с рёбрами Grid→Mesh (Mesh-индексы уже сдвинуты на +N);
+    # - grid_node_features: тензор [N, F_grid_stat] статических фичей для всех узлов Grid;
+    # - mesh_node_features: тензор [M, F_mesh_stat] статических фичей для всех узлов Mesh.
     return (
         edge_index,
         torch.tensor(grid_node_features, dtype=torch.float32),
@@ -103,13 +142,18 @@ def create_processing_graph(
 
     """
 
-    # This will have to be updated on taking multiple levels of edges
+    # 1) Выбираем нужные уровни иерархической сетки (например, один или несколько уровней разбиения икосаэдра).
+    #    filter_mesh вернёт «слитую» структуру с faces для указанных уровней.
     meshes_we_want = filter_mesh(meshes=meshes, mesh_levels=mesh_levels)
+
+    # 2) Преобразуем треугольники (faces) в рёбра графа. В неориентированном случае каждое ребро обычно даётся
+    #    в обе стороны (u→v и v→u), что удобно для message passing. Функция возвращает массив shape [2, E].
     return torch.tensor(get_edges_from_faces(meshes_we_want.faces), dtype=torch.int64)
 
 
+
 def create_decoding_graph(
-    cordinates: Tuple[np.array, np.array],
+    cordinates: Tuple[np.array, np.array],  # NOTE: орфография параметра сохранена как в исходнике
     mesh: TriangularMesh,
     graph_building_config: GraphBuildingConfig,
     num_grid_nodes: int,
@@ -133,19 +177,28 @@ def create_decoding_graph(
         Returns a tensor of shape [2, num_edges] which defines the edges between the mesh nodes and the grid nodes.
     """
 
+    # Вариант построения рёбер Mesh→Grid задаётся параметром mesh2grid_edge_creation.
     if graph_building_config.mesh2grid_edge_creation == Mesh2GridEdgeCreation.CONTAINED:
+        # 1) Для каждого узла Grid находим индекс треугольника Mesh, который «накрывает» эту точку на сфере.
+        #    Возвращаются два массива одинаковой длины: grid_indices (получатели) и mesh_indices (отправители).
+        #    Для каждого grid-узла будет ровно 3 mesh-вершины (вершины одного треугольника).
         grid_indices, mesh_indices = in_mesh_triangle_indices(
             grid_latitude=cordinates[0], grid_longitude=cordinates[1], mesh=mesh
         )
 
-        # Making sure the mesh indices start after the node_indices
+        # 2) Формируем edge_index формы [2, E], но теперь рёбра направлены от Mesh → Grid,
+        #    потому что мы будем «снимать» признаки с mesh-вершин на узлы grid.
         edge_index = np.stack([mesh_indices, grid_indices], axis=0)
+
+        # 3) Сдвигаем индексы Mesh на +num_grid_nodes (единая индексация узлов, как в ENCODING).
         edge_index[0] += num_grid_nodes
         edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
+        # Итог: на каждый узел Grid приходится ровно 3 входящих ребра от вершин соответствующего треугольника Mesh.
         return edge_index
 
     else:
+        # Сейчас реализована только стратегия CONTAINED для Mesh→Grid.
         raise NotImplementedError(
             f"There is no support for {graph_building_config.mesh2grid_edge_creation} to create Mesh2Grid edges."
         )

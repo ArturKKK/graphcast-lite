@@ -1,4 +1,18 @@
-"""Contains the training and testing logic for the Weather Prediction model."""
+"""Contains the training and testing logic for the Weather Prediction model.
+
+- Этот модуль реализует полный цикл обучения/валидации/тестирования модели `WeatherPrediction`.
+- Состоит из:
+  * `spatial_corr` — метрика ACC (пространственная корреляция) между предсказанием и истиной по узлам.
+  * `update_attention_threshold` — расписание порога для SparseGAT: постепенно увеличивает threshold, чтобы прореживать рёбра по attention.
+  * `train_epoch` — одна эпоха обучения: проход по train-дataloader, MSE лосс, оптимизация.
+  * `test` — оценка на val/test: без градиентов, считает MSE и ACC.
+  * `train` — оркестратор обучения: W&B логирование (опционально), initial eval, цикл эпох с early stopping и сохранением лучшей модели, запись результатов в JSON.
+
+КОНВЕНЦИИ:
+- Данные `X`/`y` ожидаются с батчем (часто `B=1`), поэтому внутри идёт `squeeze`.
+- Для `WeatherPrediction` можно прокинуть `epoch`/`batch_num`/`attention_threshold` — это нужно для динамического прореживания графа в `SparseGATConv`.
+"""
+
 from src.models import WeatherPrediction
 import torch
 import torch.nn as nn
@@ -11,33 +25,54 @@ from src.constants import FileNames
 from src.utils import save_to_json_file
 import os
 
+
 def spatial_corr(pred: torch.Tensor, true: torch.Tensor) -> float:
     """
-    pred, true: [num_nodes, num_features] или [batch?, num_nodes, num_features]
-    Возвращает среднюю по фичам корреляцию по полю (ACC).
+    Вычисляет среднюю «пространственную корреляцию» (ACC) между предсказанием и истиной по узлам.
+
+    Параметры
+    ---------
+    pred, true : torch.Tensor
+        Формы либо [num_nodes, num_features], либо [batch, num_nodes, num_features].
+
+    Идея
+    ----
+    1) Если есть батч, усредняем по батчу (получаем среднее поле).
+    2) Для каждой фичи нормируем по полю: вычитаем среднее по узлам и делим на std по узлам.
+    3) Умножаем нормированные поля поэлементно и усредняем по узлам — это ACC для каждой фичи.
+    4) Возвращаем среднее ACC по фичам (скаляр).
     """
     if pred.dim() == 3:      # [B, N, F] -> усредним по батчу
         pred = pred.mean(dim=0)
         true = true.mean(dim=0)
 
-    # нормируем каждую фичу по полю (по узлам)
+    # Нормируем каждую фичу по полю (по узлам), добавляем eps, чтобы избежать деления на 0
     p = (pred - pred.mean(dim=0, keepdim=True)) / (pred.std(dim=0, keepdim=True) + 1e-8)
     t = (true - true.mean(dim=0, keepdim=True)) / (true.std(dim=0, keepdim=True) + 1e-8)
 
-    # ACC по каждой фиче, потом среднее
+    # ACC по каждой фиче, потом среднее по фичам
     acc_per_feat = (p * t).mean(dim=0)
     return acc_per_feat.mean().item()
 
+
 def update_attention_threshold(epoch, max_epochs=30, start_epoch=5, final_threshold=0.1356):
+    """
+    Расписание порога attention для SparseGAT.
+
+    - До `start_epoch` порог 0.0 (не режем рёбра — модель «разглядывает» весь граф).
+    - Затем линейно растём к `final_threshold` в течение `max_epochs - start_epoch` эпох.
+    - После (epoch > max_epochs + start_epoch) фиксируемся на `final_threshold`.
+
+    Это помогает сначала стабилизировать обучение, а потом ускоряться и подавлять шумовые связи.
+    """
     if epoch < start_epoch:
         return 0.0
     if epoch > max_epochs + start_epoch:
         return final_threshold
     
-    # progress = (epoch - start_epoch) / (max_epochs - start_epoch)
-    # return min(final_threshold, progress * final_threshold)
-
+    # Линейное возрастание от 0.0 до final_threshold
     return min(final_threshold, (epoch - start_epoch) * final_threshold / (max_epochs - start_epoch))
+
 
 def train_epoch(
     model: WeatherPrediction,
@@ -48,23 +83,33 @@ def train_epoch(
     threshold,
     epoch
 ):
+    """Один проход обучения по train-датасету.
+
+    Шаги:
+    - Переводим модель в train-режим.
+    - Для каждого батча: подготавливаем X, y (удаляем лишние размерности, переносим на device),
+      прокидываем `epoch`/`batch_num`/`attention_threshold` в модель (нужно для SparseGAT),
+      считаем лосс, делаем backward и step.
+    - Возвращаем средний лосс по эпохе.
+    """
     model.train()
     total_loss = 0
     print(threshold)
 
     for i, batch in enumerate(train_dataloader):
         X, y = batch
-        # Removing the batch dimension
+        # Удаляем batch-измерение (ожидается B=1)
         y = y.squeeze(0)
 
         if len(y.shape) == 3:
-            # Removing the extra timestep dimension from y
+            # Если у y есть временное измерение длины 1 — сожмём и его
             y = y.squeeze(-2)
         X, y = X.to(device), y.to(device)
         optimiser.zero_grad()
 
+        # Прокидываем вспомогательные аргументы в модель (используются в SparseGATConv)
         kwargs = {
-            # "attention_threshold": threshold,
+            # "attention_threshold": threshold,  # порог передаём отдельным аргументом
             "epoch": epoch,
             "batch_num": i,
         }
@@ -80,6 +125,7 @@ def train_epoch(
 
 
 def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device):
+    """Оценка модели: без градиентов, считаем средний MSE и ACC по даталоудеру."""
     model.eval()
 
     total_loss = 0
@@ -88,14 +134,14 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device)
     with torch.no_grad():
         for batch in test_dataloader:
             X, y = batch
-            # Removing the batch dimension
+            # Удаляем batch-измерение (ожидается B=1)
             y = y.squeeze(0)
 
             if len(y.shape) == 3:
-                # Removing the extra timestep dimension from y
+                # Удаляем лишнюю ось времени, если она единичная
                 y = y.squeeze(-2)
             X, y = X.to(device), y.to(device)
-            outs = model(X=X, attention_threshold=0.0)
+            outs = model(X=X, attention_threshold=0.0)  # на валидации/тесте порог = 0.0
             batch_loss = loss_fn(outs, y)
             total_loss += batch_loss.detach().item()
             acc_values.append(spatial_corr(outs, y))
@@ -117,16 +163,16 @@ def train(
     config: ExperimentConfig,
     results_save_dir: str,
     print_losses: bool = True,
-    wandb_log: bool = True, # Whether to log to Weights & Biases. Зачем надо только?
+    wandb_log: bool = True, # Если True — логируем метрики/гиперпараметры в Weights & Biases для удобного трекинга экспериментов.
 ):
-    # Define the loss function
+    # Функция потерь: среднеквадратичная ошибка
     loss_fn = nn.MSELoss()
 
     train_losses = []
     val_losses = []
     test_losses = []
 
-    # Initialize Weights & Biases logging
+    # Инициализируем Weights & Biases (если включено)
     if wandb_log:
         wandb.login(key=config.wandb_key)
         wandb.init(
@@ -136,11 +182,11 @@ def train(
             name=config.wandb_name,
         )
 
-    # Early stopping variables
+    # Early stopping переменные
     best_val_loss = float("inf")
     patience_counter = 0
     
-    # Getting initial performance before training
+    # Начальная оценка до обучения (полезно, чтобы видеть «нулевую» точку на графиках)
     intial_train_loss, initial_train_acc = test(
         model=model, test_dataloader=train_dataloader, loss_fn=loss_fn, device=device
     )
@@ -173,7 +219,7 @@ def train(
             }
             )
 
-    # Running training
+    # Основной цикл обучения
     for epoch in range(num_epochs):
         print()
         epoch_threshold = update_attention_threshold(epoch)
@@ -219,7 +265,7 @@ def train(
 
         epoch_delta = best_val_loss - epoch_val_loss
 
-        # Early stopping logic
+        # Логика early stopping: если валидационный лосс улучшился больше, чем на delta — сохраняем модель и сбрасываем patience.
         if epoch_delta > config.early_stopping_delta:
 
             print(
@@ -227,7 +273,7 @@ def train(
             )
 
             best_val_loss = epoch_val_loss
-            # Save the best model
+            # Сохраняем лучшую модель
             torch.save(
                 model.state_dict(),
                 os.path.join(results_save_dir, FileNames.SAVED_MODEL),
@@ -239,11 +285,12 @@ def train(
             patience_counter += 1
             print(f"Patience counter is now {patience_counter} \n")
 
+        # Если терпение закончилось — останавливаем обучение
         if patience_counter >= config.early_stopping_patience:
             print(f"Early stopping triggered after epoch {epoch+1}. Stopping training.")
             break
 
-    # Save final training results
+    # Сохранение итоговых кривых лоссов (удобно для последующего анализа/визуализации)
     training_results = {
         "train_losses": train_losses,
         "val_losses": val_losses,

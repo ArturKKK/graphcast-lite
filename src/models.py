@@ -1,4 +1,18 @@
-"""Contains all the torch model definitions."""
+"""Contains all the torch model definitions.
+
+- Этот модуль описывает все блоки модели:
+  * MLP: линейные слои с PReLU (+опц. LayerNorm) для подготовки признаков перед графовым слоем.
+  * SparseGATConv: наследник GATConv, который может ПРОРЕЖИВАТЬ рёбра по порогу attention и возвращать новый edge_index.
+  * GraphLayer: обёртка над конкретным типом графового слоя (SimpleConv/GCN/GAT/SparseGAT) с возможностью стека (GCN, GAT).
+  * Model: композиция «(опц.) MLP → GraphLayer»; выравнивает интерфейс, сообщает output_dim вниз по пайплайну.
+  * WeatherPrediction: основной pipeline (а-ля GraphCast):
+      (опц.) продукт-граф (время×пространство) → подготовка фичей → ENCODER (Grid→Mesh) → PROCESSOR (Mesh↔Mesh) → DECODER (Mesh→Grid) → выход по grid.
+
+КОНВЕНЦИИ:
+- edge_index — тензор формы [2, E] с парами (sender→receiver).
+- Узлы объединяются в единый массив: сначала ВСЕ grid (0..N-1), затем ВСЕ mesh (N..N+M-1).
+- encoder/decoder работают на бипартийных графах (Grid↔Mesh), processor — только на mesh-графе.
+"""
 
 from typing import Tuple
 
@@ -36,16 +50,23 @@ from src.utils import get_mesh_lat_long
 
 
 class MLP(nn.Module):
+    """Многоуровневый перцептрон для подготовки входных признаков (до GNN).
+
+    - Конфиг задаёт список скрытых размеров и выходной размер (output_dim), а также LayerNorm.
+    - Активация — PReLU (устойчив к «мертвым» нейронам, как у ReLU).
+    - ВАЖНО: output_dim здесь фиксируется конфигом и далее служит входом в графовый слой.
+    """
     def __init__(self, mlp_config: MLPBlock, input_dim):
         super().__init__()
         hidden_dims = mlp_config.mlp_hidden_dims
         output_dim = (
             mlp_config.output_dim
-        )  # TODO, this should not be hardcoded but come from "data.num_features"
+        )  # TODO: при желании можно связать с data.num_features, но сейчас жёстко в конфиге
 
         self.MLP = nn.ModuleList()
         in_features_for_last_layer = input_dim
         if hidden_dims:
+            # Первый скрытый слой
             self.MLP.extend(
                 [
                     nn.Linear(
@@ -56,6 +77,7 @@ class MLP(nn.Module):
                 ]
             )
 
+            # Промежуточные скрытые слои
             for h_index in range(1, len(hidden_dims)):
                 self.MLP.extend(
                     [
@@ -68,10 +90,12 @@ class MLP(nn.Module):
                 )
             in_features_for_last_layer = hidden_dims[-1]
 
+        # Выходной слой проецирует в output_dim (каналы, с которыми дальше будет работать GNN)
         self.MLP.append(
             nn.Linear(in_features=in_features_for_last_layer, out_features=output_dim)
         )
 
+        # (Опционально) LayerNorm поверх выходного пространства
         if mlp_config.use_layer_norm:
             self.MLP.append(
                 LayerNorm(in_channels=output_dim, mode=mlp_config.layer_norm_mode)
@@ -80,10 +104,22 @@ class MLP(nn.Module):
     def forward(self, X: torch.Tensor):
         for layer in self.MLP:
             X = layer(X)
-
         return X
 
+
 class SparseGATConv(GATConv):
+    """Вариант GAT, который может возвращать И новый edge_index после прореживания по attention.
+
+    Идея:
+    - Считаем обычный GAT: получаем out и attention_scores на рёбрах.
+    - Если batch_num == 0 (например, первый батч эпохи), применяем порог attention_threshold:
+      отбрасываем рёбра с малыми α, обновляя edge_index (сохранение разрежения на следующих шагах/эпохах вне этого слоя — ответственность вызывающего кода).
+    - Возвращаем (out, (edge_index, attention_scores)) — чтобы выше по стеку можно было заменить граф.
+
+    ВАЖНО:
+    - concat=False → головы усредняются/агрегируются на уровне каналов (не конкатенируются), поэтому out имеет форму [N, out_channels].
+    - attention_scores.squeeze(): приводим от [E, 1] к [E].
+    """
     def __init__(self, in_channels, out_channels, heads=1, concat=False,
                  dropout=0.0, bias=True, **kwargs):
         super().__init__(in_channels, out_channels, heads, concat=concat,
@@ -91,18 +127,18 @@ class SparseGATConv(GATConv):
 
     def forward(self, x, edge_index, attention_threshold=0.0, **kwargs):
 
-        batch_num = kwargs.get('batch_num', 1)
+        batch_num = kwargs.get('batch_num', 1)  # внешний код может прокинуть номер батча
 
-        # Apply linear transformation and compute attention scores
+        # 1) Стандартный прямой проход GAT с возвратом attention-весов на рёбрах
         out, (edge_index, attention_scores) = super().forward(x, edge_index, return_attention_weights=True)
-        attention_scores = attention_scores.squeeze()
+        attention_scores = attention_scores.squeeze()  # [E]
 
         if batch_num == 0:
-
-            # Apply threshold to attention scores and remove edges with scores below the threshold
+            # 2) Применяем порог, отбрасывая «слабые» рёбра
             mask = attention_scores >= attention_threshold
             mask = mask.type(torch.bool)
 
+            # Небольшой лог — можно выключить при желании
             # print('attention threshold: ', attention_threshold)
             print('edge_index', edge_index.shape)
             # print('avg attn score: ', torch.mean(attention_scores))
@@ -115,6 +151,16 @@ class SparseGATConv(GATConv):
 
 
 class GraphLayer(nn.Module):
+    """Обёртка, создающая конкретный графовый слой (или стек слоёв) по конфигу.
+
+    Поддерживаемые типы:
+    - SimpleConv: простая агрегация соседей (mean), без обучаемых весов (кроме, возможно, нормализации дальше).
+    - ConvGCN: стек GCNConv с PReLU между слоями.
+    - GATConv: стек GATConv (heads из конфига), concat=False → каналы не растут по числу голов.
+    - SparseGATConv: один слой SparseGATConv (обычно достаточно одного, дальше нормализация по желанию).
+
+    На выходе сохраняем output_dim (нужен для построения следующих блоков).
+    """
     def __init__(self, graph_config: GraphBlock, input_dim):
         super().__init__()
 
@@ -122,6 +168,7 @@ class GraphLayer(nn.Module):
         self.output_dim = None
 
         if graph_config.layer_type == GraphLayerType.SimpleConv:
+            # SimpleConv не меняет число каналов: out_dim = in_dim
             self.output_dim = input_dim
             self.layers = SimpleConv(aggr="mean")
 
@@ -136,6 +183,7 @@ class GraphLayer(nn.Module):
             hidden_dims = graph_config.hidden_dims
 
             if graph_config.layer_type == GraphLayerType.ConvGCN:
+                # Стек GCNConv: [in→h0] → act → [h0→h1] → act → ... → [h_{k-1}→out]
                 self.layers.append(GCNConv(input_dim, hidden_dims[0]))
                 self.layers.append(self.activation)
 
@@ -146,6 +194,7 @@ class GraphLayer(nn.Module):
                 self.layers.append(GCNConv(hidden_dims[-1], graph_config.output_dim))
 
             elif graph_config.layer_type == GraphLayerType.GATConv:
+                # Стек GATConv с num_heads головами; concat=False → финальный dim = out_channels
                 self.num_heads = num_heads = graph_config.gat_props.num_heads
                 self.layers.append(
                     GATConv(input_dim, hidden_dims[0], heads=num_heads, concat=False)
@@ -172,12 +221,14 @@ class GraphLayer(nn.Module):
                     )
                 )
             elif graph_config.layer_type == GraphLayerType.SparseGATConv:
+                # Один SparseGATConv: часто хватает одного слоя внимания + (опц.) LayerNorm
                 self.num_heads = num_heads = graph_config.gat_props.num_heads
                 print(graph_config.layer_type)
                 self.layers.append(
                     SparseGATConv(input_dim, graph_config.output_dim, heads=num_heads, concat=False)
                 )
 
+            # (Опционально) LayerNorm поверх выходного пространства
             if graph_config.use_layer_norm:
                 self.layers.append(
                     LayerNorm(
@@ -193,6 +244,12 @@ class GraphLayer(nn.Module):
             )
 
     def forward(self, X: torch.Tensor, edge_index: torch.Tensor, attention_threshold=0.0, **kwargs):
+        """Единый интерфейс прямого прохода для разных типов слоёв.
+
+        - SimpleConv: просто применяем слой к (X, edge_index).
+        - GCNConv/GATConv: пробегаем по self.layers, где conv-слои чередуются с активациями.
+        - SparseGATConv: возвращаем (X, edge_index) — так как edge_index может обновиться (прореживание).
+        """
         if self.layer_type == GraphLayerType.SimpleConv:
             return self.layers(x=X, edge_index=edge_index)
 
@@ -219,6 +276,14 @@ class GraphLayer(nn.Module):
 
 
 class Model(nn.Module):
+    """Композиция «(опц.) MLP → GraphLayer».
+
+    Зачем:
+    - MLP выравнивает/подготавливает каналы (например, склеенные динамические + статические фичи) → аккуратный вход в GNN.
+    - GraphLayer делает собственно message passing.
+
+    Выставляет self.output_dim, чтобы следующий блок знал размерность входа.
+    """
     def __init__(self, model_config: ModelConfig, input_dim: int):
         super().__init__()
         self.mlp = None
@@ -244,22 +309,14 @@ class Model(nn.Module):
 
 
 class WeatherPrediction(nn.Module):
-    """This is our main weather prediction model. Similar to GraphCast, this model will
-      operate on three graphs -
+    """Главная модель прогноза погоды (а-ля GraphCast).
 
-    * Encoding graph: This graph contains all the nodes. This graph is strictly
-    bipartite with edges going from grid nodes to the mesh nodes.
-    The output of this stage will be a latent representation for
-    the mesh nodes.
+    Работает с тремя графами:
+    * Encoding graph (Grid→Mesh): бипаритный граф, переносит признаки с grid на mesh; на выходе — латенты для mesh-узлов.
+    * Processing graph (Mesh↔Mesh): внутри-треугольные рёбра, обновляет латенты mesh.
+    * Decoding graph (Mesh→Grid): бипаритный граф, переносит обновлённые mesh-латенты обратно на grid (каждый grid-узел связан с 3 вершинами покрывающего треугольника mesh).
 
-    * Processing Graph: This graph contains only the mesh nodes.
-    It will update the latent state of the mesh nodes.
-
-    * Decoding graph: This graph contains all nodes. This graph is strictly
-      bipartite with edges going from mesh nodes to grid nodes such that each grid
-      nodes is connected to 3 nodes of the mesh triangular face that contains
-      the grid points. It will process the updated latent state of the mesh nodes, and the latent state
-      of the grid nodes, to produce the final output for the grid nodes.
+    Опционально: продукт-граф (время×пространство) поверх входов grid для обогащения последнего временного среза.
     """
 
     def __init__(
@@ -273,17 +330,19 @@ class WeatherPrediction(nn.Module):
         super().__init__()
 
         self.device = device
-        self.obs_window = data_config.obs_window_used
-        self.num_features = data_config.num_features_used
-        self.total_feature_size = self.num_features * self.obs_window
+        self.obs_window = data_config.obs_window_used  # T — окно наблюдений (временные шаги)
+        self.num_features = data_config.num_features_used  # F — число динамических фичей на один шаг
+        self.total_feature_size = self.num_features * self.obs_window  # T*F — если склеиваем время в канал
         self.use_product_graph = pipeline_config.product_graph is not None
 
+        # Инициализация свойств grid и mesh (координаты, числа узлов, иерархия сеток)
         self._init_grid_properties(grid_lat=cordinates[0], grid_lon=cordinates[1])
         self._init_mesh_properties(graph_config)
         self.using_sparse_gat = pipeline_config.processor.gcn.layer_type == GraphLayerType.SparseGATConv
 
         self._total_nodes = self._num_grid_nodes + self._num_mesh_nodes
 
+        # (Опционально) создаём продукт-граф (время×пространство) и маленькую модель для прохода по нему.
         if self.use_product_graph:
             self.product_graph = self._create_product_graph(
                 product_graph_config=pipeline_config.product_graph
@@ -293,6 +352,7 @@ class WeatherPrediction(nn.Module):
                 input_dim=self.num_features,
             ).to(self.device)
 
+        # Строим ENCODING-граф и считаем статические фичи для grid/mesh узлов
         self.encoding_graph, self.init_grid_features, self.init_mesh_features = (
             create_encoding_graph(
                 grid_node_lats=self._grid_lat,
@@ -305,17 +365,20 @@ class WeatherPrediction(nn.Module):
             )
         )
 
+        # Переносим статические фичи на устройство
         self.init_grid_features, self.init_mesh_features = self.init_grid_features.to(
             device
         ), self.init_mesh_features.to(device)
 
-        # The shape of the initial static features that are added to each node
+        # Размер статических фичей на каждом узле (одинаковый для grid/mesh)
         self._init_feature_size = self.init_grid_features.shape[1]
 
+        # PROCESSING-граф: рёбра внутри mesh для message passing
         self.processing_graph = create_processing_graph(
             meshes=self._meshes, mesh_levels=graph_config.mesh_levels
         )
 
+        # DECODING-граф: для каждого grid — 3 входа от вершин треугольника mesh, который его содержит
         self.decoding_graph = create_decoding_graph(
             cordinates=cordinates,
             mesh=self._finest_mesh,
@@ -323,6 +386,9 @@ class WeatherPrediction(nn.Module):
             num_grid_nodes=self._num_grid_nodes,
         )
 
+        # Размер входа в ENCODER:
+        # - Если используем продукт-граф, в ENCODER идёт последний временной срез с F каналами.
+        # - Иначе склеиваем T шагов во вход: T*F.
         encoder_input_dim = (
             self.num_features + self._init_feature_size
             if self.use_product_graph
@@ -332,22 +398,26 @@ class WeatherPrediction(nn.Module):
             model_config=pipeline_config.encoder, input_dim=encoder_input_dim
         ).to(device)
 
+        # PROCESSOR: работает по mesh, получает на вход encoder.output_dim
         self.processor = Model(
             model_config=pipeline_config.processor,
             input_dim=self.encoder.output_dim,
         ).to(device)
 
+        # DECODER: работает по объединённым (grid+mesh) признакам, получает processor.output_dim
         self.decoder = Model(
             model_config=pipeline_config.decoder,
             input_dim=self.processor.output_dim,
         ).to(device)
 
+        # Переносим графы на устройство
         self.encoding_graph, self.decoding_graph, self.processing_graph = (
             self.encoding_graph.to(self.device),
             self.decoding_graph.to(device),
             self.processing_graph.to(device),
         )
 
+        # Печать краткого summary для отладки размеров и графов
         if self.use_product_graph:
             print("Product Graph summary: ")
             print(
@@ -397,11 +467,13 @@ class WeatherPrediction(nn.Module):
         print()
 
     def _init_grid_properties(self, grid_lat: np.ndarray, grid_lon: np.ndarray):
+        """Сохраняем координаты grid и считаем число узлов N = |lat| × |lon|."""
         self._grid_lat = grid_lat.astype(np.float32)
         self._grid_lon = grid_lon.astype(np.float32)
         self._num_grid_nodes = grid_lat.shape[0] * grid_lon.shape[0]
 
     def _init_mesh_properties(self, graph_config: GraphBuildingConfig):
+        """Строим иерархию сеток на сфере и извлекаем координаты узлов самого тонкого уровня."""
         self._meshes = get_hierarchy_of_triangular_meshes_for_sphere(
             splits=max(graph_config.mesh_levels)
         )
@@ -417,17 +489,29 @@ class WeatherPrediction(nn.Module):
         ), self._mesh_nodes_lon.astype(np.float32)
 
     def _create_product_graph(self, product_graph_config: ProductGraphConfig):
+        """Создаёт граф на декартовом произведении времени (T) и пространства (grid) — product-graph.
+
+        Идея:
+        - Время: простой ориентированный «цепочка» граф (i → i+1).
+        - Пространство: KNN-граф по координатам (lat, lon) всех grid-точек.
+        - Итоговая матрица смежности — линейная комбинация кронекеровых произведений:
+
+          s00 * (I_T ⊗ I_N)   +   s01 * (I_T ⊗ A_space)   +   s10 * (A_time ⊗ I_N)   +   s11 * (A_time ⊗ A_space)
+
+          где коэффициенты (s00,s01,s10,s11) зависят от типа графа: KRONECKER / CARTESIAN / STRONG.
+
+        Возвращает edge_index в формате PyG.
+        """
 
         def _construct_temporal_graph(T):
-            # We want a simple chain graph
+            # Простой цепочечный ориентированный граф по времени: i → i+1
             temporal_graph = np.zeros((T, T))
-
             for i in range(T - 1):
                 temporal_graph[i, i + 1] = 1
-
             return temporal_graph
 
         def _construct_adjacency_matrix(grid_lat, grid_lon, k):
+            # Формируем список всех grid-точек (lat, lon) → строим KNN-граф по евклидовой метрике
             lat_lon_grid = np.array(
                 [[lat, lon] for lat in grid_lat for lon in grid_lon]
             )
@@ -438,13 +522,13 @@ class WeatherPrediction(nn.Module):
                 include_self=False,
             ).toarray()
 
-            # Maybe fix transpose of adjacency matrix
-
+            # NOTE: при необходимости можно проверить/перекинуть транспонирование adjacency,
+            # если ожидается другой порядок (отправитель/получатель) — сейчас используем как есть.
             return adjacency
 
         T = self.obs_window
         N = self._num_grid_nodes
-        s00 = 0
+        s00 = 0  # всегда 0 в текущей схеме (см. ниже)
         if product_graph_config.type == ProductGraphType.KRONECKER:
             s00, s01, s10, s11 = s00, 0, 0, 1
         elif product_graph_config.type == ProductGraphType.CARTESIAN:
@@ -460,6 +544,7 @@ class WeatherPrediction(nn.Module):
             k=product_graph_config.num_k,
         )
 
+        # Комбинируем слагаемые продукт-графа через Кронекер
         product_graph = (
             s00 * np.kron(np.eye(T), np.eye(N))
             + s01 * np.kron(np.eye(T), adjacency)
@@ -467,11 +552,17 @@ class WeatherPrediction(nn.Module):
             + s11 * np.kron(temporal_graph, adjacency)
         )
 
+        # Переводим плотную матрицу смежности в edge_index
         edge_index, _ = dense_to_sparse(torch.tensor(product_graph, dtype=torch.float))
 
         return edge_index
 
     def _preprocess_input(self, grid_node_features: torch.Tensor):
+        """Готовит единый вход X для ENCODER:
+        - Конкатенирует динамические входы grid с их статическими фичами.
+        - Инициализирует нулями динамику для mesh и конкатенирует со статикой mesh.
+        - Склеивает [grid; mesh] вдоль оси узлов → единый тензор X формы [(N+M), C].
+        """
         # Concatenate the initial grid node features with the incoming input
         updated_grid_node_features = torch.cat(
             (grid_node_features, self.init_grid_features), dim=-1
@@ -499,44 +590,55 @@ class WeatherPrediction(nn.Module):
         return X
 
     def forward(self, X: torch.Tensor, attention_threshold, **kwargs):
-        """The forward method takes the features of the grid nodes and passes them through the three graphs defined above.
-        Grid2Mesh performs the encoding and calculates the
+        """Основной прямой проход:
+        1) (опц.) Product-graph: прогоняем T×N входов через маленькую GNN и берём последний временной срез (N×F).
+        2) _preprocess_input: добавляем статику и дополняем mesh нулями → общий X для ENCODER.
+        3) ENCODER (Grid→Mesh): получаем латенты и делим на grid-часть и mesh-часть.
+        4) PROCESSOR (Mesh↔Mesh): обновляем mesh-латенты. Если SparseGAT — можем проредить processing_graph.
+        5) DECODER (Mesh→Grid): склеиваем обратно [grid; processed_mesh] и получаем выход только по grid.
 
-        Parameters
+        Параметры
         ----------
         X : torch.Tensor
-          The input data of the shape [batch, num_grid_nodes, num_features].
+          Входные данные формы [batch, num_grid_nodes, num_features] (часто batch=1). Внутри сплющивается.
         """
 
-        X = X.squeeze()
+        X = X.squeeze()  # ожидается batch=1; делаем [N, T*F] или [N, F]
         if self.use_product_graph:
+            # Приводим к форме [T*N, F] и прогоняем через модель на продукт-графе
             X = X.view(self._num_grid_nodes * self.obs_window, self.num_features)
             X = self.product_graph_model(X=X, edge_index=self.product_graph)
+            # Берём только последний временной срез (последние N узлов)
             X = X[-self._num_grid_nodes :, :]
 
+        # Подготовка общего X с добавлением статических фичей
         X = self._preprocess_input(grid_node_features=X)
 
+        # ENCODER: работает на бипартитном графе Grid→Mesh
         encoded_features = self.encoder.forward(X=X, edge_index=self.encoding_graph)
 
+        # Разделяем на grid и mesh части
         grid_node_features = encoded_features[: self._num_grid_nodes, :]
         mesh_node_features = encoded_features[self._num_grid_nodes :, :]
 
-        # Processing the mesh node features
+        # PROCESSOR: обновляем mesh латенты
         if self.using_sparse_gat:
             processed_mesh_node_features, new_processor_edge_index = self.processor.forward(
                 X=mesh_node_features, edge_index=self.processing_graph, attention_threshold=attention_threshold, **kwargs
             )
+            # ВАЖНО: сохраняем новый прореженный граф для следующих проходов
             self.processing_graph = new_processor_edge_index
         else:
             processed_mesh_node_features = self.processor.forward(
                 X=mesh_node_features, edge_index=self.processing_graph, attention_threshold=attention_threshold
             )
 
-        # Concatenating the grid feature again with the processed mesh features
+        # Склеиваем обратно grid + обновлённый mesh для DECODER
         processed_features = torch.cat(
             (grid_node_features, processed_mesh_node_features), dim=0
         )
 
+        # DECODER: Mesh→Grid бипарит, на выходе берём только grid-узлы
         decoded_grid_node_features = self.decoder.forward(
             X=processed_features,
             edge_index=self.decoding_graph,
