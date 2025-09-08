@@ -180,3 +180,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# python scripts/metrics_maps.py experiments/wb2_64x32_15f \
+#   --data-dir data/datasets/wb2_64x32_zq_15f_4obs_1pred \
+#   --stat rmse --denorm

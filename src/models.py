@@ -49,6 +49,8 @@ from src.mesh.create_mesh import (
 from src.utils import get_mesh_lat_long
 
 
+# Зачем: подготовить/сжать каналы перед графовым слоем.
+# Пример: при obs_window=4, num_features=15 у каждого grid-узла вход 60 каналов (+ статика). MLP переводит это, скажем, в 64 канала — удобно для GNN.
 class MLP(nn.Module):
     """Многоуровневый перцептрон для подготовки входных признаков (до GNN).
 

@@ -1,6 +1,7 @@
 # inference
 # python scripts/predict.py experiments/demo --data-dir data/datasets/demo
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -58,6 +59,24 @@ def _spatial_acc(y_true: torch.Tensor, y_pred: torch.Tensor):
     acc_overall = acc_per_c.mean().item()     # float
     return acc_overall, acc_per_c
 
+# === читаем РЕАЛЬНЫЕ оси координат из датасета, если есть ===
+def read_coords(meta, data_dir: Path):
+    """
+    Пытаемся прочитать точные координаты из data_dir/coords.npz (создаётся build_region_wb2.py).
+    В этом файле:
+      - longitude: np.ndarray [num_lon] (например, 75.0, 75.25, ..., 90.0)
+      - latitude:  np.ndarray [num_lat] (например, 50.0, 50.25, ..., 60.0)
+    Если файла нет (глобальный WB2 64x32), используем равномерную глобальную сетку.
+    """
+    npz = data_dir / "coords.npz"
+    if npz.exists():
+        z = np.load(npz)
+        lats = z["latitude"].astype(np.float32)
+        lons = z["longitude"].astype(np.float32)
+        return lats, lons
+    # fallback: равномерная сетка во всю сферу
+    return linspace_lats_lons(meta.num_latitudes, meta.num_longitudes)
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("experiment_dir", help="напр. experiments/demo")
@@ -67,6 +86,8 @@ def main():
     ap.add_argument("--no-save", action="store_true", help="не сохранять predictions.pt")
     ap.add_argument("--region", nargs=4, type=float, metavar=("LAT_MIN","LAT_MAX","LON_MIN","LON_MAX"),
                     help="если указать, сохранит доп. файл с вырезкой региона <exp>/pred_region.pt и выведет метрики по региону")
+    ap.add_argument("--per-channel", action="store_true",
+                    help="печать подробных метрик по каждому каналу и горизонту")
     args = ap.parse_args()
 
     exp_dir = args.experiment_dir
@@ -106,7 +127,7 @@ def main():
             y = y.squeeze(0)
             if len(y.shape) == 3:
                 y = y.squeeze(-2)
-            # Персистентный базлайн: «следующий шаг = последний наблюдённый»
+            # Персистентный базлайн: «следующий шаг = последнее наблюдённое»
             # Для flattened входа: X: [1, G, T*F] -> последний шаг это последние F каналов
             # X_last = X.squeeze(0)[:, -exp_cfg.data.num_features_used:]
             C = exp_cfg.data.num_features_used
@@ -163,12 +184,25 @@ def main():
             hours = (p+1) * 6
             print(f"  +{hours:02d}h: RMSE={r:.6f} | MAE={a:.6f} | base_RMSE={r_b:.6f} | skill={skill_p*100:.2f}% | ACC={acc_p:.3f} (base {b_acc_p:.3f})")
 
+    C = exp_cfg.data.num_features_used
+    P = exp_cfg.data.pred_window_used
     # 4) опционально — вырезка региона
     # --region 53 57 74 87 - Предсказания только для Новосибирской области
     if args.region:
         lat_min, lat_max, lon_min, lon_max = args.region
-        lats, lons = linspace_lats_lons(meta.num_latitudes, meta.num_longitudes)
+
+        # NEW: читаем реальные координаты тайла, если это региональный датасет
+        coords_path = Path(data_dir) / "coords.npz"
+        if coords_path.exists():
+            z = np.load(coords_path)
+            lats = z["latitude"]    # [num_lat]
+            lons = z["longitude"]   # [num_lon]
+        else:
+            # глобальный WB2 64x32 и пр. — используем линейку как в обучении
+            lats, lons = linspace_lats_lons(meta.num_latitudes, meta.num_longitudes)
+
         idxs = region_node_indices(lat_min, lat_max, lon_min, lon_max, lats, lons)
+
         region_pred = preds[:, idxs, :]
         region_true = truths[:, idxs, :]
         region_base = baseline[:, idxs, :]
@@ -180,6 +214,46 @@ def main():
         print(f"\nRegion slice [{lat_min},{lat_max}]N x [{lon_min},{lon_max}]E | nodes={len(idxs)}")
         m_r, r_r, a_r = _metrics(region_true, region_pred)
         print(f"Region: MSE={m_r:.6f} RMSE={r_r:.6f} MAE={a_r:.6f} | base_RMSE={rmse_rb:.6f} skill={skill_r*100:.2f}%")
+
+        # --- NEW: Per-horizon REGION metrics (aggregated over channels) ---
+        C = exp_cfg.data.num_features_used
+        P = exp_cfg.data.pred_window_used
+        if P > 1:
+            print("\nPer-horizon REGION metrics (aggregated over channels):")
+            for p in range(P):
+                sl = slice(p*C, (p+1)*C)
+                m, r, a = _metrics(region_true[..., sl], region_pred[..., sl])
+                m_b, r_b, a_b = _metrics(region_true[..., sl], region_base[..., sl])
+                skill_p = 1.0 - (r / (r_b + 1e-12))
+                acc_p, _ = _spatial_acc(region_true[..., sl], region_pred[..., sl])
+                b_acc_p, _ = _spatial_acc(region_true[..., sl], region_base[..., sl])
+                hours = (p+1) * 6
+                print(f"  +{hours:02d}h: RMSE={r:.6f} | MAE={a:.6f} | base_RMSE={r_b:.6f} | skill={skill_p*100:.2f}% | ACC={acc_p:.3f} (base {b_acc_p:.3f})")
+
+        # --- NEW: Per-channel REGION metrics by horizon (only if --per-channel) ---
+        if args.per_channel:
+            # подстрахуемся: если var_order ещё не загружен выше
+            try:
+                var_order
+            except NameError:
+                var_path = Path(data_dir) / "variables.json"
+                if var_path.exists():
+                    var_order = json.loads(var_path.read_text())
+                else:
+                    var_order = [f"ch{c}" for c in range(C)]
+
+            print("\nPer-channel REGION metrics by horizon:")
+            for p in range(P):
+                hours = (p+1) * 6
+                print(f"\n  === +{hours:02d}h (region) ===")
+                for c, name in enumerate(var_order):
+                    idx = p*C + c  # канал в плоском CP
+                    m, r, a = _metrics(region_true[..., idx:idx+1], region_pred[..., idx:idx+1])
+                    m_b, r_b, a_b = _metrics(region_true[..., idx:idx+1], region_base[..., idx:idx+1])
+                    skill = 1.0 - (r / (r_b + 1e-12))
+                    acc, _ = _spatial_acc(region_true[..., idx:idx+1], region_pred[..., idx:idx+1])
+                    b_acc, _ = _spatial_acc(region_true[..., idx:idx+1], region_base[..., idx:idx+1])
+                    print(f"    {c:2d}:{name:>8s}  MSE={m:.6f} RMSE={r:.6f} MAE={a:.6f} | base_RMSE={r_b:.6f} skill={skill*100:.2f}% | ACC={acc:.3f} (base {b_acc:.3f})")
 
         # сохраняем регион как раньше
         region_path = os.path.join(exp_dir, "pred_region.pt")
