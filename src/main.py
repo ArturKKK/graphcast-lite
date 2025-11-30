@@ -108,6 +108,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
         device=device,
         config=experiment_config,
         results_save_dir=results_save_dir,
+        dataset_metadata=dataset_metadata,
         print_losses=True,
         wandb_log=experiment_config.wandb_log,
     )
