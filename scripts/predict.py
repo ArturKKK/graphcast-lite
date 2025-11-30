@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 import torch
 import numpy as np
-from src.assimilation import NudgingAssimilator, build_feature_mask, build_feature_mask_from_indices
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -18,6 +17,7 @@ from src.config import ExperimentConfig
 from src.utils import load_from_json_file
 from src.data.dataloader import load_train_and_test_datasets
 from src.main import load_model_from_experiment_config
+from src.assimilation import NudgingAssimilator, build_feature_mask, build_feature_mask_from_indices
 
 def linspace_lats_lons(num_lat, num_lon):
     lats = np.linspace(-90, 90, num_lat, endpoint=True)        # как в src.main
