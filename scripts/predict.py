@@ -19,11 +19,8 @@ from src.data.dataloader import load_train_and_test_datasets
 from src.main import load_model_from_experiment_config
 
 # --- ИМПОРТЫ АЛГОРИТМОВ УСВОЕНИЯ ---
-try:
-    from src.assimilation.nudging import sequential_nudged_rollout, nudge_sequence_offline, build_boundary_taper_mask, NudgingAssimilator
-    from src.assimilation.optimal_interpolation import OptimalInterpolation
-except ImportError:
-    pass
+from src.assimilation.nudging import sequential_nudged_rollout, nudge_sequence_offline, build_boundary_taper_mask, NudgingAssimilator
+from src.assimilation.optimal_interpolation import OptimalInterpolation
 # -----------------------------------
 
 def linspace_lats_lons(num_lat, num_lon):
@@ -97,9 +94,9 @@ def main():
     ap.add_argument("--per-channel", action="store_true",
                     help="печать подробных метрик по каждому каналу и горизонту")
     
-    # --- АРГУМЕНТЫ ДЛЯ УСВОЕНИЯ И ГРАНИЦ ---
-    ap.add_argument("--assim-method", default="none", choices=["none", "nudging", "oi"], help="Метод усвоения")
-    ap.add_argument("--obs-path", type=str, default=None, help="Путь к наблюдениям")
+    # --- НОВЫЕ АРГУМЕНТЫ (УСВОЕНИЕ И ГРАНИЦЫ) ---
+    ap.add_argument("--assim-method", default="none", choices=["none", "nudging", "oi"], help="Метод усвоения: nudging или oi")
+    ap.add_argument("--obs-path", type=str, default=None, help="Путь к файлу с наблюдениями")
     
     # Nudging
     ap.add_argument("--nudging-alpha", type=float, default=0.25)
@@ -119,7 +116,7 @@ def main():
 
     args = ap.parse_args()
 
-    exp_dir = Path(args.experiment_dir)
+    exp_dir = args.experiment_dir
     cfg_path = os.path.join(exp_dir, FileNames.EXPERIMENT_CONFIG)
     ckpt_path = args.ckpt or os.path.join(exp_dir, FileNames.SAVED_MODEL)
     save_path = args.save or os.path.join(exp_dir, "predictions.pt")
@@ -174,17 +171,20 @@ def main():
         print(f"[Boundary] Сшивание границ (width={args.taper_width})")
         if args.background_path:
             background_data = torch.load(args.background_path).cpu()
+            # FIX: Распрямляем фон, если он 4D [N, Lon, Lat, C]
+            if background_data.dim() == 4:
+                 background_data = background_data.view(background_data.shape[0], -1, background_data.shape[-1])
         else:
             print("[Boundary] ВНИМАНИЕ: Фон не задан, используем y_test.")
             background_data = truths
             
-        # Получаем тензор маски [G]
         mask_tensor = build_boundary_taper_mask(meta.num_latitudes, meta.num_longitudes, args.taper_width, args.taper_width)
-        # ИСПРАВЛЕНИЕ: Убрали torch.from_numpy, так как mask_tensor уже тензор
         boundary_mask = mask_tensor.view(1, G, 1).float()
 
     # 3) прогоняем весь test + сразу считаем метрики
     preds, baseline = [], []
+
+    print(f"[Main] Запуск инференса (DA: {args.assim_method}, Bounds: {args.boundary_blending})...")
 
     with torch.no_grad():
         for i, (X, y) in enumerate(torch.utils.data.DataLoader(test_ds, batch_size=1, shuffle=False)):
@@ -201,13 +201,12 @@ def main():
 
             X = X.to(device)
             
-            # === ЛОГИКА УСВОЕНИЯ ===
+            # === ЛОГИКА ПРОГНОЗА (ВСТАВКА) ===
             
             # 1. NUDGING (SEQUENTIAL)
             if args.assim_method == "nudging" and args.nudging_mode == "sequential":
                 x0 = X.view(1, X.shape[1], exp_cfg.data.obs_window_used, C)
                 y_obs = observations[i].unsqueeze(0)
-                
                 out = sequential_nudged_rollout(
                     model=model, x0=x0, y_obs=y_obs, p=P,
                     alpha=args.nudging_alpha, k=args.nudge_first_k, device=device
@@ -218,7 +217,6 @@ def main():
             elif args.assim_method == "oi":
                 x0 = X.view(1, X.shape[1], exp_cfg.data.obs_window_used, C)
                 curr_state = x0.to(device)
-                
                 y_obs_full = observations[i]
                 y_obs_steps = y_obs_full.view(y.shape[0], P, C)
                 
@@ -226,20 +224,20 @@ def main():
                 test_out = model(test_inp, attention_threshold=0.0).cpu()
                 
                 if test_out.shape[-1] == P*C:
+                    # 4-step: Offline OI
                     out_steps = test_out.view(1, G, P, C)
                     for t in range(P):
                         out_steps[0,:,t,:] = oi_solver.apply(out_steps[0,:,t,:], y_obs_steps[:,t,:])
                     out = out_steps.view(1, G, P*C).squeeze(0)
                 else:
+                    # 1-step: Rollout OI
                     batch_steps = []
                     for step in range(P):
                         inp = curr_state.view(1, G, -1)
                         out_step = model(inp, attention_threshold=0.0).cpu()
                         if out_step.dim() == 2: out_step = out_step.unsqueeze(0)
-                        
                         obs_step = y_obs_steps[:, step, :]
                         out_step[0] = oi_solver.apply(out_step[0], obs_step)
-                        
                         batch_steps.append(out_step)
                         out_dev = out_step.to(device)
                         curr_state = torch.cat([curr_state[:, :, 1:, :], out_dev.unsqueeze(2)], dim=2)
@@ -251,27 +249,33 @@ def main():
                 if args.assim_method == "nudging" and args.nudging_mode == "offline":
                     out = nudge_sequence_offline(out, observations[i], args.nudging_alpha)
 
-            # --- ГРАНИЦЫ ---
+            # --- ГРАНИЦЫ (ИСПРАВЛЕННАЯ ФОРМУЛА) ---
             if boundary_mask is not None:
                 bg = background_data[i].cpu()
                 b_mask = boundary_mask.squeeze(0).cpu()
-                out = (1.0 - b_mask) * out + b_mask * bg
+                # Центр (mask=1) -> out, Край (mask=0) -> bg
+                out = b_mask * out + (1.0 - b_mask) * bg
 
             preds.append(out)
             baseline.append(X_last.cpu())
 
-    preds = torch.stack(preds, dim=0)
-    baseline = torch.stack(baseline, dim=0)
+    preds = torch.stack(preds, dim=0)          # [N, G, C]
+    # truths уже загружен в начале
+    baseline = torch.stack(baseline, dim=0)    # [N, G, C]
 
-    # Метрики
+    # Общие метрики по всему тесту
     mse, rmse, mae = _metrics(truths, preds)
     b_mse, b_rmse, b_mae = _metrics(truths, baseline)
     skill_rmse = 1.0 - (rmse / (b_rmse + 1e-12))
+
+    # ACC (anomaly correlation): ближе к 1 — лучше; инвариантен к масштабу/смещению
     acc_overall, acc_pc = _spatial_acc(truths, preds)
     b_acc_overall, b_acc_pc = _spatial_acc(truths, baseline)
 
     N, G, CP = preds.shape
-    # C и P уже определены выше
+    C = exp_cfg.data.num_features_used
+    P = exp_cfg.data.pred_window_used
+    assert CP == C * P
 
     print()
     print("=== Inference summary ===")
@@ -290,6 +294,7 @@ def main():
             m, r, a = _metrics(truths[..., sl], preds[..., sl])
             m_b, r_b, a_b = _metrics(truths[..., sl], baseline[..., sl])
             skill_p = 1.0 - (r / (r_b + 1e-12))
+            # ACC для горизонта:
             acc_p, _ = _spatial_acc(truths[..., sl], preds[..., sl])
             b_acc_p, _ = _spatial_acc(truths[..., sl], baseline[..., sl])
             hours = (p+1) * 6
@@ -360,8 +365,6 @@ def main():
                     b_acc, _ = _spatial_acc(region_true[..., idx:idx+1], region_base[..., idx:idx+1])
                     print(f"    {c:2d}:{name:>8s}  MSE={m:.6f} RMSE={r:.6f} MAE={a:.6f} | base_RMSE={r_b:.6f} skill={skill*100:.2f}% | ACC={acc:.3f} (base {b_acc:.3f})")
 
-    # сохраняем регион как раньше
-    if args.region:
         region_path = os.path.join(exp_dir, "pred_region.pt")
         torch.save({"idxs": torch.tensor(idxs), "pred_region": region_pred}, region_path)
         print(f"Saved region slice: {region_path}  idxs={len(idxs)}")
