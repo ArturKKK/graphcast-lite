@@ -213,7 +213,11 @@ def train(
         # --- Увеличение сложности ---
         if epoch > 0 and (epoch % epochs_per_stage == 0) and (ar_steps < max_ar):
             ar_steps += 1
-            print(f"--> УВЕЛИЧЕНИЕ СЛОЖНОСТИ: AR={ar_steps}")
+            print(f"\n>>> УРОВЕНЬ СЛОЖНОСТИ ПОВЫШЕН! Теперь обучаем на {ar_steps} шага(ов) вперед. <<<\n")
+            
+            # ВАЖНО: Сбрасываем счетчик Early Stopping!
+            # Даем модели "фору", чтобы привыкнуть к новой сложности.
+            patience_counter = 0
 
         epoch_threshold = update_attention_threshold(epoch)  
         print(f"Epoch {epoch} (AR={ar_steps}) with attention threshold {epoch_threshold}")  
