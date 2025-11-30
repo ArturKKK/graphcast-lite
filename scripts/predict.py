@@ -1,12 +1,13 @@
 # inference
 # python scripts/predict.py experiments/demo --data-dir data/datasets/demo
 import argparse
-import json
+import json as _json
 import os
 import sys
 from pathlib import Path
 import torch
 import numpy as np
+from src.assimilation import NudgingAssimilator, build_feature_mask, build_feature_mask_from_indices
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -88,6 +89,14 @@ def main():
                     help="если указать, сохранит доп. файл с вырезкой региона <exp>/pred_region.pt и выведет метрики по региону")
     ap.add_argument("--per-channel", action="store_true",
                     help="печать подробных метрик по каждому каналу и горизонту")
+    
+    # --- Nudging / DA options ---
+    ap.add_argument("--nudging", action="store_true", help="включить усвоение (nudging) на y_test (в режиме инференса)")
+    ap.add_argument("--nudging-alpha", type=float, default=0.5, help="сила nudging [0..1], по умолчанию 0.5")
+    ap.add_argument("--nudging-vars", type=str, default="", help="список переменных через запятую (имена) для усвоения, напр.: t2m,10u,10v")
+    ap.add_argument("--nudging-idxs", type=str, default="", help="альтернатива: индексы каналов 0..C-1 для усвоения, через запятую")
+    ap.add_argument("--feature-list", type=str, default="", help="путь к файлу со списком фич в порядке датасета (txt или json)")
+    ap.add_argument("--blend-border", type=int, default=0, help="ширина тапера у границ для мягкого усвоения (0 = выкл.)")
     args = ap.parse_args()
 
     exp_dir = args.experiment_dir
@@ -132,11 +141,60 @@ def main():
             # X_last = X.squeeze(0)[:, -exp_cfg.data.num_features_used:]
             C = exp_cfg.data.num_features_used
             P = exp_cfg.data.pred_window_used
+            # --- init nudging (once) ---
+            if "__nudging_initialized" not in locals():
+                nudging_enabled = bool(args.nudging)
+                if nudging_enabled:
+                    # Build feature mask over [P*C]
+                    C = exp_cfg.data.num_features_used
+                    P = exp_cfg.data.pred_window_used
+                    mask_flat = None
+                    # try names
+                    if args.nudging_vars and args.feature_list and os.path.exists(args.feature_list):
+                        # load feature names
+                        try:
+                            import json
+                            txt = open(args.feature_list, "r", encoding="utf-8").read()
+                            if args.feature_list.endswith(".json"):
+                                feature_list = json.loads(txt)
+                            else:
+                                if "\n" in txt and ("," not in txt):
+                                    feature_list = [t.strip() for t in txt.splitlines() if t.strip()]
+                                else:
+                                    feature_list = [t.strip() for t in txt.split(",") if t.strip()]
+                        except Exception:
+                            feature_list = None
+                        if feature_list:
+                            sel = [s.strip() for s in args.nudging_vars.split(",") if s.strip()]
+                            mask_flat = build_feature_mask(feature_list, sel, P, device)
+                    # try indices
+                    if (mask_flat is None) and args.nudging_idxs:
+                        idxs = [int(s) for s in args.nudging_idxs.split(",") if s.strip().isdigit()]
+                        mask_flat = build_feature_mask_from_indices(idxs, C, P, device)
+
+                    nudger = NudgingAssimilator(
+                        alpha=float(args.nudging_alpha),
+                        feature_mask_flat=mask_flat,
+                        grid_lon=None, grid_lat=None,
+                        pred_window=P, num_features=C,
+                        blend_border=int(args.blend_border),
+                        device=device,
+                    )
+                nudging_flag = True
+
             X_last_1 = X.squeeze(0)[:, -C:]                     # [G, C]
             X_last = X_last_1.repeat(1, P)                       # [G, C*P]
 
             X = X.to(device)
+            
             out = model(X=X, attention_threshold=0.0)   # [G, pred_window*num_features_used]
+            if args.nudging:
+                # use y as observations aligned with out; ensure y is flattened [G, P*C]
+                y_obs = y
+                if y_obs.dim() == 3 and y_obs.shape[-2] == 1:
+                    y_obs = y_obs.squeeze(-2)
+                out = nudger.apply(out, y_obs)
+
             preds.append(out.cpu())
             truths.append(y.cpu())
             baseline.append(X_last.cpu())
