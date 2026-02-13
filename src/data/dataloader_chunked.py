@@ -76,26 +76,34 @@ class TimeseriesChunkDataset(Dataset):
         self.std = scalers["std"].astype(np.float32)    # (n_feat,)
 
         # 2. Load data files
-        # Support both single data.npy and multi-chunk chunk_*.npy
+        # Support both single data.npy (raw memmap) and multi-chunk chunk_*.npy
         single_file = os.path.join(data_dir, "data.npy")
-        if os.path.exists(single_file):
+        info_file = os.path.join(data_dir, "dataset_info.json")
+        if os.path.exists(single_file) and os.path.exists(info_file):
+            # Raw memmap created by build_dataset_512x256.py — no .npy header
+            with open(info_file) as f:
+                info = json.load(f)
+            shape = (info["n_time"], info["n_lon"], info["n_lat"], info["n_feat"])
+            mm = np.memmap(single_file, dtype=np.float16, mode="r", shape=shape)
             chunk_files = [single_file]
+            self.chunks = [mm]
+            self.chunk_lengths = [mm.shape[0]]
+            total_time = mm.shape[0]
         else:
             chunk_files = sorted(glob.glob(os.path.join(data_dir, "chunk_*.npy")))
-        if not chunk_files:
-            raise FileNotFoundError(f"No data.npy or chunk_*.npy found in {data_dir}")
+            if not chunk_files:
+                raise FileNotFoundError(f"No data.npy or chunk_*.npy found in {data_dir}")
 
-        # 3. Open as memory-mapped (not loaded into RAM!)
-        self.chunks: List[np.memmap] = []
-        self.chunk_lengths: List[int] = []
-        total_time = 0
+            # 3. Open as memory-mapped (not loaded into RAM!)
+            self.chunks = []
+            self.chunk_lengths = []
+            total_time = 0
 
-        for cf in chunk_files:
-            # Peek shape from .npy header
-            mm = np.load(cf, mmap_mode="r")  # memory-mapped, read-only
-            self.chunks.append(mm)
-            self.chunk_lengths.append(mm.shape[0])
-            total_time += mm.shape[0]
+            for cf in chunk_files:
+                mm = np.load(cf, mmap_mode="r")
+                self.chunks.append(mm)
+                self.chunk_lengths.append(mm.shape[0])
+                total_time += mm.shape[0]
 
         self.total_time = total_time
         self.n_lon = self.chunks[0].shape[1]
