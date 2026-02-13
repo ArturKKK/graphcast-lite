@@ -55,6 +55,7 @@ class DatasetNames(str, Enum):
     wb2_64x32_zq_15f_4obs_1pred = "wb2_64x32_zq_15f_4obs_1pred"
     wb2_64x32_zq_15f_4obs_4pred = "wb2_64x32_zq_15f_4obs_4pred"
     wb2_64x32_ar_15f_4obs_4pred = "wb2_64x32_ar_15f_4obs_4pred"
+    wb2_512x256_19f_ar = "wb2_512x256_19f_ar"
 
 
 class GraphBuildingConfig(BaseModel):
@@ -222,4 +223,4 @@ class ExperimentConfig(BaseModel):
     wandb_name: Optional[str] = None
     wandb_key: str = "3a59363c20cd4fdf2b95dfd7a9cd72398d15321e"
     use_latitude_weighting: bool = True  # Включить вес по широте
-    max_ar_steps: int = 4                # Максимальное число шагов авторегрессии
+    max_ar_steps: int = 1                # Максимальное число шагов авторегрессии

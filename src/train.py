@@ -82,23 +82,26 @@ def train_epoch(
         # --- НАЧАЛО НОВОЙ ЛОГИКИ (AR) ---
         
         # 1. Понимаем размеры.
-        # y (цель) у нас содержит 4 шага (потому что датасет 4pred).
+        # y (цель) содержит ar_steps шагов (pred_window из датасета).
         # Нам нужно разбить y на отдельные шаги.
         N, G, _ = X.shape
-        total_targets = y.shape[-1]
-        C = total_targets // 4 # Вычисляем число каналов (15)
+        # Определяем число каналов C из размерности входа и obs_window модели
+        C = X.shape[-1] // model.obs_window  # число каналов (17 или 15)
+        total_target_feats = y.shape[-1]
+        total_target_steps = total_target_feats // C  # сколько шагов target в данных
         
-        # [N, G, 4, C]
-        y_steps = y.view(N, G, 4, C)
+        # [N, G, total_target_steps, C]
+        y_steps = y.view(N, G, total_target_steps, C)
         
         # 2. Готовим входное состояние
-        # X: [N, G, 4*C]. Превращаем в [N, G, 4, C]
-        curr_state = X.view(N, G, 4, C)
+        # X: [N, G, obs*C]. Превращаем в [N, G, obs, C]
+        obs = model.obs_window
+        curr_state = X.view(N, G, obs, C)
         
         loss_batch = 0
         
-        # 3. Крутим цикл (сколько шагов скажет current_ar_steps)
-        steps_to_run = min(current_ar_steps, 4)
+        # 3. Крутим цикл (сколько шагов скажет current_ar_steps, но не больше target)
+        steps_to_run = min(current_ar_steps, total_target_steps)
         
         for step in range(steps_to_run):
             # Вход в модель (плоский)
@@ -146,8 +149,12 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device,
             X, y = X.to(device), y.to(device)  
             
             # Берем только 1-й шаг из y для сравнения
-            C = y.shape[-1] // 4
-            y_step0 = y.view(y.shape[0], y.shape[1], 4, C)[:, :, 0, :]
+            C = X.shape[-1] // model.obs_window if hasattr(model, 'obs_window') else y.shape[-1]
+            total_target_steps = y.shape[-1] // C if C > 0 else 1
+            if total_target_steps > 1:
+                y_step0 = y.view(y.shape[0], y.shape[1], total_target_steps, C)[:, :, 0, :]
+            else:
+                y_step0 = y
 
             outs = model(X=X, attention_threshold=0.0) 
             if outs.dim() == 2: outs = outs.unsqueeze(0)

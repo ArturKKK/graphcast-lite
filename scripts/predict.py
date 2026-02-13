@@ -106,7 +106,7 @@ def main():
     # OI
     ap.add_argument("--oi-sigma-b", type=float, default=0.8)
     ap.add_argument("--oi-sigma-o", type=float, default=0.5)
-    ap.add_argument("--oi-corr-len", type=float, default=200000.0)
+    ap.add_argument("--oi-corr-len", type=float, default=10000.0) # 10000 пока лучшее
     
     # Границы
     ap.add_argument("--boundary-blending", action="store_true")

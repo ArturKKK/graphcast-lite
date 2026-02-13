@@ -11,7 +11,9 @@ import numpy as np
 from torch.optim import Adam
 from src.train import train
 from src.data.dataloader import load_train_and_test_datasets
+from src.data.dataloader_chunked import load_chunked_datasets
 from src.data.data_configs import DatasetMetadata
+from src.config import DatasetNames
 import random
 
 CURRENT_WORKING_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -67,24 +69,48 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
     set_random_seeds(seed=experiment_config.random_seed)
 
     # Загружает датасеты
-    train_dataset, val_dataset, test_dataset, dataset_metadata = (
-        load_train_and_test_datasets(
-            data_path=os.path.join(
-                "data", "datasets", experiment_config.data.dataset_name
-            ),
-            data_config=experiment_config.data,
+    if experiment_config.data.dataset_name == DatasetNames.wb2_512x256_19f_ar:
+        # Chunked dataloader для больших сеток (512×256)
+        # Для AR-обучения подаём max_ar_steps целевых кадров
+        ar_target_steps = max(experiment_config.max_ar_steps, 1)
+        data_path = os.path.join("data", "datasets", experiment_config.data.dataset_name)
+        train_dataset, val_dataset, test_dataset, dataset_metadata = (
+            load_chunked_datasets(
+                data_path=data_path,
+                obs_window=experiment_config.data.obs_window_used,
+                pred_steps=ar_target_steps,
+                n_features=experiment_config.data.num_features_used,
+            )
         )
-    )
+    else:
+        # Legacy: загрузка из .pt файлов (64×32)
+        train_dataset, val_dataset, test_dataset, dataset_metadata = (
+            load_train_and_test_datasets(
+                data_path=os.path.join(
+                    "data", "datasets", experiment_config.data.dataset_name
+                ),
+                data_config=experiment_config.data,
+            )
+        )
 
     # shuffle в DataLoader — это «перемешивать ли порядок сэмплов при формировании батчей».
+    use_cuda = device.type == "cuda"
+    loader_kwargs = dict(
+        num_workers=4 if use_cuda else 0,
+        pin_memory=True if use_cuda else False,
+        persistent_workers=True if use_cuda else False,
+    )
     train_dataloader = DataLoader(
-        train_dataset, batch_size=experiment_config.batch_size, shuffle=True
+        train_dataset, batch_size=experiment_config.batch_size, shuffle=True,
+        **loader_kwargs,
     )
     val_dataloader = DataLoader(
-        val_dataset, batch_size=experiment_config.batch_size, shuffle=False
+        val_dataset, batch_size=experiment_config.batch_size, shuffle=False,
+        **loader_kwargs,
     )
     test_dataloader = DataLoader(
-        test_dataset, batch_size=experiment_config.batch_size, shuffle=False
+        test_dataset, batch_size=experiment_config.batch_size, shuffle=False,
+        **loader_kwargs,
     )
 
     model: WeatherPrediction = load_model_from_experiment_config(
