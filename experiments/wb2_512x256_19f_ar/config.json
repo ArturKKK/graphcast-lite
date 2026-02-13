@@ -1,0 +1,63 @@
+{
+  "batch_size": 1,
+  "learning_rate": 5e-4,
+  "num_epochs": 60,
+  "early_stopping_patience": 12,
+  "early_stopping_delta": 1e-5,
+  "wandb_log": false,
+  "random_seed": 42,
+  "use_latitude_weighting": true,
+  "max_ar_steps": 4,
+
+  "graph": {
+    "grid2mesh_edge_creation": "radius",
+    "mesh2grid_edge_creation": "contained",
+    "grid2mesh_radius_query": 0.6,
+    "mesh_levels": [4, 6]
+  },
+
+  "pipeline": {
+    "encoder": {
+      "mlp": {
+        "mlp_hidden_dims": [128, 128],
+        "output_dim": 128,
+        "use_layer_norm": true,
+        "layer_norm_mode": "node"
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [128, 128],
+        "output_dim": 128
+      }
+    },
+    "processor": {
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [128, 128, 128, 128],
+        "output_dim": 128,
+        "use_layer_norm": true,
+        "layer_norm_mode": "node"
+      }
+    },
+    "decoder": {
+      "mlp": {
+        "mlp_hidden_dims": [128, 64],
+        "output_dim": 64,
+        "use_layer_norm": false
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [64, 64],
+        "output_dim": 19
+      }
+    }
+  },
+
+  "data": {
+    "dataset_name": "wb2_512x256_19f_ar",
+    "num_features_used": 19,
+    "obs_window_used": 2,
+    "pred_window_used": 1,
+    "want_feats_flattened": true
+  }
+}
