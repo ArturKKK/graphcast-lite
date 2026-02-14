@@ -138,7 +138,8 @@
 │   ├── attention/                      # Эксперимент с механизмом внимания.
 │   ├── product_graph/                  # Эксперимент с произведёнными графами.
 │   ├── sparse_attention/               # Эксперимент с разреженным вниманием.
-│   ├── wb2_512x256_19f_ar/             # 512×256 с 19 переменными и AR-обучением.
+│   ├── wb2_512x256_19f_ar/             # 512×256 с 19 переменными и AR-обучением (v1: GCNConv, 128d, ~210K params).
+│   ├── wb2_512x256_19f_ar_v2/          # v2: InteractionNet, 256d, 12 msg steps, ~5.9M params.
 │
 ├── data/datasets/                      # Наборы данных.
 │   ├── wb2_512x256_19f_ar/             # 512×256, 19 фич, float16 memmap (~81 GB).
@@ -217,6 +218,44 @@ python -m src.main experiments/wb2_512x256_19f_ar
 - **mesh_levels**: [4, 6], **grid2mesh_radius**: 0.6
 
 Обученная модель сохраняется в `experiments/wb2_512x256_19f_ar/best_model.pth`.
+
+## Обучение v2 (InteractionNet)
+
+Улучшенная архитектура, приближенная к оригинальному GraphCast:
+
+```bash
+python -m src.main experiments/wb2_512x256_19f_ar_v2
+```
+
+Ключевые отличия v2 от v1:
+
+| Аспект | v1 | v2 |
+|--------|-----|-----|
+| Processor GNN | GCNConv (4 слоя, только узлы) | **InteractionNet** (12 шагов, узлы + рёбра) |
+| Edge features | ❌ | ✅ 4D: distance + 3D relative position |
+| Residual connections | ❌ | ✅ Node + Edge на каждом шаге |
+| Latent dimension | 128 | **256** |
+| Activation | PReLU | **Swish** (SiLU) |
+| Параметры | ~210K | **~5.9M** (28×) |
+| LR / Epochs | 5e-4 / 60 | 3e-4 / 80 |
+
+Почему параметры выросли в 28 раз:
+- **Latent 128→256**: каждая весовая матрица 4× больше (256² vs 128²)
+- **12 шагов вместо 5 слоёв**: 2.4× больше
+- **InteractionNet vs GCNConv**: на каждом шаге 2 MLP (edge + node) вместо 1 матрицы — ~6× на шаг
+- Итого: 4 × 2.4 × 6 ≈ 28×
+
+Для сравнения: Google GraphCast = 36.7M параметров (ещё 6× больше v2).
+
+Конфигурация в `experiments/wb2_512x256_19f_ar_v2/config.json`.
+Подробное сравнение в `experiments/wb2_512x256_19f_ar_v2/CHANGELOG_v1_vs_v2.md`.
+
+Ожидаемое время обучения на A100: ~10–14 дней.
+
+Лог обучения (можно следить даже после отключения от сессии):
+```bash
+tail -f experiments/wb2_512x256_19f_ar_v2/training_log.txt
+```
 
 ## Инференс (прогноз)
 

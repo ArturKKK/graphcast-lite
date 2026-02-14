@@ -69,11 +69,16 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
     set_random_seeds(seed=experiment_config.random_seed)
 
     # Загружает датасеты
-    if experiment_config.data.dataset_name == DatasetNames.wb2_512x256_19f_ar:
+    if experiment_config.data.dataset_name in (
+        DatasetNames.wb2_512x256_19f_ar,
+        DatasetNames.wb2_512x256_19f_ar_v2,
+    ):
         # Chunked dataloader для больших сеток (512×256)
         # Для AR-обучения подаём max_ar_steps целевых кадров
         ar_target_steps = max(experiment_config.max_ar_steps, 1)
-        data_path = os.path.join("data", "datasets", experiment_config.data.dataset_name)
+        # v2 использует тот же датасет, что и v1
+        physical_dataset = "wb2_512x256_19f_ar"
+        data_path = os.path.join("data", "datasets", physical_dataset)
         train_dataset, val_dataset, test_dataset, dataset_metadata = (
             load_chunked_datasets(
                 data_path=data_path,

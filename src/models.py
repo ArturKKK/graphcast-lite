@@ -151,6 +151,140 @@ class SparseGATConv(GATConv):
         return out, (edge_index, attention_scores)
 
 
+def _get_activation(name: str = "prelu"):
+    """Возвращает модуль активации по имени."""
+    if name == "swish" or name == "silu":
+        return nn.SiLU()
+    elif name == "prelu":
+        return nn.PReLU()
+    elif name == "relu":
+        return nn.ReLU()
+    else:
+        raise ValueError(f"Unknown activation: {name}")
+
+
+class InteractionNetLayer(nn.Module):
+    """Один шаг InteractionNetwork а-ля GraphCast.
+
+    На каждом шаге:
+    1) Edge update: MLP_edge(concat(sender, receiver, edge_features)) → new edge_features
+    2) Aggregate: scatter_mean обновлённых edge features для каждого receiver node
+    3) Node update: MLP_node(concat(node, aggregated_edges)) → new node_features
+    4) Residual: node = node + new_node, edge = edge + new_edge
+
+    Поддерживает edge features и residual connections — два ключевых компонента,
+    которых не хватало в старой модели.
+    """
+
+    def __init__(self, node_dim: int, edge_dim: int, hidden_dim: int,
+                 activation: str = "swish", use_layer_norm: bool = True):
+        super().__init__()
+        from torch_geometric.nn import LayerNorm as PygLayerNorm
+
+        act = _get_activation(activation)
+
+        # Edge MLP: [sender_features || receiver_features || edge_features] → edge_features
+        self.edge_mlp = nn.Sequential(
+            nn.Linear(node_dim * 2 + edge_dim, hidden_dim),
+            act,
+            nn.Linear(hidden_dim, edge_dim),
+        )
+
+        # Node MLP: [node_features || aggregated_edge_features] → node_features
+        self.node_mlp = nn.Sequential(
+            nn.Linear(node_dim + edge_dim, hidden_dim),
+            act,
+            nn.Linear(hidden_dim, node_dim),
+        )
+
+        # LayerNorm (как в GraphCast)
+        self.use_layer_norm = use_layer_norm
+        if use_layer_norm:
+            self.edge_norm = PygLayerNorm(edge_dim, mode="graph")
+            self.node_norm = PygLayerNorm(node_dim, mode="node")
+
+    def forward(self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor):
+        """
+        x: [num_nodes, node_dim]
+        edge_index: [2, num_edges]
+        edge_attr: [num_edges, edge_dim]
+        """
+        senders = edge_index[0]
+        receivers = edge_index[1]
+
+        # 1) Edge update
+        edge_input = torch.cat([x[senders], x[receivers], edge_attr], dim=-1)
+        edge_update = self.edge_mlp(edge_input)
+
+        # 2) Aggregate edges → nodes (scatter_mean по receivers)
+        from torch_geometric.utils import scatter
+        aggregated = scatter(edge_update, receivers, dim=0, dim_size=x.size(0), reduce="mean")
+
+        # 3) Node update
+        node_input = torch.cat([x, aggregated], dim=-1)
+        node_update = self.node_mlp(node_input)
+
+        # 4) Residual connections
+        new_edge_attr = edge_attr + edge_update
+        new_x = x + node_update
+
+        # 5) LayerNorm
+        if self.use_layer_norm:
+            new_edge_attr = self.edge_norm(new_edge_attr)
+            new_x = self.node_norm(new_x)
+
+        return new_x, new_edge_attr
+
+
+class InteractionNetProcessor(nn.Module):
+    """Processor из N шагов InteractionNetwork с UNSHARED weights (как GraphCast).
+
+    Каждый шаг — отдельный InteractionNetLayer с собственными весами.
+    Edge features сначала проецируются из raw (4D) в latent space, затем
+    обновляются на каждом шаге.
+    """
+
+    def __init__(self, node_dim: int, raw_edge_dim: int, edge_latent_dim: int,
+                 hidden_dim: int, num_steps: int,
+                 activation: str = "swish", use_layer_norm: bool = True):
+        super().__init__()
+
+        act = _get_activation(activation)
+
+        # Проецируем raw edge features (4D) в латентное пространство
+        self.edge_encoder = nn.Sequential(
+            nn.Linear(raw_edge_dim, edge_latent_dim),
+            act,
+        )
+
+        # N шагов message passing, каждый с отдельными весами
+        self.steps = nn.ModuleList([
+            InteractionNetLayer(
+                node_dim=node_dim,
+                edge_dim=edge_latent_dim,
+                hidden_dim=hidden_dim,
+                activation=activation,
+                use_layer_norm=use_layer_norm,
+            )
+            for _ in range(num_steps)
+        ])
+
+    def forward(self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr_raw: torch.Tensor):
+        """
+        x: [num_mesh_nodes, node_dim]
+        edge_index: [2, E]
+        edge_attr_raw: [E, raw_edge_dim] — сырые edge features (4D: distance + 3D position)
+        """
+        # Проецируем edge features в латентное пространство
+        edge_attr = self.edge_encoder(edge_attr_raw)
+
+        # Message passing
+        for step in self.steps:
+            x, edge_attr = step(x, edge_index, edge_attr)
+
+        return x
+
+
 
 class GraphLayer(nn.Module):
     """Обёртка, создающая конкретный графовый слой (или стек слоёв) по конфигу.
@@ -179,7 +313,7 @@ class GraphLayer(nn.Module):
             GraphLayerType.GATConv,
             GraphLayerType.SparseGATConv,
         ]:
-            self.activation = torch.nn.PReLU()
+            self.activation = _get_activation(graph_config.activation or "prelu")
             self.output_dim = graph_config.output_dim
             self.layers = torch.nn.ModuleList()
             hidden_dims = graph_config.hidden_dims
@@ -239,6 +373,30 @@ class GraphLayer(nn.Module):
                     )
                 )
 
+        elif graph_config.layer_type == GraphLayerType.InteractionNet:
+            # InteractionNetProcessor: N шагов message passing с edge features + residuals
+            self.output_dim = graph_config.output_dim
+            num_steps = graph_config.num_message_passing_steps or 4
+            raw_edge_dim = graph_config.edge_feature_dim or 4  # distance + 3D relative position
+            activation = graph_config.activation or "swish"
+            use_ln = graph_config.use_layer_norm if graph_config.use_layer_norm is not None else True
+
+            # Residual connections требуют output_dim == input_dim
+            assert graph_config.output_dim == input_dim, (
+                f"InteractionNet requires output_dim ({graph_config.output_dim}) == input_dim ({input_dim}), "
+                f"так как используются residual connections."
+            )
+
+            self.layers = InteractionNetProcessor(
+                node_dim=input_dim,  # должен совпадать с output_dim (latent)
+                raw_edge_dim=raw_edge_dim,
+                edge_latent_dim=input_dim,  # edge latent = node latent (как в GraphCast)
+                hidden_dim=input_dim,       # hidden = latent (как в GraphCast)
+                num_steps=num_steps,
+                activation=activation,
+                use_layer_norm=use_ln,
+            )
+
         else:
             print(graph_config.layer_type)
             raise NotImplementedError(
@@ -274,6 +432,11 @@ class GraphLayer(nn.Module):
                 else:
                     X = layer(X)
             return X, edge_index
+        elif self.layer_type == GraphLayerType.InteractionNet:
+            edge_attr = kwargs.get("edge_attr", None)
+            if edge_attr is None:
+                raise ValueError("InteractionNet requires edge_attr (edge features)")
+            return self.layers(x=X, edge_index=edge_index, edge_attr_raw=edge_attr)
         return X
 
 
@@ -376,9 +539,20 @@ class WeatherPrediction(nn.Module):
         self._init_feature_size = self.init_grid_features.shape[1]
 
         # PROCESSING-граф: рёбра внутри mesh для message passing
-        self.processing_graph = create_processing_graph(
-            meshes=self._meshes, mesh_levels=graph_config.mesh_levels
+        self.using_interaction_net = pipeline_config.processor.gcn.layer_type == GraphLayerType.InteractionNet
+        self._processing_edge_features = None  # будет заполнен ниже, если есть InteractionNet
+
+        proc_graph_result = create_processing_graph(
+            meshes=self._meshes, mesh_levels=graph_config.mesh_levels,
+            mesh_node_lats=self._mesh_nodes_lat,
+            mesh_node_longs=self._mesh_nodes_lon,
         )
+        if isinstance(proc_graph_result, tuple):
+            self.processing_graph, proc_edge_features = proc_graph_result
+            # Регистрируем как буфер (не trainable, но переезжает на GPU)
+            self.register_buffer("_processing_edge_features", proc_edge_features)
+        else:
+            self.processing_graph = proc_graph_result
 
         # DECODING-граф: для каждого grid — 3 входа от вершин треугольника mesh, который его содержит
         self.decoding_graph = create_decoding_graph(
@@ -630,6 +804,13 @@ class WeatherPrediction(nn.Module):
             )
             # ВАЖНО: сохраняем новый прореженный граф для следующих проходов
             self.processing_graph = new_processor_edge_index
+        elif self.using_interaction_net:
+            # InteractionNet: передаём edge features
+            processed_mesh_node_features = self.processor.forward(
+                X=mesh_node_features, edge_index=self.processing_graph,
+                attention_threshold=attention_threshold,
+                edge_attr=self._processing_edge_features,
+            )
         else:
             processed_mesh_node_features = self.processor.forward(
                 X=mesh_node_features, edge_index=self.processing_graph, attention_threshold=attention_threshold

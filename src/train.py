@@ -16,6 +16,7 @@ from src.constants import FileNames
 from src.utils import save_to_json_file
 import os
 import numpy as np # Нужно для генерации весов
+from datetime import datetime
 
 # --- НОВЫЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 def get_lat_weights(lat_dim, lon_dim, device):
@@ -208,10 +209,22 @@ def train(
 
     best_val_loss = float("inf")  
     patience_counter = 0  
-    
+
+    # --- File logging (можно отключить nohup и просто смотреть файл) ---
+    log_path = os.path.join(results_save_dir, "training_log.txt")
+    def _log(msg):
+        """Пишем строку и в stdout, и в файл."""
+        with open(log_path, "a") as f:
+            f.write(msg + "\n")
+    _log(f"=== Training started: {datetime.now().isoformat()} ===")
+    _log(f"epochs={num_epochs}  max_ar={max_ar}  epochs_per_stage={epochs_per_stage}")
+    _log(f"{'epoch':>5}  {'ar':>2}  {'train_loss':>10}  {'val_loss':>10}  {'val_ACC':>8}  {'best_vl':>10}  {'patience':>8}  timestamp")
+    _log("-" * 90)
+
     intial_val_loss, initial_val_acc = test(model, val_dataloader, loss_fn, device, lat_weights)  
     if print_losses:  
         print(f"[Init] val_loss={intial_val_loss:.5f} val_acc={initial_val_acc:.4f}")
+    _log(f"{'init':>5}  {'--':>2}  {'--':>10}  {intial_val_loss:10.5f}  {initial_val_acc:8.4f}  {'--':>10}  {'--':>8}  {datetime.now().strftime('%H:%M:%S')}")
 
     # Основной цикл обучения  
     for epoch in range(num_epochs):  
@@ -260,10 +273,15 @@ def train(
             patience_counter += 1  
             print(f"Patience counter is now {patience_counter} \n")  
 
+        # --- Пишем строку в лог-файл ---
+        _log(f"{epoch+1:5d}  {ar_steps:2d}  {epoch_train_loss:10.5f}  {epoch_val_loss:10.5f}  {epoch_val_acc:8.4f}  {best_val_loss:10.5f}  {patience_counter:8d}  {datetime.now().strftime('%H:%M:%S')}")
+
         if patience_counter >= config.early_stopping_patience:  
             print(f"Early stopping.")  
+            _log(f">>> Early stopping at epoch {epoch+1}")
             break  
 
+    _log(f"=== Training finished: {datetime.now().isoformat()} ===")
     training_results = {"train_losses": train_losses, "val_losses": val_losses}  
     save_to_json_file(training_results, os.path.join(results_save_dir, FileNames.SAVED_RESULTS))  
     if wandb_log: wandb.finish()  

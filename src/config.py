@@ -35,6 +35,9 @@ class GraphLayerType(str, Enum):
     # То же, но после первой итерации отбрасываем рёбра с α < threshold → граф редеет
     # Ускорить последующие эпохи
     SparseGATConv = "sparse_gat"
+    # InteractionNetwork а-ля GraphCast: обновляет И рёбра, И узлы,
+    # с residual connections на каждом шаге message passing.
+    InteractionNet = "interaction_net"
 
 class ProductGraphType(str, Enum):
     """The different types of product graph."""
@@ -56,6 +59,7 @@ class DatasetNames(str, Enum):
     wb2_64x32_zq_15f_4obs_4pred = "wb2_64x32_zq_15f_4obs_4pred"
     wb2_64x32_ar_15f_4obs_4pred = "wb2_64x32_ar_15f_4obs_4pred"
     wb2_512x256_19f_ar = "wb2_512x256_19f_ar"
+    wb2_512x256_19f_ar_v2 = "wb2_512x256_19f_ar_v2"
 
 
 class GraphBuildingConfig(BaseModel):
@@ -143,6 +147,12 @@ class GraphBlock(BaseModel):
         Whether to use layer norm or not. Applied after every GNN layer. 
     layer_norm_mode: Optional[str]
          The mode of the layer norm. Can be either "node" or "graph".
+    activation: Optional[str]
+        Activation function: "prelu" (default) or "swish".
+    num_message_passing_steps: Optional[int]
+        Only for InteractionNet: number of message passing steps with separate weights.
+    edge_feature_dim: Optional[int]
+        Only for InteractionNet: dimensionality of edge features from graph construction.
     """
     layer_type: GraphLayerType
     gat_props: Optional[GATProps] = None
@@ -150,6 +160,9 @@ class GraphBlock(BaseModel):
     output_dim: Optional[int] = None
     use_layer_norm: Optional[bool] = None
     layer_norm_mode: Optional[str] = None
+    activation: Optional[str] = "prelu"
+    num_message_passing_steps: Optional[int] = None
+    edge_feature_dim: Optional[int] = None
 
 
 class ModelConfig(BaseModel):

@@ -31,7 +31,64 @@ from src.config import GraphBuildingConfig, Grid2MeshEdgeCreation, Mesh2GridEdge
 import torch
 
 from src.mesh.create_mesh import filter_mesh, get_edges_from_faces
-from src.utils import get_bipartite_graph_spatial_features
+from src.utils import get_bipartite_graph_spatial_features, get_mesh_lat_long
+
+
+def _compute_mesh_edge_features(
+    mesh_node_lats: np.ndarray,
+    mesh_node_longs: np.ndarray,
+    edge_index: np.ndarray,
+) -> torch.Tensor:
+    """Вычисляет пространственные фичи рёбер для processing-графа (mesh↔mesh).
+
+    Для каждого ребра:
+    - relative_distance (нормированная длина) — 1 фича
+    - relative_position (3D вектор в локальных координатах получателя) — 3 фичи
+    Итого 4 фичи на ребро.
+
+    Это именно то, что делает Google GraphCast для mesh-рёбер.
+    """
+    from src.utils import lat_lon_deg_to_spherical, spherical_to_cartesian
+    from src.utils import get_bipartite_relative_position_in_receiver_local_coordinates
+
+    senders = edge_index[0]
+    receivers = edge_index[1]
+
+    sender_phi, sender_theta = lat_lon_deg_to_spherical(
+        mesh_node_lats[senders], mesh_node_longs[senders]
+    )
+    receiver_phi, receiver_theta = lat_lon_deg_to_spherical(
+        mesh_node_lats[receivers], mesh_node_longs[receivers]
+    )
+
+    # Используем ту же функцию, что и в GraphCast — относительные позиции
+    # в локальных координатах получателя.
+    relative_position = get_bipartite_relative_position_in_receiver_local_coordinates(
+        senders_node_phi=lat_lon_deg_to_spherical(mesh_node_lats, mesh_node_longs)[0],
+        senders_node_theta=lat_lon_deg_to_spherical(mesh_node_lats, mesh_node_longs)[1],
+        receivers_node_phi=lat_lon_deg_to_spherical(mesh_node_lats, mesh_node_longs)[0],
+        receivers_node_theta=lat_lon_deg_to_spherical(mesh_node_lats, mesh_node_longs)[1],
+        senders=senders,
+        receivers=receivers,
+        latitude_local_coordinates=True,
+        longitude_local_coordinates=True,
+    )
+
+    # Нормируем по максимальной длине ребра
+    relative_edge_distances = np.linalg.norm(relative_position, axis=-1, keepdims=True)
+    max_dist = relative_edge_distances.max()
+    if max_dist > 0:
+        relative_edge_distances_norm = relative_edge_distances / max_dist
+        relative_position_norm = relative_position / max_dist
+    else:
+        relative_edge_distances_norm = relative_edge_distances
+        relative_position_norm = relative_position
+
+    # [num_edges, 4]: distance + 3D position
+    edge_features = np.concatenate(
+        [relative_edge_distances_norm, relative_position_norm], axis=-1
+    )
+    return torch.tensor(edge_features, dtype=torch.float32)
 
 
 # Задача. Построить рёбра от узлов Grid к узлам Mesh, чтобы «залить» исходные признаки с Grid в ближайшие Mesh-узлы.
@@ -124,8 +181,10 @@ def create_encoding_graph(
 
 
 def create_processing_graph(
-    meshes: List[TriangularMesh], mesh_levels: List[int]
-) -> torch.Tensor:
+    meshes: List[TriangularMesh], mesh_levels: List[int],
+    mesh_node_lats: np.ndarray = None,
+    mesh_node_longs: np.ndarray = None,
+) -> Tuple[torch.Tensor, ...]:
     """Returns the edges within the mesh in the processing graph based on the mesh resolution levels.
 
     Parameters
@@ -134,12 +193,15 @@ def create_processing_graph(
         All the meshes constructed using the mesh_levels specified
     mesh_levels : List[int]
         The mesh levels for the experiment.
+    mesh_node_lats : np.ndarray, optional
+        Latitudes of mesh nodes (needed for edge features).
+    mesh_node_longs : np.ndarray, optional
+        Longitudes of mesh nodes (needed for edge features).
 
     Returns
     -------
-    torch.Tensor
-        Returns the edges in the mesh based on the resolution levels. Returns tensor of shape [2, num_edges].
-
+    Tuple[torch.Tensor, ...]
+        Returns (edge_index, edge_features) or just edge_index if no coordinates provided.
     """
 
     # 1) Выбираем нужные уровни иерархической сетки (например, один или несколько уровней разбиения икосаэдра).
@@ -148,7 +210,18 @@ def create_processing_graph(
 
     # 2) Преобразуем треугольники (faces) в рёбра графа. В неориентированном случае каждое ребро обычно даётся
     #    в обе стороны (u→v и v→u), что удобно для message passing. Функция возвращает массив shape [2, E].
-    return torch.tensor(get_edges_from_faces(meshes_we_want.faces), dtype=torch.int64)
+    edge_index = torch.tensor(get_edges_from_faces(meshes_we_want.faces), dtype=torch.int64)
+
+    # 3) Если переданы координаты, вычисляем edge features
+    if mesh_node_lats is not None and mesh_node_longs is not None:
+        edge_features = _compute_mesh_edge_features(
+            mesh_node_lats=mesh_node_lats,
+            mesh_node_longs=mesh_node_longs,
+            edge_index=edge_index.numpy(),
+        )
+        return edge_index, edge_features
+
+    return edge_index
 
 
 
