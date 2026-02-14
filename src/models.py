@@ -540,7 +540,6 @@ class WeatherPrediction(nn.Module):
 
         # PROCESSING-граф: рёбра внутри mesh для message passing
         self.using_interaction_net = pipeline_config.processor.gcn.layer_type == GraphLayerType.InteractionNet
-        self._processing_edge_features = None  # будет заполнен ниже, если есть InteractionNet
 
         proc_graph_result = create_processing_graph(
             meshes=self._meshes, mesh_levels=graph_config.mesh_levels,
@@ -549,10 +548,10 @@ class WeatherPrediction(nn.Module):
         )
         if isinstance(proc_graph_result, tuple):
             self.processing_graph, proc_edge_features = proc_graph_result
-            # Регистрируем как буфер (не trainable, но переезжает на GPU)
             self.register_buffer("_processing_edge_features", proc_edge_features)
         else:
             self.processing_graph = proc_graph_result
+            self._processing_edge_features = None
 
         # DECODING-граф: для каждого grid — 3 входа от вершин треугольника mesh, который его содержит
         self.decoding_graph = create_decoding_graph(
