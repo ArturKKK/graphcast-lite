@@ -94,8 +94,6 @@ def main():
                     help="если указать, сохранит доп. файл с вырезкой региона <exp>/pred_region.pt и выведет метрики по региону")
     ap.add_argument("--per-channel", action="store_true",
                     help="печать подробных метрик по каждому каналу и горизонту")
-    ap.add_argument("--max-samples", type=int, default=None,
-                    help="макс. число тестовых сэмплов (экономия RAM; по умолчанию все)")
     
     # --- НОВЫЕ АРГУМЕНТЫ (УСВОЕНИЕ И ГРАНИЦЫ) ---
     ap.add_argument("--assim-method", default="none", choices=["none", "nudging", "oi"], help="Метод усвоения: nudging или oi")
@@ -142,18 +140,29 @@ def main():
     # 1) грузим конфиг и датасет
     _CHUNKED = {DatasetNames.wb2_512x256_19f_ar.value,
                 DatasetNames.wb2_512x256_19f_ar_v2.value}
-    is_chunked = exp_cfg.data.dataset_name in _CHUNKED
 
-    if is_chunked:
+    if exp_cfg.data.dataset_name in _CHUNKED:
+        # Chunked memmap format (512×256+)
         train_ds, val_ds, test_ds, meta = load_chunked_datasets(
             data_path=str(data_dir),
             obs_window=exp_cfg.data.obs_window_used,
             pred_steps=exp_cfg.data.pred_window_used,
             n_features=exp_cfg.data.num_features_used,
         )
+        # У chunked-датасета нет .y — собираем через DataLoader
+        print(f"[predict] Collecting test truths from chunked dataset "
+              f"({len(test_ds)} samples) ...")
+        _all_y = []
+        for _, y_i in torch.utils.data.DataLoader(
+                test_ds, batch_size=64, shuffle=False, num_workers=2):
+            _all_y.append(y_i)
+        truths = torch.cat(_all_y, dim=0).cpu()
+        del _all_y
     else:
+        # Legacy .pt format (64×32 и прочие)
         train_ds, val_ds, test_ds, meta = load_train_and_test_datasets(
             str(data_dir), exp_cfg.data)
+        truths = test_ds.y.cpu()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -167,25 +176,14 @@ def main():
     C = exp_cfg.data.num_features_used
     P = exp_cfg.data.pred_window_used
 
-    # Ограничение числа сэмплов (для больших сеток экономит RAM)
-    max_samples = args.max_samples if args.max_samples else len(test_ds)
-    if is_chunked and args.max_samples is None:
-        max_samples = min(len(test_ds), 200)
-    est_gb = max_samples * G * C * P * 4 * 3 / 1e9  # preds + truths + baseline
-    print(f"[predict] {max_samples}/{len(test_ds)} test samples "
-          f"(~{est_gb:.1f} GB RAM).  Override with --max-samples N")
-
     # --- ПОДГОТОВКА DA ---
-    observations = None  # None → используем GT текущего сэмпла в цикле
+    observations = truths
     if args.assim_method != "none":
         if args.obs_path:
             print(f"[DA] Загрузка наблюдений: {args.obs_path}")
             observations = torch.load(args.obs_path).cpu()
-        elif not is_chunked:
-            observations = test_ds.y.cpu()
-            print("[DA] ВНИМАНИЕ: Используем y_test (идеальные данные) как наблюдения.")
         else:
-            print("[DA] ВНИМАНИЕ: chunked — DA использует GT каждого сэмпла.")
+            print("[DA] ВНИМАНИЕ: Используем y_test (идеальные данные) как наблюдения.")
 
     oi_solver = None
     if args.assim_method == "oi":
@@ -204,30 +202,23 @@ def main():
             if background_data.dim() == 4:
                  background_data = background_data.view(background_data.shape[0], -1, background_data.shape[-1])
         else:
-            if is_chunked:
-                print("[Boundary] ОШИБКА: для chunked нужен --background-path"); sys.exit(1)
-            background_data = test_ds.y.cpu()
             print("[Boundary] ВНИМАНИЕ: Фон не задан, используем y_test.")
+            background_data = truths
             
         mask_tensor = build_boundary_taper_mask(meta.num_latitudes, meta.num_longitudes, args.taper_width, args.taper_width)
         boundary_mask = mask_tensor.view(1, G, 1).float()
 
     # 3) прогоняем весь test + сразу считаем метрики
-    preds, truths_list, baseline = [], [], []
+    preds, baseline = [], []
 
-    print(f"[Main] Запуск инференса ({max_samples} samples, "
-          f"DA: {args.assim_method}, Bounds: {args.boundary_blending})...")
+    print(f"[Main] Запуск инференса (DA: {args.assim_method}, Bounds: {args.boundary_blending})...")
 
     with torch.no_grad():
         for i, (X, y) in enumerate(torch.utils.data.DataLoader(test_ds, batch_size=1, shuffle=False)):
-            if i >= max_samples:
-                break
             # Подготовим ground truth как в train/test
             y = y.squeeze(0)
             if len(y.shape) == 3:
                 y = y.squeeze(-2)
-            truths_list.append(y.cpu())
-            obs_i = observations[i] if observations is not None else y
             
             # Персистентный базлайн: «следующий шаг = последнее наблюдённое»
             # Для flattened входа: X: [1, G, T*F] -> последний шаг это последние F каналов
@@ -242,7 +233,7 @@ def main():
             # 1. NUDGING (SEQUENTIAL)
             if args.assim_method == "nudging" and args.nudging_mode == "sequential":
                 x0 = X.view(1, X.shape[1], exp_cfg.data.obs_window_used, C)
-                y_obs = obs_i.unsqueeze(0)
+                y_obs = observations[i].unsqueeze(0)
                 out = sequential_nudged_rollout(
                     model=model, x0=x0, y_obs=y_obs, p=P,
                     alpha=args.nudging_alpha, k=args.nudge_first_k, device=device
@@ -253,7 +244,7 @@ def main():
             elif args.assim_method == "oi":
                 x0 = X.view(1, X.shape[1], exp_cfg.data.obs_window_used, C)
                 curr_state = x0.to(device)
-                y_obs_full = obs_i
+                y_obs_full = observations[i]
                 y_obs_steps = y_obs_full.view(y.shape[0], P, C)
                 
                 test_inp = curr_state.view(1, G, -1)
@@ -283,7 +274,7 @@ def main():
             else:
                 out = model(X, attention_threshold=0.0).cpu()   # [G, pred_window*num_features_used]
                 if args.assim_method == "nudging" and args.nudging_mode == "offline":
-                    out = nudge_sequence_offline(out, obs_i, args.nudging_alpha)
+                    out = nudge_sequence_offline(out, observations[i], args.nudging_alpha)
 
             # --- ГРАНИЦЫ (ИСПРАВЛЕННАЯ ФОРМУЛА) ---
             if boundary_mask is not None:
@@ -295,10 +286,9 @@ def main():
             preds.append(out)
             baseline.append(X_last.cpu())
 
-    preds = torch.stack(preds, dim=0)          # [N, G, C*P]
-    truths = torch.stack(truths_list, dim=0)   # [N, G, C*P]
-    baseline = torch.stack(baseline, dim=0)    # [N, G, C*P]
-    del truths_list
+    preds = torch.stack(preds, dim=0)          # [N, G, C]
+    # truths уже загружен в начале
+    baseline = torch.stack(baseline, dim=0)    # [N, G, C]
 
     # Общие метрики по всему тесту
     mse, rmse, mae = _metrics(truths, preds)
