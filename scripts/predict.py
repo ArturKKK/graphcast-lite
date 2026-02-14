@@ -131,7 +131,10 @@ def main():
     if args.data_dir:
         data_dir = Path(args.data_dir)
     else:
-        data_dir = REPO_ROOT / "data" / "datasets" / exp_cfg.data.dataset_name
+        ds_name = str(exp_cfg.data.dataset_name.value
+                      if hasattr(exp_cfg.data.dataset_name, "value")
+                      else exp_cfg.data.dataset_name)
+        data_dir = REPO_ROOT / "data" / "datasets" / ds_name
 
     # 1) грузим конфиг и датасет
     # Автоопределение формата: если есть data.npy — chunked (memmap), иначе legacy (.pt)
