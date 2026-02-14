@@ -13,7 +13,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.constants import FileNames
-from src.config import ExperimentConfig, DatasetNames
+from src.config import ExperimentConfig
 from src.utils import load_from_json_file
 from src.data.dataloader import load_train_and_test_datasets
 from src.data.dataloader_chunked import load_chunked_datasets
@@ -131,18 +131,13 @@ def main():
     if args.data_dir:
         data_dir = Path(args.data_dir)
     else:
-        ds_name = exp_cfg.data.dataset_name
-        # v2 использует тот же физический датасет, что и v1
-        if ds_name == DatasetNames.wb2_512x256_19f_ar_v2.value:
-            ds_name = DatasetNames.wb2_512x256_19f_ar.value
-        data_dir = REPO_ROOT / "data" / "datasets" / ds_name
+        data_dir = REPO_ROOT / "data" / "datasets" / exp_cfg.data.dataset_name
 
     # 1) грузим конфиг и датасет
-    _CHUNKED = {DatasetNames.wb2_512x256_19f_ar.value,
-                DatasetNames.wb2_512x256_19f_ar_v2.value}
+    # Автоопределение формата: если есть data.npy — chunked (memmap), иначе legacy (.pt)
+    is_chunked = (data_dir / "data.npy").exists()
 
-    if exp_cfg.data.dataset_name in _CHUNKED:
-        # Chunked memmap format (512×256+)
+    if is_chunked:
         train_ds, val_ds, test_ds, meta = load_chunked_datasets(
             data_path=str(data_dir),
             obs_window=exp_cfg.data.obs_window_used,
@@ -154,7 +149,7 @@ def main():
               f"({len(test_ds)} samples) ...")
         _all_y = []
         for _, y_i in torch.utils.data.DataLoader(
-                test_ds, batch_size=64, shuffle=False, num_workers=2):
+                test_ds, batch_size=64, shuffle=False, num_workers=0):
             _all_y.append(y_i)
         truths = torch.cat(_all_y, dim=0).cpu()
         del _all_y
