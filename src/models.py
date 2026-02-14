@@ -619,13 +619,20 @@ class WeatherPrediction(nn.Module):
         print()
 
         print("Processor summary: ")
-        print(
-            summary(
-                self.processor,
-                torch.randn(self._num_mesh_nodes, self.encoder.output_dim).to(device),
-                self.processing_graph,
+        try:
+            proc_kwargs = {}
+            if self._processing_edge_features is not None:
+                proc_kwargs["edge_attr"] = self._processing_edge_features
+            print(
+                summary(
+                    self.processor,
+                    torch.randn(self._num_mesh_nodes, self.encoder.output_dim).to(device),
+                    self.processing_graph,
+                    **proc_kwargs,
+                )
             )
-        )
+        except Exception as e:
+            print(f"  (summary skipped: {e})")
         print()
 
         print("Decoder summary: ")
