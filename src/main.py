@@ -129,7 +129,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
     # Создание оптимизатора — алгоритма, который меняет веса модели по градиентам, чтобы минимизировать loss.
     optimizer = Adam(params=model.parameters(), lr=experiment_config.learning_rate)
 
-    train_losses, val_losses, test_losses = train(
+    results = train(
         model=model,
         train_dataloader=train_dataloader,
         val_dataloader=val_dataloader,
@@ -143,12 +143,6 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
         print_losses=True,
         wandb_log=experiment_config.wandb_log,
     )
-
-    results = {
-        "train_losses": train_losses,
-        "val_losses": val_losses,
-        "test_losses": test_losses,
-    }
 
     return results
 
