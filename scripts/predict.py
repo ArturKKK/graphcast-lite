@@ -112,6 +112,10 @@ def main():
     ap.add_argument("--region", nargs=4, type=float,
                     metavar=("LAT_MIN","LAT_MAX","LON_MIN","LON_MAX"))
     ap.add_argument("--per-channel", action="store_true")
+    ap.add_argument("--ar-steps", type=int, default=None,
+                    help="Число AR-шагов для авторегрессионного инференса. "
+                         "Если модель одношаговая (P=1), можно прогнать N шагов, "
+                         "подавая выход обратно на вход. Напр. --ar-steps 4 для +24h.")
 
     # --- УСВОЕНИЕ ---
     ap.add_argument("--assim-method", default="none", choices=["none", "nudging", "oi"])
@@ -160,13 +164,16 @@ def main():
 
     # --- load dataset ---
     is_chunked = (data_dir / "data.npy").exists() or (data_dir / "dataset_info.json").exists()
-    print(f"[predict] data_dir={data_dir} (chunked={is_chunked})")
+
+    # Определяем сколько целевых шагов нам нужно из датасета
+    ds_pred_steps = args.ar_steps if args.ar_steps else exp_cfg.data.pred_window_used
+    print(f"[predict] data_dir={data_dir} (chunked={is_chunked}, pred_steps={ds_pred_steps})")
 
     if is_chunked:
         train_ds, val_ds, test_ds, meta = load_chunked_datasets(
             data_path=str(data_dir),
             obs_window=exp_cfg.data.obs_window_used,
-            pred_steps=exp_cfg.data.pred_window_used,
+            pred_steps=ds_pred_steps,
             n_features=exp_cfg.data.num_features_used,
         )
     else:
@@ -184,7 +191,13 @@ def main():
 
     G = meta.num_longitudes * meta.num_latitudes
     C = exp_cfg.data.num_features_used
-    P = exp_cfg.data.pred_window_used
+    P_model = exp_cfg.data.pred_window_used  # сколько шагов модель выдаёт за раз
+    AR_STEPS = args.ar_steps if args.ar_steps else P_model  # сколько горизонтов хотим
+    P = AR_STEPS  # общее число горизонтов для метрик
+    OBS = exp_cfg.data.obs_window_used
+
+    if AR_STEPS > P_model:
+        print(f"[AR-rollout] Модель выдаёт {P_model} шаг(ов), но мы прогоним {AR_STEPS} шагов авторегрессионно.")
 
     # --- max samples (авто-лимит для больших сеток) ---
     if args.max_samples is not None:
@@ -239,8 +252,8 @@ def main():
     sm_base_r = StreamingMetrics(C) if region_idxs is not None else None
 
     sm_pred_h, sm_base_h = [], []
-    if P > 1:
-        for _ in range(P):
+    if AR_STEPS > 1:
+        for _ in range(AR_STEPS):
             sm_pred_h.append(StreamingMetrics(C))
             sm_base_h.append(StreamingMetrics(C))
 
@@ -256,7 +269,16 @@ def main():
             if len(y.shape) == 3:
                 y = y.squeeze(-2)
 
-            X_last = X.squeeze(0)[:, -C:].repeat(1, P)  # persistence baseline
+            # Для AR-инференса: если y содержит меньше горизонтов, чем AR_STEPS,
+            # пропускаем сэмпл (нет ground truth для всех шагов).
+            y_total_steps = y.shape[-1] // C
+            if AR_STEPS > y_total_steps:
+                # Нет ground truth на столько горизонтов — берём сколько есть
+                effective_P = y_total_steps
+            else:
+                effective_P = AR_STEPS
+
+            X_last = X.squeeze(0)[:, -C:].repeat(1, effective_P)  # persistence baseline
 
             obs_i = y if observations is None else observations[i]
 
@@ -290,7 +312,27 @@ def main():
                         curr_state = torch.cat([curr_state[:, :, 1:, :], out_step.to(device).unsqueeze(2)], dim=2)
                     out = torch.stack(batch_steps, dim=2).view(1, G, -1).squeeze(0)
             else:
-                out = model(X, attention_threshold=0.0).cpu()
+                if AR_STEPS <= P_model:
+                    # Модель сама выдаёт все горизонты
+                    out = model(X, attention_threshold=0.0).cpu()
+                else:
+                    # AR-rollout: модель одношаговая, прогоняем несколько раз
+                    # curr_state: [1, G, OBS, C]
+                    curr_state = X.view(1, G, OBS, C)
+                    ar_outs = []
+                    for ar_step in range(AR_STEPS):
+                        inp = curr_state.view(1, G, -1)
+                        step_out = model(inp, attention_threshold=0.0)  # [G, C] or [1, G, C]
+                        if step_out.dim() == 2:
+                            step_out = step_out.unsqueeze(0)
+                        ar_outs.append(step_out.cpu())
+                        # Сдвигаем окно: [obs0, obs1] → [obs1, pred]
+                        curr_state = torch.cat(
+                            [curr_state[:, :, 1:, :], step_out.unsqueeze(2)], dim=2
+                        )
+                    # Склеиваем все шаги: [1, G, AR_STEPS*C]
+                    out = torch.cat(ar_outs, dim=-1).squeeze(0)  # [G, AR_STEPS*C]
+
                 if args.assim_method == "nudging" and args.nudging_mode == "offline":
                     out = nudge_sequence_offline(out, obs_i, args.nudging_alpha)
 
@@ -301,11 +343,17 @@ def main():
             # --- update streaming metrics ---
             out_cpu, y_cpu, bl_cpu = out.cpu(), y.cpu(), X_last.cpu()
 
+            # Если out шире, чем y (нет ground truth на все шаги), обрезаем
+            if out_cpu.shape[-1] > y_cpu.shape[-1]:
+                out_cpu = out_cpu[:, :y_cpu.shape[-1]]
+            if bl_cpu.shape[-1] > y_cpu.shape[-1]:
+                bl_cpu = bl_cpu[:, :y_cpu.shape[-1]]
+
             sm_pred.update(y_cpu, out_cpu)
             sm_base.update(y_cpu, bl_cpu)
 
-            if P > 1:
-                for p in range(P):
+            if effective_P > 1:
+                for p in range(effective_P):
                     sl = slice(p*C, (p+1)*C)
                     sm_pred_h[p].update(y_cpu[:, sl], out_cpu[:, sl])
                     sm_base_h[p].update(y_cpu[:, sl], bl_cpu[:, sl])
@@ -324,15 +372,15 @@ def main():
     print()
     print("=" * 60)
     print(f"=== Inference summary ({N} samples) ===")
-    print(f"Grid: {meta.num_longitudes}x{meta.num_latitudes} (G={G}) | C={C} | P={P}")
+    print(f"Grid: {meta.num_longitudes}x{meta.num_latitudes} (G={G}) | C={C} | AR={AR_STEPS} horizons")
     print(f"Overall: MSE={sm_pred.mse:.6f} | RMSE={sm_pred.rmse:.6f} | MAE={sm_pred.mae:.6f}")
     print(f"Baseline: RMSE={sm_base.rmse:.6f} | MAE={sm_base.mae:.6f}")
     print(f"Skill: {skill*100:.2f}%")
     print(f"ACC: {sm_pred.acc:.4f} | base: {sm_base.acc:.4f} | Δ={sm_pred.acc - sm_base.acc:+.4f}")
 
-    if P > 1:
+    if AR_STEPS > 1 and sm_pred_h:
         print(f"\nPer-horizon:")
-        for p in range(P):
+        for p in range(len(sm_pred_h)):
             sp, sb = sm_pred_h[p], sm_base_h[p]
             sk = 1.0 - (sp.rmse / (sb.rmse + 1e-12))
             print(f"  +{(p+1)*6:02d}h: RMSE={sp.rmse:.6f} | base={sb.rmse:.6f} | skill={sk*100:.2f}% | ACC={sp.acc:.4f} (base {sb.acc:.4f})")
