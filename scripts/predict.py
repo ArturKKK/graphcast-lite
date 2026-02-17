@@ -145,10 +145,22 @@ def main():
         ds_name = str(exp_cfg.data.dataset_name.value
                       if hasattr(exp_cfg.data.dataset_name, "value")
                       else exp_cfg.data.dataset_name)
-        data_dir = REPO_ROOT / "data" / "datasets" / ds_name
+        # v2 конфиги используют тот же физический датасет, что и v1
+        physical_ds_name = ds_name.replace("_v2", "")
+        # Пробуем относительный путь (как main.py), затем абсолютный от REPO_ROOT
+        for candidate in [Path("data") / "datasets" / physical_ds_name,
+                          REPO_ROOT / "data" / "datasets" / physical_ds_name,
+                          Path("data") / "datasets" / ds_name,
+                          REPO_ROOT / "data" / "datasets" / ds_name]:
+            if candidate.exists():
+                data_dir = candidate
+                break
+        else:
+            data_dir = Path("data") / "datasets" / physical_ds_name  # fallback
 
     # --- load dataset ---
-    is_chunked = (data_dir / "data.npy").exists()
+    is_chunked = (data_dir / "data.npy").exists() or (data_dir / "dataset_info.json").exists()
+    print(f"[predict] data_dir={data_dir} (chunked={is_chunked})")
 
     if is_chunked:
         train_ds, val_ds, test_ds, meta = load_chunked_datasets(
@@ -167,6 +179,7 @@ def main():
     model = load_model_from_experiment_config(exp_cfg, device, meta)
     state = torch.load(ckpt_path, map_location=device)
     model.load_state_dict(state)
+    model = model.to(device)  # ensure ALL buffers (edge features etc.) are on device
     model.eval()
 
     G = meta.num_longitudes * meta.num_latitudes
