@@ -60,6 +60,7 @@ class StreamingMetrics:
         self.sum_se = 0.0
         self.sum_ae = 0.0
         self.sum_acc = np.zeros(num_channels, dtype=np.float64)
+        self.acc_count = np.zeros(num_channels, dtype=np.int64)  # сколько раз добавляли ACC в каждый канал
 
     def update(self, y_true: torch.Tensor, y_pred: torch.Tensor):
         """y_true, y_pred: [G, C*P] or [G, C]"""
@@ -77,7 +78,9 @@ class StreamingMetrics:
             yt_a = yt - yt.mean()
             yp_a = yp - yp.mean()
             corr = (yt_a * yp_a).sum() / (yt_a.norm() * yp_a.norm() + eps)
-            self.sum_acc[c % self.C] += corr.item()
+            ch = c % self.C
+            self.sum_acc[ch] += corr.item()
+            self.acc_count[ch] += 1
         self.n += 1
 
     @property
@@ -94,7 +97,7 @@ class StreamingMetrics:
 
     @property
     def acc_per_channel(self):
-        return self.sum_acc / max(self.n, 1)
+        return self.sum_acc / np.maximum(self.acc_count, 1)
 
     @property
     def acc(self):
