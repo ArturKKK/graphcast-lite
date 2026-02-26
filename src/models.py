@@ -493,17 +493,20 @@ class WeatherPrediction(nn.Module):
         device,
         region_bounds=None,
         mesh_buffer: float = 15.0,
+        flat_grid: bool = False,
     ):
         super().__init__()
 
         self.device = device
+        self.flat_grid = flat_grid
         self.obs_window = data_config.obs_window_used  # T — окно наблюдений (временные шаги)
         self.num_features = data_config.num_features_used  # F — число динамических фичей на один шаг
         self.total_feature_size = self.num_features * self.obs_window  # T*F — если склеиваем время в канал
         self.use_product_graph = pipeline_config.product_graph is not None
 
         # Инициализация свойств grid и mesh (координаты, числа узлов, иерархия сеток)
-        self._init_grid_properties(grid_lat=cordinates[0], grid_lon=cordinates[1])
+        self._init_grid_properties(grid_lat=cordinates[0], grid_lon=cordinates[1],
+                                    flat_grid=flat_grid)
         self._init_mesh_properties(graph_config, region_bounds=region_bounds,
                                    mesh_buffer=mesh_buffer)
         self.using_sparse_gat = pipeline_config.processor.gcn.layer_type == GraphLayerType.SparseGATConv
@@ -530,6 +533,7 @@ class WeatherPrediction(nn.Module):
                 mesh=self._finest_mesh,
                 graph_building_config=graph_config,
                 num_grid_nodes=self._num_grid_nodes,
+                flat_grid=self.flat_grid,
             )
         )
 
@@ -562,6 +566,7 @@ class WeatherPrediction(nn.Module):
             mesh=self._finest_mesh,
             graph_building_config=graph_config,
             num_grid_nodes=self._num_grid_nodes,
+            flat_grid=self.flat_grid,
         )
 
         # Размер входа в ENCODER:
@@ -651,11 +656,20 @@ class WeatherPrediction(nn.Module):
         )
         print()
 
-    def _init_grid_properties(self, grid_lat: np.ndarray, grid_lon: np.ndarray):
-        """Сохраняем координаты grid и считаем число узлов N = |lat| × |lon|."""
+    def _init_grid_properties(self, grid_lat: np.ndarray, grid_lon: np.ndarray,
+                              flat_grid: bool = False):
+        """Сохраняем координаты grid и считаем число узлов.
+        
+        Regular grid: N = |lat| × |lon|, lat/lon — 1D оси.
+        Flat grid: N = len(lat) = len(lon), lat/lon — спаренные координаты.
+        """
         self._grid_lat = grid_lat.astype(np.float32)
         self._grid_lon = grid_lon.astype(np.float32)
-        self._num_grid_nodes = grid_lat.shape[0] * grid_lon.shape[0]
+        if flat_grid:
+            # Flat multi-resolution grid: lat and lon are paired (N,)
+            self._num_grid_nodes = len(grid_lat)
+        else:
+            self._num_grid_nodes = grid_lat.shape[0] * grid_lon.shape[0]
 
     def _init_mesh_properties(self, graph_config: GraphBuildingConfig,
                               region_bounds=None, mesh_buffer: float = 15.0):

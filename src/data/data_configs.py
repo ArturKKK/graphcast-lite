@@ -17,6 +17,10 @@ class DatasetMetadata:
         self.num_features = num_features
         self.obs_window = obs_window
         self.pred_window = pred_window
+        # Multi-resolution / flat grid support
+        self.flat_grid: bool = False
+        self.num_grid_nodes: int = num_latitudes * num_longitudes
+        self.is_regional = None  # bool array (N,) marking regional nodes
 
 
 def get_dataset_metadata(dataset_name: DatasetNames) -> DatasetMetadata:

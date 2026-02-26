@@ -8,12 +8,29 @@ from typing import Tuple
 
 
 def _grid_lat_lon_to_coordinates(
-    grid_latitude: np.ndarray, grid_longitude: np.ndarray
+    grid_latitude: np.ndarray, grid_longitude: np.ndarray, flat: bool = False
 ) -> np.ndarray:
-    """Copied from GraphCast
+    """Copied from GraphCast (extended for flat grids).
 
-    Lat [num_lat] lon [num_lon] to 3d coordinates [num_lat, num_lon, 3].
+    Regular mode (flat=False):
+      Lat [num_lat] lon [num_lon] to 3d coordinates [num_lat, num_lon, 3].
+    Flat mode (flat=True):
+      Lat [N] lon [N] (paired per-node) to 3d coordinates [N, 3].
     """
+    if flat:
+        # Уже спаренные координаты — пропускаем meshgrid
+        phi = np.deg2rad(grid_longitude)
+        theta = np.deg2rad(90 - grid_latitude)
+        return np.stack(
+            [
+                np.cos(phi) * np.sin(theta),
+                np.sin(phi) * np.sin(theta),
+                np.cos(theta),
+            ],
+            axis=-1,
+        )  # (N, 3)
+
+    # Regular grid mode: meshgrid из 1D осей
     # Convert to spherical coordinates phi and theta defined in the grid.
     # Each [num_latitude_points, num_longitude_points]
     phi_grid, theta_grid = np.meshgrid(
@@ -38,29 +55,31 @@ def radius_query_indices(
     grid_latitude: np.ndarray,
     grid_longitude: np.ndarray,
     mesh: TriangularMesh,
-    radius: float
+    radius: float,
+    flat: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Copied from GraphCast
+    """Copied from GraphCast (extended for flat grids).
 
     Returns mesh-grid edge indices for radius query.
 
     Args:
-      grid_latitude: Latitude values for the grid [num_lat_points]
-      grid_longitude: Longitude values for the grid [num_lon_points]
+      grid_latitude: Latitude values for the grid [num_lat_points] (regular)
+                     or [N] (flat, paired with grid_longitude).
+      grid_longitude: Longitude values for the grid [num_lon_points] (regular)
+                      or [N] (flat, paired with grid_latitude).
       mesh: Mesh object.
       radius: Radius of connectivity in R3. for a sphere of unit radius.
+      flat: If True, grid_latitude and grid_longitude are already-paired
+            flat coordinate arrays of shape (N,) instead of 1D axes.
 
     Returns:
-      tuple with `grid_indices` and `mesh_indices` indicating edges between the
-      grid and the mesh such that the distances in a straight line (not geodesic)
-      are smaller than or equal to `radius`.
-      * grid_indices: Indices of shape [num_edges], that index into a
-        [num_lat_points, num_lon_points] grid, after flattening the leading axes.
-      * mesh_indices: Indices of shape [num_edges], that index into mesh.vertices.
+      tuple with `grid_indices` and `mesh_indices` indicating edges.
+      * grid_indices: Indices of shape [num_edges], indexing into flattened grid.
+      * mesh_indices: Indices of shape [num_edges], indexing into mesh.vertices.
     """
-    # [num_grid_points=num_lat_points * num_lon_points, 3]
+    # [num_grid_points, 3]
     grid_positions = _grid_lat_lon_to_coordinates(
-        grid_latitude, grid_longitude
+        grid_latitude, grid_longitude, flat=flat
     ).reshape([-1, 3])
 
     # [num_mesh_points, 3]
@@ -118,29 +137,28 @@ def faces_to_edges(faces: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def in_mesh_triangle_indices(
-    *, grid_latitude: np.ndarray, grid_longitude: np.ndarray, mesh: TriangularMesh
+    *, grid_latitude: np.ndarray, grid_longitude: np.ndarray,
+    mesh: TriangularMesh, flat: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Copied from GraphCast
+    """Copied from GraphCast (extended for flat grids).
 
     Returns mesh-grid edge indices for grid points contained in mesh triangles.
 
     Args:
-      grid_latitude: Latitude values for the grid [num_lat_points]
-      grid_longitude: Longitude values for the grid [num_lon_points]
+      grid_latitude: Latitude values [num_lat_points] (regular) or [N] (flat).
+      grid_longitude: Longitude values [num_lon_points] (regular) or [N] (flat).
       mesh: Mesh object.
+      flat: If True, coords are already-paired flat arrays.
 
     Returns:
-      tuple with `grid_indices` and `mesh_indices` indicating edges between the
-      grid and the mesh vertices of the triangle that contain each grid point.
-      The number of edges is always num_lat_points * num_lon_points * 3
-      * grid_indices: Indices of shape [num_edges], that index into a
-        [num_lat_points, num_lon_points] grid, after flattening the leading axes.
-      * mesh_indices: Indices of shape [num_edges], that index into mesh.vertices.
+      tuple with `grid_indices` and `mesh_indices`.
+      * grid_indices: Indices of shape [num_edges], indexing into flattened grid.
+      * mesh_indices: Indices of shape [num_edges], indexing into mesh.vertices.
     """
 
-    # [num_grid_points=num_lat_points * num_lon_points, 3]
+    # [num_grid_points, 3]
     grid_positions = _grid_lat_lon_to_coordinates(
-        grid_latitude, grid_longitude
+        grid_latitude, grid_longitude, flat=flat
     ).reshape([-1, 3])
 
     mesh_trimesh = trimesh.Trimesh(vertices=mesh.vertices, faces=mesh.faces)

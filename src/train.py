@@ -19,8 +19,18 @@ import numpy as np # Нужно для генерации весов
 from datetime import datetime
 
 # --- НОВЫЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-def get_lat_weights(lat_dim, lon_dim, device):
-    """Создает веса (cos(lat)) чтобы не переобучаться на полюсах."""
+def get_lat_weights(lat_dim, lon_dim, device, flat_lats=None):
+    """Создает веса (cos(lat)) чтобы не переобучаться на полюсах.
+    
+    flat_lats: если задан (np.ndarray shape (N,)), используются реальные широты
+               каждого узла вместо linspace. Для мультирезолюционных сеток.
+    """
+    if flat_lats is not None:
+        # Flat grid: веса по реальным координатам каждого узла
+        w = torch.cos(torch.deg2rad(torch.from_numpy(flat_lats.copy()).float()))
+        w = w / w.mean()
+        return w.view(1, -1, 1).to(device)
+    
     lats = torch.linspace(-90, 90, lat_dim)
     w = torch.cos(torch.deg2rad(lats))
     w = w / w.mean()
@@ -189,7 +199,12 @@ def train(
     # --- Инициализация весов (Новое) ---
     lat_weights = None
     if config.use_latitude_weighting and dataset_metadata:
-        lat_weights = get_lat_weights(dataset_metadata.num_latitudes, dataset_metadata.num_longitudes, device)
+        if getattr(dataset_metadata, 'flat_grid', False) and hasattr(dataset_metadata, 'cordinates'):
+            # Flat grid: используем реальные широты узлов
+            flat_lats = dataset_metadata.cordinates[0]
+            lat_weights = get_lat_weights(0, 0, device, flat_lats=flat_lats)
+        else:
+            lat_weights = get_lat_weights(dataset_metadata.num_latitudes, dataset_metadata.num_longitudes, device)
         print("[Train] Включен Weighted Loss.")
         
     # --- Инициализация Curriculum (Новое) ---

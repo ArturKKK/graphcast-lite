@@ -36,6 +36,7 @@ def set_random_seeds(seed: int = 42):
 def load_model_from_experiment_config(
     experiment_config: ExperimentConfig, device, dataset_metadata: DatasetMetadata,
     coordinates=None, region_bounds=None, mesh_buffer: float = 15.0,
+    flat_grid: bool = False,
 ) -> WeatherPrediction:
 
     if coordinates is not None:
@@ -62,6 +63,7 @@ def load_model_from_experiment_config(
         device=device,
         region_bounds=region_bounds,
         mesh_buffer=mesh_buffer,
+        flat_grid=flat_grid,
     )
 
     return model
@@ -78,13 +80,24 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
     if experiment_config.data.dataset_name in (
         DatasetNames.wb2_512x256_19f_ar,
         DatasetNames.wb2_512x256_19f_ar_v2,
+        DatasetNames.multires,
     ):
-        # Chunked dataloader для больших сеток (512×256)
+        # Chunked dataloader для больших сеток (512×256) и мультирезолюционных
         # Для AR-обучения подаём max_ar_steps целевых кадров
         ar_target_steps = max(experiment_config.max_ar_steps, 1)
-        # v2 использует тот же датасет, что и v1
-        physical_dataset = "wb2_512x256_19f_ar"
-        data_path = os.path.join("data", "datasets", physical_dataset)
+        
+        if experiment_config.data.dataset_name == DatasetNames.multires:
+            # Multires: data_dir задаётся через конфиг (dataset_name — просто маркер)
+            # По умолчанию пробуем data/datasets/multires_*
+            if experiment_config.data_dir:
+                data_path = experiment_config.data_dir
+            else:
+                physical_dataset = str(experiment_config.data.dataset_name.value)
+                data_path = os.path.join("data", "datasets", physical_dataset)
+        else:
+            # v2 использует тот же датасет, что и v1
+            physical_dataset = "wb2_512x256_19f_ar"
+            data_path = os.path.join("data", "datasets", physical_dataset)
         train_dataset, val_dataset, test_dataset, dataset_metadata = (
             load_chunked_datasets(
                 data_path=data_path,
@@ -128,6 +141,8 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
         experiment_config=experiment_config,
         device=device,
         dataset_metadata=dataset_metadata,
+        coordinates=getattr(dataset_metadata, 'cordinates', None),
+        flat_grid=getattr(dataset_metadata, 'flat_grid', False),
     )
 
     model = model.to(device)

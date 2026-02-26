@@ -101,9 +101,19 @@ def create_encoding_graph(
     mesh: TriangularMesh,
     graph_building_config: GraphBuildingConfig,
     num_grid_nodes: int,
+    flat_grid: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Creates the edges between the grid and the mesh based on the strategy specified in the graph building config. Also contructs
         the initial static features of the grid and the mesh nodes like the latitudes, longitudes etc.
+
+    Parameters
+    ----------
+    grid_node_lats : np.ndarray
+        1D latitude axis [num_lat] for regular grid, or flat [N] for flat_grid=True.
+    grid_node_longs : np.ndarray
+        1D longitude axis [num_lon] for regular grid, or flat [N] for flat_grid=True.
+    flat_grid : bool
+        If True, grid_node_lats and grid_node_longs are already-paired flat arrays.
 
     Returns
     -------
@@ -130,6 +140,7 @@ def create_encoding_graph(
             grid_longitude=grid_node_longs,
             mesh=mesh,
             radius=radius,
+            flat=flat_grid,
         )
 
         # 3) Собираем edge_index формы [2, E], где первая строка — индексы отправителей (Grid),
@@ -148,11 +159,16 @@ def create_encoding_graph(
         )
 
     # 5) Подготавливаем координаты узлов Grid в векторной форме.
-    #    Входные grid_node_lats/longs — это 1D массивы «осей». meshgrid даёт 2D сетку (ширина×высота),
-    #    затем мы её выравниваем (flatten) в длину N и приводим к float32.
-    grid_nodes_lon, grid_nodes_lat = np.meshgrid(grid_node_longs, grid_node_lats)
-    grid_nodes_lon = grid_nodes_lon.reshape([-1]).astype(np.float32)
-    grid_nodes_lat = grid_nodes_lat.reshape([-1]).astype(np.float32)
+    if flat_grid:
+        # Flat grid: координаты уже спарены, пропускаем meshgrid
+        grid_nodes_lat = grid_node_lats.reshape([-1]).astype(np.float32)
+        grid_nodes_lon = grid_node_longs.reshape([-1]).astype(np.float32)
+    else:
+        #    Входные grid_node_lats/longs — это 1D массивы «осей». meshgrid даёт 2D сетку (ширина×высота),
+        #    затем мы её выравниваем (flatten) в длину N и приводим к float32.
+        grid_nodes_lon, grid_nodes_lat = np.meshgrid(grid_node_longs, grid_node_lats)
+        grid_nodes_lon = grid_nodes_lon.reshape([-1]).astype(np.float32)
+        grid_nodes_lat = grid_nodes_lat.reshape([-1]).astype(np.float32)
 
     # 6) Считаем статические пространственные признаки для бипартийного графа Grid→Mesh.
     #    Функция вернёт:
@@ -230,6 +246,7 @@ def create_decoding_graph(
     mesh: TriangularMesh,
     graph_building_config: GraphBuildingConfig,
     num_grid_nodes: int,
+    flat_grid: bool = False,
 ) -> torch.Tensor:
     """Creates the edges between the mesh and the grid based on the strategy specified for mesh to grid in the graph building config.
 
@@ -256,7 +273,8 @@ def create_decoding_graph(
         #    Возвращаются два массива одинаковой длины: grid_indices (получатели) и mesh_indices (отправители).
         #    Для каждого grid-узла будет ровно 3 mesh-вершины (вершины одного треугольника).
         grid_indices, mesh_indices = in_mesh_triangle_indices(
-            grid_latitude=cordinates[0], grid_longitude=cordinates[1], mesh=mesh
+            grid_latitude=cordinates[0], grid_longitude=cordinates[1], mesh=mesh,
+            flat=flat_grid,
         )
 
         # 2) Формируем edge_index формы [2, E], но теперь рёбра направлены от Mesh → Grid,

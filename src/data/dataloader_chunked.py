@@ -83,13 +83,20 @@ class TimeseriesChunkDataset(Dataset):
             # Raw memmap created by build_dataset_512x256.py — no .npy header
             with open(info_file) as f:
                 info = json.load(f)
-            shape = (info["n_time"], info["n_lon"], info["n_lat"], info["n_feat"])
+            self.flat_grid = info.get("flat", False)
+            if self.flat_grid:
+                # Flat multi-resolution data: (T, N_nodes, C)
+                shape = (info["n_time"], info["n_nodes"], info["n_feat"])
+            else:
+                # Regular grid data: (T, n_lon, n_lat, C)
+                shape = (info["n_time"], info["n_lon"], info["n_lat"], info["n_feat"])
             mm = np.memmap(single_file, dtype=np.float16, mode="r", shape=shape)
             chunk_files = [single_file]
             self.chunks = [mm]
             self.chunk_lengths = [mm.shape[0]]
             total_time = mm.shape[0]
         else:
+            self.flat_grid = False
             chunk_files = sorted(glob.glob(os.path.join(data_dir, "chunk_*.npy")))
             if not chunk_files:
                 raise FileNotFoundError(f"No data.npy or chunk_*.npy found in {data_dir}")
@@ -106,9 +113,16 @@ class TimeseriesChunkDataset(Dataset):
                 total_time += mm.shape[0]
 
         self.total_time = total_time
-        self.n_lon = self.chunks[0].shape[1]
-        self.n_lat = self.chunks[0].shape[2]
-        self.n_feat_total = self.chunks[0].shape[3]
+        if self.flat_grid:
+            self.n_nodes = self.chunks[0].shape[1]
+            self.n_lon = None
+            self.n_lat = None
+            self.n_feat_total = self.chunks[0].shape[2]
+        else:
+            self.n_nodes = None
+            self.n_lon = self.chunks[0].shape[1]
+            self.n_lat = self.chunks[0].shape[2]
+            self.n_feat_total = self.chunks[0].shape[3]
         self.n_feat = n_features if n_features else self.n_feat_total
 
         # Apply feature subset to scalers too
@@ -154,8 +168,8 @@ class TimeseriesChunkDataset(Dataset):
             raise ValueError(f"Unknown split: {split}")
 
         print(f"[ChunkDataset] {split}: {len(self._sample_indices)} samples, "
-              f"grid={self.n_lon}×{self.n_lat}, feat={self.n_feat}, "
-              f"obs={obs_window}, pred={pred_steps}")
+              f"{'flat_nodes=' + str(self.n_nodes) if self.flat_grid else 'grid=' + str(self.n_lon) + '×' + str(self.n_lat)}, "
+              f"feat={self.n_feat}, obs={obs_window}, pred={pred_steps}")
 
     def __len__(self):
         return len(self._sample_indices)
@@ -166,9 +180,24 @@ class TimeseriesChunkDataset(Dataset):
 
         # Extract window: [local_t : local_t + obs + pred]
         window = chunk[local_t : local_t + self.obs_window + self.pred_steps]
-        # window shape: (obs+pred, lon, lat, feat_total)
 
-        # Convert to float32 and select features
+        if self.flat_grid:
+            # Flat data: window shape (obs+pred, N_nodes, feat_total)
+            window = window[:, :, :self.n_feat].astype(np.float32)
+            window = (window - self.mean) / self.std
+
+            X_frames = window[:self.obs_window]   # (obs, N, feat)
+            Y_frames = window[self.obs_window:]   # (pred, N, feat)
+
+            N = self.n_nodes
+            # (obs, N, feat) -> (N, obs*feat)
+            X = X_frames.transpose(1, 0, 2).reshape(N, self.obs_window * self.n_feat)
+            # (pred, N, feat) -> (N, pred*feat)
+            Y = Y_frames.transpose(1, 0, 2).reshape(N, self.pred_steps * self.n_feat)
+
+            return torch.from_numpy(X), torch.from_numpy(Y)
+
+        # Regular grid data: window shape (obs+pred, lon, lat, feat_total)
         window = window[:, :, :, :self.n_feat].astype(np.float32)
 
         # Normalize
@@ -207,6 +236,14 @@ def load_chunked_datasets(
     lons = coords["longitude"]
     lats = coords["latitude"]
     
+    # Detect flat grid
+    info_file = os.path.join(data_path, "dataset_info.json")
+    is_flat = False
+    if os.path.exists(info_file):
+        with open(info_file) as f:
+            info = json.load(f)
+        is_flat = info.get("flat", False)
+    
     # Load variable list
     with open(os.path.join(data_path, "variables.json")) as f:
         var_names = json.load(f)
@@ -226,15 +263,33 @@ def load_chunked_datasets(
         split="test_only", n_features=n_feat, test_fraction=test_fraction,
     )
 
-    metadata = DatasetMetadata(
-        flattened=True,
-        num_latitudes=len(lats),
-        num_longitudes=len(lons),
-        num_features=n_feat,
-        obs_window=obs_window,
-        pred_window=pred_steps,
-    )
-    # Attach real coordinates
-    metadata.cordinates = (lats.astype(np.float32), lons.astype(np.float32))
+    if is_flat:
+        # Flat multi-resolution grid: lats and lons are paired (N,) arrays
+        metadata = DatasetMetadata(
+            flattened=True,
+            num_latitudes=0,  # not meaningful for flat grid
+            num_longitudes=0,
+            num_features=n_feat,
+            obs_window=obs_window,
+            pred_window=pred_steps,
+        )
+        metadata.flat_grid = True
+        metadata.num_grid_nodes = len(lats)
+        metadata.cordinates = (lats.astype(np.float32), lons.astype(np.float32))
+        if "is_regional" in coords:
+            metadata.is_regional = coords["is_regional"]
+        else:
+            metadata.is_regional = None
+    else:
+        metadata = DatasetMetadata(
+            flattened=True,
+            num_latitudes=len(lats),
+            num_longitudes=len(lons),
+            num_features=n_feat,
+            obs_window=obs_window,
+            pred_window=pred_steps,
+        )
+        metadata.flat_grid = False
+        metadata.cordinates = (lats.astype(np.float32), lons.astype(np.float32))
 
     return train_ds, val_ds, test_ds, metadata
