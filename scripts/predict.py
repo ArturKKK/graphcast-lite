@@ -195,6 +195,10 @@ def main():
     real_coords = None
     region_bounds_for_mesh = None
 
+    # Для flat grid всегда берём координаты из metadata (они уже загружены load_chunked_datasets)
+    if getattr(meta, 'flat_grid', False) and hasattr(meta, 'cordinates'):
+        real_coords = meta.cordinates
+
     coords_file = data_dir / "coords.npz"
     if args.prune_mesh and coords_file.exists():
         z = np.load(coords_file)
@@ -215,6 +219,7 @@ def main():
         coordinates=real_coords,
         region_bounds=region_bounds_for_mesh,
         mesh_buffer=args.mesh_buffer,
+        flat_grid=getattr(meta, 'flat_grid', False),
     )
     state = torch.load(ckpt_path, map_location=device)
     # При обрезке mesh размер _processing_edge_features меняется — убираем из state_dict,
@@ -226,7 +231,10 @@ def main():
     model = model.to(device)  # ensure ALL buffers (edge features etc.) are on device
     model.eval()
 
-    G = meta.num_longitudes * meta.num_latitudes
+    if getattr(meta, 'flat_grid', False):
+        G = meta.num_grid_nodes
+    else:
+        G = meta.num_longitudes * meta.num_latitudes
     C = exp_cfg.data.num_features_used
     P_model = exp_cfg.data.pred_window_used  # сколько шагов модель выдаёт за раз
     AR_STEPS = args.ar_steps if args.ar_steps else P_model  # сколько горизонтов хотим
@@ -293,6 +301,11 @@ def main():
         for _ in range(AR_STEPS):
             sm_pred_h.append(StreamingMetrics(C))
             sm_base_h.append(StreamingMetrics(C))
+
+    # --- accumulate predictions (if --save) ---
+    save_preds_list = [] if (args.save and not args.no_save) else None
+    save_gt_list = [] if (args.save and not args.no_save) else None
+    save_sample_offsets = [] if (args.save and not args.no_save) else None
 
     # --- inference loop ---
     print(f"[Main] Инференс ({max_samples} samples, DA={args.assim_method})...")
@@ -399,8 +412,37 @@ def main():
                 sm_pred_r.update(y_cpu[region_idxs], out_cpu[region_idxs])
                 sm_base_r.update(y_cpu[region_idxs], bl_cpu[region_idxs])
 
+            # --- save raw predictions ---
+            if save_preds_list is not None:
+                save_preds_list.append(out_cpu.clone())
+                save_gt_list.append(y_cpu.clone())
+                # Save temporal offset for temporal alignment with other datasets
+                if hasattr(test_ds, '_sample_indices') and i < len(test_ds._sample_indices):
+                    _, local_t = test_ds._sample_indices[i]
+                    save_sample_offsets.append(local_t)
+                else:
+                    save_sample_offsets.append(i)
+
             if (i+1) % 50 == 0:
                 print(f"  [{i+1}/{max_samples}] RMSE={sm_pred.rmse:.6f} ACC={sm_pred.acc:.4f}")
+
+    # --- persist predictions ---
+    if save_preds_list is not None:
+        preds_tensor = torch.stack(save_preds_list)  # (N, G, C*P)
+        gt_tensor = torch.stack(save_gt_list)         # (N, G, C*P)
+        save_dict = {
+            "predictions": preds_tensor,
+            "ground_truth": gt_tensor,
+            "n_features": C,
+            "ar_steps": AR_STEPS,
+            "obs_window": OBS,
+            "n_lon": meta.num_longitudes,
+            "n_lat": meta.num_latitudes,
+            "sample_offsets": save_sample_offsets,
+            "data_dir": str(data_dir),
+        }
+        torch.save(save_dict, save_path)
+        print(f"\n[Save] predictions → {save_path} (pred={preds_tensor.shape}, gt={gt_tensor.shape})")
 
     # === RESULTS ===
     N = sm_pred.n
