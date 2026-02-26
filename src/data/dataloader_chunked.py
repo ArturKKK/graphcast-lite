@@ -207,14 +207,16 @@ class TimeseriesChunkDataset(Dataset):
         X_frames = window[:self.obs_window]   # (obs, lon, lat, feat)
         Y_frames = window[self.obs_window:]   # (pred, lon, lat, feat)
 
-        # Flatten spatial dims: (lon, lat) -> (grid_nodes,)
+        # Flatten spatial dims: (lat, lon) -> (grid_nodes,)
+        # ВАЖНО: порядок (lat, lon) должен совпадать с np.meshgrid(lons, lats).reshape(-1)
+        # в create_graphs.py, где lat меняется медленно, lon — быстро (lat-major).
         grid_nodes = self.n_lon * self.n_lat
 
-        # Flatten obs*feat for X: (obs, lon, lat, feat) -> (lon*lat, obs*feat)
-        X = X_frames.transpose(1, 2, 0, 3).reshape(grid_nodes, self.obs_window * self.n_feat)
+        # (obs, lon, lat, feat) -> (lat, lon, obs, feat) -> (lat*lon, obs*feat)
+        X = X_frames.transpose(2, 1, 0, 3).reshape(grid_nodes, self.obs_window * self.n_feat)
 
-        # Flatten pred*feat for Y: (pred, lon, lat, feat) -> (lon*lat, pred*feat)
-        Y = Y_frames.transpose(1, 2, 0, 3).reshape(grid_nodes, self.pred_steps * self.n_feat)
+        # (pred, lon, lat, feat) -> (lat, lon, pred, feat) -> (lat*lon, pred*feat)
+        Y = Y_frames.transpose(2, 1, 0, 3).reshape(grid_nodes, self.pred_steps * self.n_feat)
 
         return torch.from_numpy(X), torch.from_numpy(Y)
 

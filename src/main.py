@@ -69,7 +69,8 @@ def load_model_from_experiment_config(
     return model
 
 
-def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str, resume: bool = False):
+def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str,
+                   resume: bool = False, pretrained_ckpt: str = None):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -147,6 +148,18 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str, r
 
     model = model.to(device)
 
+    # Загрузка pretrained весов (fine-tuning из другой модели)
+    if pretrained_ckpt and os.path.exists(pretrained_ckpt):
+        print(f"\n>>> Загружаю pretrained веса: {pretrained_ckpt}")
+        state = torch.load(pretrained_ckpt, map_location=device)
+        # strict=False — пропустить буферы, чьи размеры не совпадут
+        missing, unexpected = model.load_state_dict(state, strict=False)
+        if missing:
+            print(f"  Missing keys ({len(missing)}): {missing[:5]}...")
+        if unexpected:
+            print(f"  Unexpected keys ({len(unexpected)}): {unexpected[:5]}...")
+        print(f"  Pretrained веса загружены.\n")
+
     # Создание оптимизатора — алгоритма, который меняет веса модели по градиентам, чтобы минимизировать loss.
     optimizer = Adam(params=model.parameters(), lr=experiment_config.learning_rate)
 
@@ -176,6 +189,12 @@ def main():
     experiment_directory = sys.argv[1]
     resume = "--resume" in sys.argv
 
+    # --pretrained path/to/model.pth — загрузить веса другой модели для fine-tuning
+    pretrained_ckpt = None
+    if "--pretrained" in sys.argv:
+        idx = sys.argv.index("--pretrained")
+        pretrained_ckpt = sys.argv[idx + 1]
+
     experiment_config_path = os.path.join(
         experiment_directory, FileNames.EXPERIMENT_CONFIG
     )
@@ -189,7 +208,7 @@ def main():
 
     run_experiment(
         experiment_config=experiment_config, results_save_dir=results_save_dir,
-        resume=resume,
+        resume=resume, pretrained_ckpt=pretrained_ckpt,
     )
 
 
