@@ -18,6 +18,37 @@ import os
 import numpy as np # Нужно для генерации весов
 from datetime import datetime
 
+# --- ЧЕКПОИНТИНГ (для возобновления обучения) ---
+def save_checkpoint(path, model, optimiser, epoch, ar_steps, best_val_loss,
+                    patience_counter, train_losses, val_losses):
+    """Сохраняет полное состояние обучения для возобновления."""
+    torch.save({
+        'epoch': epoch,
+        'ar_steps': ar_steps,
+        'best_val_loss': best_val_loss,
+        'patience_counter': patience_counter,
+        'train_losses': train_losses,
+        'val_losses': val_losses,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimiser.state_dict(),
+    }, path)
+
+
+def load_checkpoint(path, model, optimiser, device):
+    """Загружает чекпоинт и возвращает состояние обучения."""
+    ckpt = torch.load(path, map_location=device)
+    model.load_state_dict(ckpt['model_state_dict'])
+    optimiser.load_state_dict(ckpt['optimizer_state_dict'])
+    return {
+        'start_epoch': ckpt['epoch'] + 1,  # следующая эпоха
+        'ar_steps': ckpt['ar_steps'],
+        'best_val_loss': ckpt['best_val_loss'],
+        'patience_counter': ckpt['patience_counter'],
+        'train_losses': ckpt['train_losses'],
+        'val_losses': ckpt['val_losses'],
+    }
+
+
 # --- НОВЫЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 def get_lat_weights(lat_dim, lon_dim, device, flat_lats=None):
     """Создает веса (cos(lat)) чтобы не переобучаться на полюсах.
@@ -194,7 +225,8 @@ def train(
     # НОВОЕ: Метаданные нужны, чтобы узнать размеры сетки для весов
     dataset_metadata=None, 
     print_losses: bool = True,
-    wandb_log: bool = True, 
+    wandb_log: bool = True,
+    resume_checkpoint: str = None,  # путь к checkpoint.pth для возобновления
 ):
     # --- Инициализация весов (Новое) ---
     lat_weights = None
@@ -223,7 +255,20 @@ def train(
         wandb.init(entity="graphml-group4", project="weather-prediction", config=dict(config), name=config.wandb_name)  
 
     best_val_loss = float("inf")  
-    patience_counter = 0  
+    patience_counter = 0
+    start_epoch = 0  # с какой эпохи начинаем
+
+    # --- Возобновление из чекпоинта ---
+    if resume_checkpoint and os.path.exists(resume_checkpoint):
+        ckpt_state = load_checkpoint(resume_checkpoint, model, optimiser, device)
+        start_epoch = ckpt_state['start_epoch']
+        ar_steps = ckpt_state['ar_steps']
+        best_val_loss = ckpt_state['best_val_loss']
+        patience_counter = ckpt_state['patience_counter']
+        train_losses = ckpt_state['train_losses']
+        val_losses = ckpt_state['val_losses']
+        print(f"\n>>> ВОЗОБНОВЛЕНИЕ с эпохи {start_epoch + 1}, AR={ar_steps}, "
+              f"best_val_loss={best_val_loss:.5f}, patience={patience_counter} <<<\n")
 
     # --- File logging (можно отключить nohup и просто смотреть файл) ---
     log_path = os.path.join(results_save_dir, "training_log.txt")
@@ -233,21 +278,27 @@ def train(
             f.write(msg + "\n")
     _log(f"=== Training started: {datetime.now().isoformat()} ===")
     _log(f"epochs={num_epochs}  max_ar={max_ar}  epochs_per_stage={epochs_per_stage}")
+    if resume_checkpoint and os.path.exists(resume_checkpoint):
+        _log(f">>> Resumed from epoch {start_epoch}, AR={ar_steps}, best_vl={best_val_loss:.5f}")
     _log(f"{'epoch':>5}  {'ar':>2}  {'train_loss':>10}  {'val_loss':>10}  {'val_ACC':>8}  {'best_vl':>10}  {'patience':>8}  timestamp")
     _log("-" * 90)
 
-    intial_val_loss, initial_val_acc = test(model, val_dataloader, loss_fn, device, lat_weights)  
-    if print_losses:  
-        print(f"[Init] val_loss={intial_val_loss:.5f} val_acc={initial_val_acc:.4f}")
-    _log(f"{'init':>5}  {'--':>2}  {'--':>10}  {intial_val_loss:10.5f}  {initial_val_acc:8.4f}  {'--':>10}  {'--':>8}  {datetime.now().strftime('%H:%M:%S')}")
+    if start_epoch == 0:
+        intial_val_loss, initial_val_acc = test(model, val_dataloader, loss_fn, device, lat_weights)  
+        if print_losses:  
+            print(f"[Init] val_loss={intial_val_loss:.5f} val_acc={initial_val_acc:.4f}")
+        _log(f"{'init':>5}  {'--':>2}  {'--':>10}  {intial_val_loss:10.5f}  {initial_val_acc:8.4f}  {'--':>10}  {'--':>8}  {datetime.now().strftime('%H:%M:%S')}")
 
     # Основной цикл обучения  
-    for epoch in range(num_epochs):  
+    for epoch in range(start_epoch, num_epochs):  
         print()
         
         # --- Увеличение сложности ---
-        if epoch > 0 and (epoch % epochs_per_stage == 0) and (ar_steps < max_ar):
-            ar_steps += 1
+        # Вычисляем правильный AR-уровень для текущей эпохи
+        # (важно при resume: epoch может быть > 0 с первой итерации)
+        correct_ar = min(1 + epoch // epochs_per_stage, max_ar)
+        if correct_ar > ar_steps:
+            ar_steps = correct_ar
             print(f"\n>>> УРОВЕНЬ СЛОЖНОСТИ ПОВЫШЕН! Теперь обучаем на {ar_steps} шага(ов) вперед. <<<\n")
             
             # ВАЖНО: Сбрасываем счетчик Early Stopping!
@@ -290,6 +341,15 @@ def train(
 
         # --- Пишем строку в лог-файл ---
         _log(f"{epoch+1:5d}  {ar_steps:2d}  {epoch_train_loss:10.5f}  {epoch_val_loss:10.5f}  {epoch_val_acc:8.4f}  {best_val_loss:10.5f}  {patience_counter:8d}  {datetime.now().strftime('%H:%M:%S')}")
+
+        # --- Сохраняем чекпоинт для возможного возобновления ---
+        save_checkpoint(
+            path=os.path.join(results_save_dir, FileNames.CHECKPOINT),
+            model=model, optimiser=optimiser, epoch=epoch,
+            ar_steps=ar_steps, best_val_loss=best_val_loss,
+            patience_counter=patience_counter,
+            train_losses=train_losses, val_losses=val_losses,
+        )
 
         if patience_counter >= config.early_stopping_patience:  
             print(f"Early stopping.")  

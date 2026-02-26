@@ -11,3 +11,4 @@ class FileNames:
     TEST_Y = "y_test.pt"
     SAVED_MODEL = "best_model.pth"
     SAVED_RESULTS = "results.json"
+    CHECKPOINT = "checkpoint.pth"

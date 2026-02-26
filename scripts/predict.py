@@ -153,6 +153,9 @@ def main():
     # --- data dir ---
     if args.data_dir:
         data_dir = Path(args.data_dir)
+    elif getattr(exp_cfg, 'data_dir', None):
+        # Multires и другие конфиги с явным data_dir
+        data_dir = Path(exp_cfg.data_dir)
     else:
         ds_name = str(exp_cfg.data.dataset_name.value
                       if hasattr(exp_cfg.data.dataset_name, "value")

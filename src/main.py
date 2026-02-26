@@ -69,7 +69,7 @@ def load_model_from_experiment_config(
     return model
 
 
-def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
+def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str, resume: bool = False):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -150,6 +150,9 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
     # Создание оптимизатора — алгоритма, который меняет веса модели по градиентам, чтобы минимизировать loss.
     optimizer = Adam(params=model.parameters(), lr=experiment_config.learning_rate)
 
+    # Путь к чекпоинту для возобновления
+    checkpoint_path = os.path.join(results_save_dir, "checkpoint.pth") if resume else None
+
     results = train(
         model=model,
         train_dataloader=train_dataloader,
@@ -163,6 +166,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
         dataset_metadata=dataset_metadata,
         print_losses=True,
         wandb_log=experiment_config.wandb_log,
+        resume_checkpoint=checkpoint_path,
     )
 
     return results
@@ -170,6 +174,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str):
 
 def main():
     experiment_directory = sys.argv[1]
+    resume = "--resume" in sys.argv
 
     experiment_config_path = os.path.join(
         experiment_directory, FileNames.EXPERIMENT_CONFIG
@@ -183,7 +188,8 @@ def main():
     experiment_config = ExperimentConfig(**load_from_json_file(experiment_config_path))
 
     run_experiment(
-        experiment_config=experiment_config, results_save_dir=results_save_dir
+        experiment_config=experiment_config, results_save_dir=results_save_dir,
+        resume=resume,
     )
 
 
