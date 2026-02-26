@@ -491,6 +491,8 @@ class WeatherPrediction(nn.Module):
         pipeline_config: PipelineConfig,
         data_config: DataConfig,
         device,
+        region_bounds=None,
+        mesh_buffer: float = 15.0,
     ):
         super().__init__()
 
@@ -502,7 +504,8 @@ class WeatherPrediction(nn.Module):
 
         # Инициализация свойств grid и mesh (координаты, числа узлов, иерархия сеток)
         self._init_grid_properties(grid_lat=cordinates[0], grid_lon=cordinates[1])
-        self._init_mesh_properties(graph_config)
+        self._init_mesh_properties(graph_config, region_bounds=region_bounds,
+                                   mesh_buffer=mesh_buffer)
         self.using_sparse_gat = pipeline_config.processor.gcn.layer_type == GraphLayerType.SparseGATConv
 
         self._total_nodes = self._num_grid_nodes + self._num_mesh_nodes
@@ -654,11 +657,28 @@ class WeatherPrediction(nn.Module):
         self._grid_lon = grid_lon.astype(np.float32)
         self._num_grid_nodes = grid_lat.shape[0] * grid_lon.shape[0]
 
-    def _init_mesh_properties(self, graph_config: GraphBuildingConfig):
-        """Строим иерархию сеток на сфере и извлекаем координаты узлов самого тонкого уровня."""
+    def _init_mesh_properties(self, graph_config: GraphBuildingConfig,
+                              region_bounds=None, mesh_buffer: float = 15.0):
+        """Строим иерархию сеток на сфере и извлекаем координаты узлов самого тонкого уровня.
+
+        Если передан region_bounds=(lat_min, lat_max, lon_min, lon_max), вырезаем
+        только часть mesh вблизи региона, чтобы GCN-процессор работал на компактном
+        подграфе вместо полного глобуса (40k+ вершин).
+        """
+        from src.mesh.create_mesh import prune_mesh_to_region
+
         self._meshes = get_hierarchy_of_triangular_meshes_for_sphere(
             splits=max(graph_config.mesh_levels)
         )
+
+        if region_bounds is not None:
+            lat_min, lat_max, lon_min, lon_max = region_bounds
+            self._meshes = prune_mesh_to_region(
+                self._meshes,
+                lat_min, lat_max, lon_min, lon_max,
+                buffer_deg=mesh_buffer,
+            )
+
         self._finest_mesh = self._meshes[-1]
         self._num_mesh_nodes = len(self._finest_mesh.vertices)
 

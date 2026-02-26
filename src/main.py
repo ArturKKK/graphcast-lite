@@ -34,21 +34,25 @@ def set_random_seeds(seed: int = 42):
 # data_config (сколько фич/окон реально использовать),
 # device.
 def load_model_from_experiment_config(
-    experiment_config: ExperimentConfig, device, dataset_metadata: DatasetMetadata
+    experiment_config: ExperimentConfig, device, dataset_metadata: DatasetMetadata,
+    coordinates=None, region_bounds=None, mesh_buffer: float = 15.0,
 ) -> WeatherPrediction:
 
-    lats = np.linspace(
-        start=-90,
-        stop=90,
-        num=dataset_metadata.num_latitudes,
-        endpoint=True,
-    )
-    longs = np.linspace(
-        start=0,
-        stop=360,
-        num=dataset_metadata.num_longitudes,
-        endpoint=False,
-    )
+    if coordinates is not None:
+        lats, longs = coordinates
+    else:
+        lats = np.linspace(
+            start=-90,
+            stop=90,
+            num=dataset_metadata.num_latitudes,
+            endpoint=True,
+        )
+        longs = np.linspace(
+            start=0,
+            stop=360,
+            num=dataset_metadata.num_longitudes,
+            endpoint=False,
+        )
 
     model = WeatherPrediction(
         cordinates=(lats, longs),
@@ -56,6 +60,8 @@ def load_model_from_experiment_config(
         pipeline_config=experiment_config.pipeline,
         data_config=experiment_config.data,
         device=device,
+        region_bounds=region_bounds,
+        mesh_buffer=mesh_buffer,
     )
 
     return model

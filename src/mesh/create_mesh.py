@@ -222,6 +222,104 @@ def filter_mesh(meshes: List[TriangularMesh], mesh_levels: list[int]):
     mesh_we_want = TriangularMesh(vertices=meshes[mesh_levels[0]].vertices, faces=faces)
     return mesh_we_want
 
+def prune_mesh_to_region(
+    meshes: List[TriangularMesh],
+    lat_min: float, lat_max: float,
+    lon_min: float, lon_max: float,
+    buffer_deg: float = 15.0,
+) -> List[TriangularMesh]:
+    """Обрезает иерархию mesh до вершин вблизи заданного региона.
+
+    Оставляет только вершины, попадающие в bounding-box региона + buffer,
+    и только грани, все 3 вершины которых выжили. Переиндексирует всё
+    в новое непрерывное пространство индексов.
+
+    Благодаря тому, что иерархия mesh вложенная (первые V_k вершин уровня k+1
+    совпадают с вершинами уровня k), маппинг строится по finest mesh и
+    применяется ко всем уровням.
+
+    Parameters
+    ----------
+    meshes : List[TriangularMesh]
+        Иерархия от get_hierarchy_of_triangular_meshes_for_sphere.
+    lat_min, lat_max : float
+        Широтные границы региона (градусы, -90..90).
+    lon_min, lon_max : float
+        Долготные границы региона (градусы, 0..360).
+    buffer_deg : float
+        Расширение bounding box во все стороны (градусы).
+
+    Returns
+    -------
+    List[TriangularMesh]
+        Обрезанная иерархия mesh того же размера.
+    """
+    from src.utils import get_mesh_lat_long
+
+    finest = meshes[-1]
+    mesh_lats, mesh_lons = get_mesh_lat_long(finest)
+
+    # Расширяем границы на buffer
+    lat_lo = max(lat_min - buffer_deg, -90.0)
+    lat_hi = min(lat_max + buffer_deg, 90.0)
+    lon_lo = lon_min - buffer_deg
+    lon_hi = lon_max + buffer_deg
+
+    lat_mask = (mesh_lats >= lat_lo) & (mesh_lats <= lat_hi)
+
+    # Долготы: 0..360, нужно корректно обрабатывать переход через 0/360
+    if lon_lo < 0:
+        lon_mask = (mesh_lons >= (lon_lo % 360)) | (mesh_lons <= lon_hi)
+    elif lon_hi > 360:
+        lon_mask = (mesh_lons >= lon_lo) | (mesh_lons <= (lon_hi % 360))
+    else:
+        lon_mask = (mesh_lons >= lon_lo) & (mesh_lons <= lon_hi)
+
+    mask = lat_mask & lon_mask  # shape: [V_finest]
+
+    n_surviving = mask.sum()
+    print(f"[prune_mesh] Region [{lat_min},{lat_max}]×[{lon_min},{lon_max}] + buffer={buffer_deg}° "
+          f"→ {n_surviving}/{len(mask)} mesh vertices")
+
+    if n_surviving == 0:
+        raise ValueError("Ни одна вершина mesh не попала в регион! Проверьте координаты.")
+
+    # Маппинг old→new для finest mesh
+    old_to_new = np.full(len(finest.vertices), -1, dtype=np.int32)
+    surviving_indices = np.where(mask)[0]
+    old_to_new[surviving_indices] = np.arange(n_surviving, dtype=np.int32)
+
+    # Вершины finest после обрезки
+    finest_pruned_verts = finest.vertices[mask]
+
+    pruned_meshes: List[TriangularMesh] = []
+    for mesh in meshes:
+        n_v = len(mesh.vertices)
+        level_mask = mask[:n_v]
+
+        # Грани: оставляем только те, где ВСЕ 3 вершины выжили
+        face_survive = (
+            level_mask[mesh.faces[:, 0]]
+            & level_mask[mesh.faces[:, 1]]
+            & level_mask[mesh.faces[:, 2]]
+        )
+        surviving_faces = mesh.faces[face_survive]
+
+        # Переиндексация граней в пространство finest pruned
+        new_faces = old_to_new[surviving_faces]
+
+        # Все уровни используют общий пул вершин finest — это корректно,
+        # т.к. filter_mesh() тоже берёт vertices=[finest].
+        pruned_meshes.append(
+            TriangularMesh(
+                vertices=finest_pruned_verts.astype(np.float32),
+                faces=new_faces.astype(np.int32),
+            )
+        )
+
+    return pruned_meshes
+
+
 def get_edges_from_faces(faces) -> np.ndarray:
     """
     Get edges from faces.

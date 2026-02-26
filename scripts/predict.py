@@ -114,6 +114,11 @@ def main():
                     help="макс. тестовых сэмплов (default: 200 для больших сеток)")
     ap.add_argument("--region", nargs=4, type=float,
                     metavar=("LAT_MIN","LAT_MAX","LON_MIN","LON_MAX"))
+    ap.add_argument("--prune-mesh", action="store_true",
+                    help="Обрезать mesh до bounding-box данных + буфер. "
+                         "Нужно для инференса на региональных датасетах (вместо полного глобуса).")
+    ap.add_argument("--mesh-buffer", type=float, default=15.0,
+                    help="Буфер (градусы) вокруг данных при prune-mesh (default: 15)")
     ap.add_argument("--per-channel", action="store_true")
     ap.add_argument("--ar-steps", type=int, default=None,
                     help="Число AR-шагов для авторегрессионного инференса. "
@@ -186,9 +191,38 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # --- load model ---
-    model = load_model_from_experiment_config(exp_cfg, device, meta)
+    # Определяем, используем ли реальные координаты из датасета (для регионов)
+    real_coords = None
+    region_bounds_for_mesh = None
+
+    coords_file = data_dir / "coords.npz"
+    if args.prune_mesh and coords_file.exists():
+        z = np.load(coords_file)
+        real_lats = z["latitude"].astype(np.float32)
+        real_lons = z["longitude"].astype(np.float32)
+        real_coords = (real_lats, real_lons)
+        # Bounding box данных → region_bounds для обрезки mesh
+        region_bounds_for_mesh = (
+            float(real_lats.min()), float(real_lats.max()),
+            float(real_lons.min()), float(real_lons.max()),
+        )
+        print(f"[prune-mesh] Реальные координаты: "
+              f"lat=[{real_lats.min():.2f},{real_lats.max():.2f}] "
+              f"lon=[{real_lons.min():.2f},{real_lons.max():.2f}]")
+
+    model = load_model_from_experiment_config(
+        exp_cfg, device, meta,
+        coordinates=real_coords,
+        region_bounds=region_bounds_for_mesh,
+        mesh_buffer=args.mesh_buffer,
+    )
     state = torch.load(ckpt_path, map_location=device)
-    model.load_state_dict(state)
+    # При обрезке mesh размер _processing_edge_features меняется — убираем из state_dict,
+    # т.к. буфер уже пересчитан при _init_ с правильными размерами.
+    if region_bounds_for_mesh is not None:
+        state = {k: v for k, v in state.items()
+                 if not k.startswith("_processing_edge_features")}
+    model.load_state_dict(state, strict=False)
     model = model.to(device)  # ensure ALL buffers (edge features etc.) are on device
     model.eval()
 
