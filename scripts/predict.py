@@ -503,11 +503,38 @@ def main():
             "z@500": "m²/s²", "q@500": "kg/kg",
         }
 
+        # --- Per-horizon per-channel (ключевая таблица) ---
+        if AR_STEPS > 1 and sm_pred_h and std is not None:
+            # Ключевые переменные для компактной таблицы
+            key_vars = ["t2m", "10u", "10v", "msl", "z@500", "t@850", "u@850", "v@850", "z@850"]
+            key_idx = [i for i, v in enumerate(var_order[:C]) if v in key_vars]
+            
+            print(f"\nPer-horizon per-channel RMSE (physical units):")
+            header = f"  {'var':>10s} {'unit':>6s}"
+            for p in range(len(sm_pred_h)):
+                header += f" {'+'+ str((p+1)*6) + 'h':>8s}"
+            print(header)
+            
+            for c in key_idx:
+                name = var_order[c]
+                unit = UNITS.get(name, "?")
+                row = f"  {name:>10s} {unit:>6s}"
+                for p in range(len(sm_pred_h)):
+                    phys_rmse = sm_pred_h[p].rmse_per_channel[c] * std[c]
+                    if "z@" in name or name == "z_surf":
+                        row += f" {phys_rmse/9.81:8.1f}m"
+                    elif name == "t2m" or name.startswith("t@"):
+                        row += f" {phys_rmse:7.2f}°C"
+                    else:
+                        row += f" {phys_rmse:8.2f}"
+                print(row)
+
+        # --- Overall per-channel ---
         rmse_pc = sm_pred.rmse_per_channel
         acc_pc = sm_pred.acc_per_channel
 
         if std is not None:
-            print(f"\nPer-channel metrics (physical units):")
+            print(f"\nPer-channel metrics overall (physical units, avg over {AR_STEPS} horizons):")
             print(f"  {'#':>3s} {'var':>10s} {'ACC':>8s} {'RMSE_norm':>10s} {'RMSE_phys':>12s} {'unit':>8s}")
             for c, name in enumerate(var_order[:C]):
                 unit = UNITS.get(name, "?")
