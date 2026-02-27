@@ -299,8 +299,24 @@ def main():
 
     # --- region ---
     region_idxs = None
-    if getattr(meta, 'is_regional', None) is not None:
-        # Flat multires grid: region mask уже в metadata
+    coords_npz = data_dir / "coords.npz"
+    if args.region and coords_npz.exists():
+        # --region задан явно → фильтруем по bbox из coords.npz (работает и для flat grid)
+        z = np.load(coords_npz)
+        c_lats = z["latitude"].astype(np.float32)
+        c_lons = z["longitude"].astype(np.float32)
+        lat_min_r, lat_max_r, lon_min_r, lon_max_r = args.region
+        if c_lats.ndim == 1 and len(c_lats) != G:
+            # Регулярная сетка (lats, lons — оси)
+            region_idxs = region_node_indices(lat_min_r, lat_max_r, lon_min_r, lon_max_r, c_lats, c_lons)
+        else:
+            # Flat grid (multires): координаты уже (N,)
+            mask = ((c_lats >= lat_min_r) & (c_lats <= lat_max_r) &
+                    (c_lons >= lon_min_r) & (c_lons <= lon_max_r))
+            region_idxs = np.where(mask)[0]
+        print(f"[Region] {len(region_idxs)} nodes (--region [{lat_min_r},{lat_max_r}]N x [{lon_min_r},{lon_max_r}]E)")
+    elif getattr(meta, 'is_regional', None) is not None:
+        # Flat multires grid: region mask из metadata (весь ROI)
         region_idxs = np.where(meta.is_regional)[0]
         print(f"[Region] {len(region_idxs)} nodes (from is_regional mask)")
     elif args.region:
