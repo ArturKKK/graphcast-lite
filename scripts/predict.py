@@ -314,11 +314,16 @@ def main():
     sm_pred_r = StreamingMetrics(C) if region_idxs is not None else None
     sm_base_r = StreamingMetrics(C) if region_idxs is not None else None
 
+    sm_pred_rh, sm_base_rh = [], []  # per-horizon region metrics
+
     sm_pred_h, sm_base_h = [], []
     if AR_STEPS > 1:
         for _ in range(AR_STEPS):
             sm_pred_h.append(StreamingMetrics(C))
             sm_base_h.append(StreamingMetrics(C))
+            if region_idxs is not None:
+                sm_pred_rh.append(StreamingMetrics(C))
+                sm_base_rh.append(StreamingMetrics(C))
 
     # --- accumulate predictions (if --save) ---
     save_preds_list = [] if (args.save and not args.no_save) else None
@@ -429,6 +434,11 @@ def main():
             if region_idxs is not None:
                 sm_pred_r.update(y_cpu[region_idxs], out_cpu[region_idxs])
                 sm_base_r.update(y_cpu[region_idxs], bl_cpu[region_idxs])
+                if effective_P > 1:
+                    for p in range(effective_P):
+                        sl = slice(p*C, (p+1)*C)
+                        sm_pred_rh[p].update(y_cpu[region_idxs][:, sl], out_cpu[region_idxs][:, sl])
+                        sm_base_rh[p].update(y_cpu[region_idxs][:, sl], bl_cpu[region_idxs][:, sl])
 
             # --- save raw predictions ---
             if save_preds_list is not None:
@@ -559,6 +569,75 @@ def main():
         print(f"\n--- Region {region_label} ({len(region_idxs)} nodes) ---")
         print(f"RMSE={sm_pred_r.rmse:.6f} | base={sm_base_r.rmse:.6f} | skill={sk_r*100:.2f}%")
         print(f"ACC={sm_pred_r.acc:.4f} | base={sm_base_r.acc:.4f}")
+
+        # Per-horizon region
+        if AR_STEPS > 1 and sm_pred_rh:
+            print(f"\n  Per-horizon (region):")
+            for p in range(len(sm_pred_rh)):
+                sp, sb = sm_pred_rh[p], sm_base_rh[p]
+                sk = 1.0 - (sp.rmse / (sb.rmse + 1e-12))
+                print(f"    +{(p+1)*6:02d}h: RMSE={sp.rmse:.6f} | base={sb.rmse:.6f} | skill={sk*100:.2f}% | ACC={sp.acc:.4f} (base {sb.acc:.4f})")
+
+        # Per-channel region
+        if args.per_channel:
+            var_path = Path(data_dir) / "variables.json"
+            var_order_r = json.loads(var_path.read_text()) if var_path.exists() else [f"ch{c}" for c in range(C)]
+            scalers_path_r = Path(data_dir) / "scalers.npz"
+            std_r = None
+            if scalers_path_r.exists():
+                scl_r = np.load(scalers_path_r)
+                std_r = scl_r["std"].astype(np.float64)[:C]
+
+            UNITS_R = {
+                "t2m": "K", "10u": "m/s", "10v": "m/s", "msl": "Pa",
+                "tp": "m", "sp": "Pa", "tcwv": "kg/m²",
+                "z_surf": "m²/s²", "lsm": "-",
+                "t@850": "K", "u@850": "m/s", "v@850": "m/s",
+                "z@850": "m²/s²", "q@850": "kg/kg",
+                "t@500": "K", "u@500": "m/s", "v@500": "m/s",
+                "z@500": "m²/s²", "q@500": "kg/kg",
+            }
+
+            # Per-horizon per-channel region table
+            if AR_STEPS > 1 and sm_pred_rh and std_r is not None:
+                key_vars_r = ["t2m", "10u", "10v", "msl", "t@850", "u@850", "v@850", "z@850", "z@500"]
+                key_idx_r = [i for i, v in enumerate(var_order_r[:C]) if v in key_vars_r]
+
+                print(f"\n  Per-horizon per-channel RMSE — REGION ({len(region_idxs)} nodes):")
+                header = f"    {'var':>10s} {'unit':>6s}"
+                for p in range(len(sm_pred_rh)):
+                    header += f" {'+'+ str((p+1)*6) + 'h':>8s}"
+                print(header)
+
+                for c in key_idx_r:
+                    name = var_order_r[c]
+                    unit = UNITS_R.get(name, "?")
+                    row = f"    {name:>10s} {unit:>6s}"
+                    for p in range(len(sm_pred_rh)):
+                        phys_rmse = sm_pred_rh[p].rmse_per_channel[c] * std_r[c]
+                        if "z@" in name or name == "z_surf":
+                            row += f" {phys_rmse/9.81:8.1f}m"
+                        elif name == "t2m" or name.startswith("t@"):
+                            row += f" {phys_rmse:7.2f}°C"
+                        else:
+                            row += f" {phys_rmse:8.2f}"
+                    print(row)
+
+            # Overall per-channel region
+            rmse_pc_r = sm_pred_r.rmse_per_channel
+            acc_pc_r = sm_pred_r.acc_per_channel
+            if std_r is not None:
+                print(f"\n  Per-channel region (physical units, avg over {AR_STEPS} horizons):")
+                print(f"    {'#':>3s} {'var':>10s} {'ACC':>8s} {'RMSE_norm':>10s} {'RMSE_phys':>12s} {'unit':>8s}")
+                for c, name in enumerate(var_order_r[:C]):
+                    unit = UNITS_R.get(name, "?")
+                    phys_rmse = rmse_pc_r[c] * std_r[c]
+                    extra = ""
+                    if "z@" in name or name == "z_surf":
+                        extra = f"  (≈{phys_rmse/9.81:.1f} gpm)"
+                    elif name == "t2m" or name.startswith("t@"):
+                        extra = f"  (≈{phys_rmse:.2f} °C)"
+                    print(f"    {c:3d} {name:>10s} {acc_pc_r[c]:8.4f} {rmse_pc_r[c]:10.4f} {phys_rmse:12.4f} {unit:>8s}{extra}")
 
     print("=" * 60)
 
