@@ -59,8 +59,10 @@ class StreamingMetrics:
         self.total_elem = 0
         self.sum_se = 0.0
         self.sum_ae = 0.0
+        self.sum_se_per_ch = np.zeros(num_channels, dtype=np.float64)
+        self.elem_per_ch = np.zeros(num_channels, dtype=np.int64)
         self.sum_acc = np.zeros(num_channels, dtype=np.float64)
-        self.acc_count = np.zeros(num_channels, dtype=np.int64)  # сколько раз добавляли ACC в каждый канал
+        self.acc_count = np.zeros(num_channels, dtype=np.int64)
 
     def update(self, y_true: torch.Tensor, y_pred: torch.Tensor):
         """y_true, y_pred: [G, C*P] or [G, C]"""
@@ -69,16 +71,19 @@ class StreamingMetrics:
         self.sum_ae += err.abs().sum().item()
         self.total_elem += y_true.numel()
 
-        # spatial ACC per channel
+        # per-channel SE & spatial ACC
         CP = y_true.shape[1]
         eps = 1e-8
         for c in range(CP):
             yt = y_true[:, c].float()
             yp = y_pred[:, c].float()
+            ch = c % self.C
+            se_c = (yp - yt).pow(2).sum().item()
+            self.sum_se_per_ch[ch] += se_c
+            self.elem_per_ch[ch] += yt.numel()
             yt_a = yt - yt.mean()
             yp_a = yp - yp.mean()
             corr = (yt_a * yp_a).sum() / (yt_a.norm() * yp_a.norm() + eps)
-            ch = c % self.C
             self.sum_acc[ch] += corr.item()
             self.acc_count[ch] += 1
         self.n += 1
@@ -98,6 +103,12 @@ class StreamingMetrics:
     @property
     def acc_per_channel(self):
         return self.sum_acc / np.maximum(self.acc_count, 1)
+
+    @property
+    def rmse_per_channel(self):
+        """Normalized RMSE per channel."""
+        mse_pc = self.sum_se_per_ch / np.maximum(self.elem_per_ch, 1)
+        return np.sqrt(mse_pc)
 
     @property
     def acc(self):
@@ -474,10 +485,43 @@ def main():
     if args.per_channel:
         var_path = Path(data_dir) / "variables.json"
         var_order = json.loads(var_path.read_text()) if var_path.exists() else [f"ch{c}" for c in range(C)]
-        print(f"\nPer-channel ACC:")
+
+        # --- Загружаем scalers для денормализации ---
+        scalers_path = Path(data_dir) / "scalers.npz"
+        std = None
+        if scalers_path.exists():
+            scl = np.load(scalers_path)
+            std = scl["std"].astype(np.float64)[:C]
+
+        UNITS = {
+            "t2m": "K", "10u": "m/s", "10v": "m/s", "msl": "Pa",
+            "tp": "m", "sp": "Pa", "tcwv": "kg/m²",
+            "z_surf": "m²/s²", "lsm": "-",
+            "t@850": "K", "u@850": "m/s", "v@850": "m/s",
+            "z@850": "m²/s²", "q@850": "kg/kg",
+            "t@500": "K", "u@500": "m/s", "v@500": "m/s",
+            "z@500": "m²/s²", "q@500": "kg/kg",
+        }
+
+        rmse_pc = sm_pred.rmse_per_channel
         acc_pc = sm_pred.acc_per_channel
-        for c, name in enumerate(var_order[:C]):
-            print(f"  {c:2d}:{name:>10s}  ACC={acc_pc[c]:.4f}")
+
+        if std is not None:
+            print(f"\nPer-channel metrics (physical units):")
+            print(f"  {'#':>3s} {'var':>10s} {'ACC':>8s} {'RMSE_norm':>10s} {'RMSE_phys':>12s} {'unit':>8s}")
+            for c, name in enumerate(var_order[:C]):
+                unit = UNITS.get(name, "?")
+                phys_rmse = rmse_pc[c] * std[c]
+                extra = ""
+                if "z@" in name or name == "z_surf":
+                    extra = f"  (≈{phys_rmse/9.81:.1f} gpm)"
+                elif name == "t2m" or name.startswith("t@"):
+                    extra = f"  (≈{phys_rmse:.2f} °C)"
+                print(f"  {c:3d} {name:>10s} {acc_pc[c]:8.4f} {rmse_pc[c]:10.4f} {phys_rmse:12.4f} {unit:>8s}{extra}")
+        else:
+            print(f"\nPer-channel ACC & RMSE (normalized):")
+            for c, name in enumerate(var_order[:C]):
+                print(f"  {c:2d}:{name:>10s}  ACC={acc_pc[c]:.4f}  RMSE={rmse_pc[c]:.4f}")
 
     if region_idxs is not None:
         sk_r = 1.0 - (sm_pred_r.rmse / (sm_base_r.rmse + 1e-12))
