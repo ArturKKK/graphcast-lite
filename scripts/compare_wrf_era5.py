@@ -96,9 +96,14 @@ def load_era5(era5_dir, scalers_dir=None):
     n_lat  = info["n_lat"]
     n_feat = info["n_feat"]
 
-    data = np.load(era5_dir / "data.npy", mmap_mode="r")
-    if data.ndim == 1:
-        data = data.reshape(n_time, n_lon, n_lat, n_feat)
+    data_path = era5_dir / "data.npy"
+    try:
+        data = np.memmap(str(data_path), dtype=np.float16, mode="r",
+                         shape=(n_time, n_lon, n_lat, n_feat))
+    except Exception:
+        data = np.load(data_path, allow_pickle=True, mmap_mode="r")
+        if data.ndim == 1:
+            data = data.reshape(n_time, n_lon, n_lat, n_feat)
 
     # Денормализация: x_scaled = x_norm * std + mean
     # (в scaled units: hPa для давления, m для геопотенциала, K для T, m/s для ветра)
