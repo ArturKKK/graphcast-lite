@@ -288,7 +288,11 @@ def main():
 
     # --- region ---
     region_idxs = None
-    if args.region:
+    if getattr(meta, 'is_regional', None) is not None:
+        # Flat multires grid: region mask уже в metadata
+        region_idxs = np.where(meta.is_regional)[0]
+        print(f"[Region] {len(region_idxs)} nodes (from is_regional mask)")
+    elif args.region:
         lats, lons = read_coords(meta, data_dir)
         region_idxs = region_node_indices(*args.region, lats, lons)
         print(f"[Region] {len(region_idxs)} nodes")
@@ -477,7 +481,11 @@ def main():
 
     if region_idxs is not None:
         sk_r = 1.0 - (sm_pred_r.rmse / (sm_base_r.rmse + 1e-12))
-        print(f"\n--- Region [{args.region[0]},{args.region[1]}]N x [{args.region[2]},{args.region[3]}]E ({len(region_idxs)} nodes) ---")
+        if args.region:
+            region_label = f"[{args.region[0]},{args.region[1]}]N x [{args.region[2]},{args.region[3]}]E"
+        else:
+            region_label = "is_regional mask"
+        print(f"\n--- Region {region_label} ({len(region_idxs)} nodes) ---")
         print(f"RMSE={sm_pred_r.rmse:.6f} | base={sm_base_r.rmse:.6f} | skill={sk_r*100:.2f}%")
         print(f"ACC={sm_pred_r.acc:.4f} | base={sm_base_r.acc:.4f}")
 
