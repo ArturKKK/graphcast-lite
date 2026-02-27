@@ -74,9 +74,15 @@ def load_wrf_json(path):
 
 
 def load_era5(era5_dir, scalers_dir=None):
-    """Загрузка и денормализация ERA5 jan2023."""
+    """
+    Загрузка ERA5 jan2023.
+
+    ВАЖНО: data.npy хранит данные в ФИЗИЧЕСКИХ единицах (K, m/s, hPa, м),
+    а НЕ нормализованные. Нормализация (x-mean)/std делается в dataloader
+    при обучении, но в файле значения «как есть».
+    Поэтому денормализация НЕ нужна.
+    """
     era5_dir = Path(era5_dir)
-    scalers_src = Path(scalers_dir) if scalers_dir else era5_dir
 
     with open(era5_dir / "dataset_info.json") as f:
         info = json.load(f)
@@ -86,10 +92,6 @@ def load_era5(era5_dir, scalers_dir=None):
     coords = np.load(era5_dir / "coords.npz")
     lons = coords["longitude"].astype(np.float64)   # (512,)
     lats = coords["latitude"].astype(np.float64)     # (256,)
-
-    sc = np.load(scalers_src / "scalers.npz")
-    mean = sc["mean"].astype(np.float32)  # (19,)
-    std  = sc["std"].astype(np.float32)   # (19,)
 
     n_time = info["n_time"]
     n_lon  = info["n_lon"]
@@ -105,15 +107,21 @@ def load_era5(era5_dir, scalers_dir=None):
         if data.ndim == 1:
             data = data.reshape(n_time, n_lon, n_lat, n_feat)
 
-    # Денормализация: x_scaled = x_norm * std + mean
-    # (в scaled units: hPa для давления, m для геопотенциала, K для T, m/s для ветра)
     print(f"\nERA5 jan2023: shape={data.shape}, dtype={data.dtype}")
     print(f"  Period: {info.get('time_start','?')} → {info.get('time_end','?')}")
     print(f"  Grid: lon [{lons.min():.2f},{lons.max():.2f}] ({len(lons)}), "
           f"lat [{lats.min():.2f},{lats.max():.2f}] ({len(lats)})")
     print(f"  Variables: {var_names}")
 
-    return data, lons, lats, mean, std, var_names, info
+    # Проверка: t2m должна быть ~200-320 K, не нормализованная ~[-3,3]
+    sample_t2m = float(np.nanmean(data[0, :, :, var_names.index("t2m")]))
+    if abs(sample_t2m) < 10:
+        print(f"  ⚠ WARNING: t2m mean={sample_t2m:.2f} — данные НОРМАЛИЗОВАНЫ!")
+        print(f"    Нужно указать --scalers-dir для денормализации")
+    else:
+        print(f"  ✓ t2m sample mean={sample_t2m:.1f} K — данные в физ. единицах")
+
+    return data, lons, lats, var_names, info
 
 
 def interpolate_era5_to_wrf(era5_field_2d, era5_lons, era5_lats, wrf_lat, wrf_lon):
@@ -166,7 +174,7 @@ def main():
 
     # ─── 1. Загрузка данных ───────────────────────────────────────────
     wrf_fields, wrf_lat, wrf_lon, wrf_times, wrf_domain = load_wrf_json(args.wrf_json)
-    era5_data, era5_lons, era5_lats, mean, std, var_names, era5_info = load_era5(
+    era5_data, era5_lons, era5_lats, var_names, era5_info = load_era5(
         args.era5_dir, args.scalers_dir)
 
     # ─── 2. Совмещение временных шагов ────────────────────────────────
@@ -227,9 +235,8 @@ def main():
         print(f"\n  {era5_name} ({unit}):")
 
         for era5_idx, wrf_hour_idx, label in match_steps:
-            # ERA5: денормализация одного поля
-            era5_slice = era5_data[era5_idx, :, :, vi].astype(np.float32)  # (512, 256)
-            era5_phys = era5_slice * std[vi] + mean[vi]  # в scaled units
+            # ERA5: данные уже в физических единицах (K, m/s, hPa)
+            era5_phys = era5_data[era5_idx, :, :, vi].astype(np.float32)  # (512, 256)
 
             # Интерполяция ERA5 на WRF-сетку
             era5_on_wrf = interpolate_era5_to_wrf(
