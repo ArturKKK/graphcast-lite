@@ -82,6 +82,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str,
         DatasetNames.wb2_512x256_19f_ar,
         DatasetNames.wb2_512x256_19f_ar_v2,
         DatasetNames.multires,
+        DatasetNames.region_krsk_cds_19f,
     ):
         # Chunked dataloader для больших сеток (512×256) и мультирезолюционных
         # Для AR-обучения подаём max_ar_steps целевых кадров
@@ -95,9 +96,12 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str,
             else:
                 physical_dataset = str(experiment_config.data.dataset_name.value)
                 data_path = os.path.join("data", "datasets", physical_dataset)
+        elif hasattr(experiment_config, 'data_dir') and experiment_config.data_dir:
+            # Любой датасет с явным data_dir в конфиге (region_krsk_cds и т.п.)
+            data_path = experiment_config.data_dir
         else:
             # v2 использует тот же датасет, что и v1
-            physical_dataset = "wb2_512x256_19f_ar"
+            physical_dataset = "global_512x256_19f_2010-2021_07deg"
             data_path = os.path.join("data", "datasets", physical_dataset)
         train_dataset, val_dataset, test_dataset, dataset_metadata = (
             load_chunked_datasets(

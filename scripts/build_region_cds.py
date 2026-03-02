@@ -144,91 +144,182 @@ def make_date_list(start_date, end_date):
     return dates
 
 
+def _half_year_ranges(start_date, end_date):
+    """Return list of (year, month_start, month_end) tuples covering [start_date, end_date].
+    Each range covers ~6 months: Jan-Jun or Jul-Dec."""
+    from datetime import datetime
+    s = datetime.strptime(start_date, "%Y-%m-%d")
+    e = datetime.strptime(end_date, "%Y-%m-%d")
+    result = []
+    y = s.year
+    while y <= e.year:
+        for m_start, m_end in [(1, 6), (7, 12)]:
+            # Clip to actual date range
+            if (y, m_end) < (s.year, s.month):
+                continue
+            if (y, m_start) > (e.year, e.month):
+                continue
+            result.append((y, m_start, m_end))
+        y += 1
+    return result
+
+
+def _days_for_range(year, m_start, m_end, start_date, end_date):
+    """Return list of day strings for months [m_start..m_end] of year, clipped to date range."""
+    import calendar
+    from datetime import datetime
+    s = datetime.strptime(start_date, "%Y-%m-%d")
+    e = datetime.strptime(end_date, "%Y-%m-%d")
+    days = []
+    for m in range(m_start, m_end + 1):
+        last_day = calendar.monthrange(year, m)[1]
+        for d in range(1, last_day + 1):
+            dt = datetime(year, m, d)
+            if s <= dt <= e:
+                days.append("%02d" % d)
+    return days
+
+
+def _months_for_range(m_start, m_end):
+    return ["%02d" % m for m in range(m_start, m_end + 1)]
+
+
 def download_surface(client, dates, area, tmpdir):
     """
-    Download surface variables from CDS.
+    Download surface variables from CDS in half-year batches.
     area = [lat_max, lon_min, lat_min, lon_max] (North/West/South/East)
-    Returns: path to netcdf file.
+    Returns: list of paths to netcdf files.
     """
-    outfile = os.path.join(tmpdir, "surface.nc")
-
-    years = sorted(set(d[:4] for d in dates))
-    months = sorted(set(d[5:7] for d in dates))
-    days = sorted(set(d[8:10] for d in dates))
-
-    print("\nDownloading SURFACE variables from CDS...")
+    print("\nDownloading SURFACE variables from CDS (half-year batches)...")
     print("  Variables: %s" % list(SURF_VARS_CDS.keys()))
     print("  Dates: %s to %s (%d days)" % (dates[0], dates[-1], len(dates)))
     print("  Area: N=%.1f W=%.1f S=%.1f E=%.1f" % tuple(area))
 
+    ranges = _half_year_ranges(dates[0], dates[-1])
+    print("  Batches: %d" % len(ranges))
+    all_files = []
     t0 = _time.time()
 
-    client.retrieve(
-        "reanalysis-era5-single-levels",
-        {
-            "product_type": "reanalysis",
-            "variable": list(SURF_VARS_CDS.keys()),
-            "year": years,
-            "month": months,
-            "day": days,
-            "time": ["00:00", "06:00", "12:00", "18:00"],
-            "area": area,
-            "grid": [0.25, 0.25],
-            "download_format": "unarchived",
-            "format": "netcdf",
-        },
-        outfile,
-    )
+    for idx, (year, m_start, m_end) in enumerate(ranges):
+        label = "%04d-H%d" % (year, 1 if m_start == 1 else 2)
+        outfile = os.path.join(tmpdir, "surface_%s.nc" % label)
+        if os.path.exists(outfile) and os.path.getsize(outfile) > 1000:
+            print("  [%d/%d] %s — cached" % (idx+1, len(ranges), label))
+            all_files.append(outfile)
+            continue
 
+        days = _days_for_range(year, m_start, m_end, dates[0], dates[-1])
+        months = _months_for_range(m_start, m_end)
+        if not days:
+            continue
+
+        print("  [%d/%d] %s (%d days)..." % (idx+1, len(ranges), label, len(days)),
+              end=" ", flush=True)
+        t1 = _time.time()
+
+        try:
+            client.retrieve(
+                "reanalysis-era5-single-levels",
+                {
+                    "product_type": "reanalysis",
+                    "variable": list(SURF_VARS_CDS.keys()),
+                    "year": [str(year)],
+                    "month": months,
+                    "day": sorted(set(days)),
+                    "time": ["00:00", "06:00", "12:00", "18:00"],
+                    "area": area,
+                    "grid": [0.25, 0.25],
+                    "download_format": "unarchived",
+                    "format": "netcdf",
+                },
+                outfile,
+            )
+            extracted = _unzip_if_needed(outfile, tmpdir, "surface_%s" % label)
+            all_files.extend(extracted)
+            sz = sum(os.path.getsize(f) for f in extracted) / 1024**2
+            print("%.1f MB [%.0fs]" % (sz, _time.time() - t1))
+        except Exception as e:
+            print("FAILED: %s" % e)
+            continue
+
+    total_mb = sum(os.path.getsize(f) for f in all_files if os.path.exists(f)) / 1024**2
     dt = _time.time() - t0
-    outfiles = _unzip_if_needed(outfile, tmpdir, "surface")
-    total_mb = sum(os.path.getsize(f) for f in outfiles) / 1024**2
-    print("  Done: %.1f MB in %.0fs (%.2f MB/s)" % (total_mb, dt, total_mb / dt if dt > 0 else 0))
+    print("  Surface total: %.1f MB in %.0fs" % (total_mb, dt))
 
-    return outfiles
+    return all_files
 
 
 def download_pressure(client, dates, area, tmpdir):
     """
     Download pressure level variables from CDS.
-    Returns: path to netcdf file.
+    Split by LEVEL to keep request size within CDS limits:
+      half-year × 5 vars × 1 level ≈ 3600 fields (OK)
+    vs half-year × 5 vars × 2 levels ≈ 7200 fields (403 Forbidden).
+    Returns: list of paths to netcdf files.
     """
-    outfile = os.path.join(tmpdir, "pressure.nc")
-
-    years = sorted(set(d[:4] for d in dates))
-    months = sorted(set(d[5:7] for d in dates))
-    days = sorted(set(d[8:10] for d in dates))
-
-    print("\nDownloading PRESSURE LEVEL variables from CDS...")
+    print("\nDownloading PRESSURE LEVEL variables from CDS (per-level, half-year batches)...")
     print("  Variables: %s" % list(PLEV_VARS_CDS.keys()))
-    print("  Levels: %s hPa" % LEVELS)
+    print("  Levels: %s hPa (each downloaded separately)" % LEVELS)
 
+    ranges = _half_year_ranges(dates[0], dates[-1])
+    n_batches = len(ranges) * len(LEVELS)
+    print("  Batches: %d (%d half-years × %d levels)" % (n_batches, len(ranges), len(LEVELS)))
+    all_files = []
     t0 = _time.time()
+    batch_idx = 0
 
-    client.retrieve(
-        "reanalysis-era5-pressure-levels",
-        {
-            "product_type": "reanalysis",
-            "variable": list(PLEV_VARS_CDS.keys()),
-            "pressure_level": [str(l) for l in LEVELS],
-            "year": years,
-            "month": months,
-            "day": days,
-            "time": ["00:00", "06:00", "12:00", "18:00"],
-            "area": area,
-            "grid": [0.25, 0.25],
-            "download_format": "unarchived",
-            "format": "netcdf",
-        },
-        outfile,
-    )
+    for year, m_start, m_end in ranges:
+        half = 1 if m_start == 1 else 2
+        days = _days_for_range(year, m_start, m_end, dates[0], dates[-1])
+        months = _months_for_range(m_start, m_end)
+        if not days:
+            batch_idx += len(LEVELS)
+            continue
 
+        for level in LEVELS:
+            batch_idx += 1
+            label = "%04d-H%d-L%d" % (year, half, level)
+            outfile = os.path.join(tmpdir, "pressure_%s.nc" % label)
+            if os.path.exists(outfile) and os.path.getsize(outfile) > 1000:
+                print("  [%d/%d] %s — cached" % (batch_idx, n_batches, label))
+                all_files.append(outfile)
+                continue
+
+            print("  [%d/%d] %s (%d days)..." % (batch_idx, n_batches, label, len(days)),
+                  end=" ", flush=True)
+            t1 = _time.time()
+
+            try:
+                client.retrieve(
+                    "reanalysis-era5-pressure-levels",
+                    {
+                        "product_type": "reanalysis",
+                        "variable": list(PLEV_VARS_CDS.keys()),
+                        "pressure_level": [str(level)],
+                        "year": [str(year)],
+                        "month": months,
+                        "day": sorted(set(days)),
+                        "time": ["00:00", "06:00", "12:00", "18:00"],
+                        "area": area,
+                        "grid": [0.25, 0.25],
+                        "download_format": "unarchived",
+                        "format": "netcdf",
+                    },
+                    outfile,
+                )
+                extracted = _unzip_if_needed(outfile, tmpdir, "pressure_%s" % label)
+                all_files.extend(extracted)
+                sz = sum(os.path.getsize(f) for f in extracted) / 1024**2
+                print("%.1f MB [%.0fs]" % (sz, _time.time() - t1))
+            except Exception as e:
+                print("FAILED: %s" % e)
+                continue
+
+    total_mb = sum(os.path.getsize(f) for f in all_files if os.path.exists(f)) / 1024**2
     dt = _time.time() - t0
-    outfiles = _unzip_if_needed(outfile, tmpdir, "pressure")
-    total_mb = sum(os.path.getsize(f) for f in outfiles) / 1024**2
-    print("  Done: %.1f MB in %.0fs (%.2f MB/s)" % (total_mb, dt, total_mb / dt if dt > 0 else 0))
+    print("  Pressure total: %.1f MB in %.0fs" % (total_mb, dt))
 
-    return outfiles
+    return all_files
 
 
 def parse_netcdf(surf_paths, pres_paths, scale_factors):
@@ -408,6 +499,8 @@ def main():
                    help="Path to scalers.npz from training dataset")
     p.add_argument("--keep-nc",       action="store_true",
                    help="Keep downloaded .nc files (for debugging)")
+    p.add_argument("--pressure-only", action="store_true",
+                   help="Re-download only pressure levels (reuse cached surface)")
 
     args = p.parse_args()
     out_dir = Path(args.out_dir)
@@ -452,13 +545,23 @@ def main():
     # CDS area format: [North, West, South, East]
     area = [args.lat_max, args.lon_min, args.lat_min, args.lon_max]
 
-    # Download
-    tmpdir = tempfile.mkdtemp(prefix="era5_cds_")
-    print("\n  Temp dir: %s" % tmpdir)
+    # Download — use out_dir/_tmp as persistent tmpdir (resumable!)
+    tmpdir = str(out_dir / "_tmp")
+    os.makedirs(tmpdir, exist_ok=True)
+    print("\n  Temp dir: %s (persistent, for resume)" % tmpdir)
 
     t_start = _time.time()
 
-    surf_paths = download_surface(client, dates, area, tmpdir)
+    if args.pressure_only:
+        # Reuse cached surface files from tmpdir
+        import glob
+        surf_paths = sorted(glob.glob(os.path.join(tmpdir, "surface_*.nc")))
+        if not surf_paths:
+            print("ERROR: --pressure-only but no cached surface files in %s" % tmpdir)
+            raise SystemExit(1)
+        print("\n  Reusing %d cached surface files" % len(surf_paths))
+    else:
+        surf_paths = download_surface(client, dates, area, tmpdir)
     pres_paths = download_pressure(client, dates, area, tmpdir)
 
     t_download = _time.time() - t_start
@@ -475,8 +578,13 @@ def main():
             shutil.copy2(pp, out_dir / ("pressure_%d.nc" % i))
         print("\nKept .nc files in %s" % out_dir)
 
-    # Cleanup temp
-    shutil.rmtree(tmpdir)
+    # Cleanup temp — only if we actually got pressure data
+    has_pressure = any(v in channels for v in ["t@850", "u@850", "t@500"])
+    if has_pressure and os.path.exists(tmpdir):
+        shutil.rmtree(tmpdir)
+        print("  Cleaned up tmp dir")
+    elif not has_pressure:
+        print("  WARNING: pressure data missing! Keeping tmp dir for --pressure-only resume")
 
     # Assemble (T, LON, LAT, F) array
     n_lon, n_lat = len(lons), len(lats)

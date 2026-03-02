@@ -104,13 +104,92 @@ SCALE_FACTORS_15 = {}
 
 # ─── Скачивание региона из ARCO ERA5 ──────────────────────────────────
 
+def _month_ranges(start_date: str, end_date: str):
+    """Generate (year, month) tuples covering the date range."""
+    from datetime import datetime
+    s = datetime.strptime(start_date, "%Y-%m-%d")
+    e = datetime.strptime(end_date, "%Y-%m-%d")
+    result = []
+    y, m = s.year, s.month
+    while (y, m) <= (e.year, e.month):
+        result.append((y, m))
+        m += 1
+        if m > 12:
+            m = 1; y += 1
+    return result
+
+
+def _load_var_monthly(ds, var_name, lat_c, lon_c,
+                      lon_min, lon_max, lat_min, lat_max,
+                      months, scale_factor=1.0):
+    """Load one variable month by month, only 6h steps, region-clipped.
+    
+    Returns: np.ndarray (T_6h, lon, lat) float32
+    """
+    chunks = []
+    for i, (year, month) in enumerate(months):
+        # Temporal slice for this month
+        t_start = f"{year}-{month:02d}-01"
+        if month == 12:
+            t_end = f"{year+1}-01-01"
+        else:
+            t_end = f"{year}-{month+1:02d}-01"
+
+        ds_m = ds.sel(time=slice(t_start, t_end))
+        # Exclude first day of next month (slice is inclusive on Zarr)
+        times_m = ds_m.time.values
+        if len(times_m) == 0:
+            continue
+        # Filter to last day of this month max
+        import calendar
+        last_day = calendar.monthrange(year, month)[1]
+        t_end_exact = np.datetime64(f"{year}-{month:02d}-{last_day}T23:59:59")
+        mask_month = times_m <= t_end_exact
+        ds_m = ds_m.isel(time=mask_month)
+        
+        # 6h filter BEFORE .values  (critical: reduces HTTP requests 4x)
+        times_m = ds_m.time.values
+        if len(times_m) == 0:
+            continue
+        hours = np.array([t.astype("datetime64[h]").astype(int) % 24 for t in times_m])
+        mask_6h = np.isin(hours, [0, 6, 12, 18])
+        ds_m = ds_m.isel(time=mask_6h)
+
+        if ds_m.sizes["time"] == 0:
+            continue
+
+        # Spatial clip + load
+        da = ds_m[var_name].sel({
+            lon_c: slice(lon_min, lon_max),
+            lat_c: slice(lat_max, lat_min),
+        })
+        arr = da.values.astype(np.float32)  # NOW loads — small chunk
+
+        # (T, lat, lon) → (T, lon, lat)
+        dims = list(da.dims)
+        if dims.index(lat_c) < dims.index(lon_c):
+            arr = np.swapaxes(arr, dims.index(lat_c), dims.index(lon_c))
+
+        if scale_factor != 1.0:
+            arr *= scale_factor
+
+        chunks.append(arr)
+
+        if (i + 1) % 12 == 0 or i == len(months) - 1:
+            done_steps = sum(c.shape[0] for c in chunks)
+            print(f"  [{i+1}/{len(months)} months, {done_steps} steps]", end="", flush=True)
+
+    return np.concatenate(chunks, axis=0)
+
+
 def download_region(start_date: str, end_date: str,
                     lon_min: float, lon_max: float,
                     lat_min: float, lat_max: float,
                     scale_factors: dict):
     """
     Скачивает ERA5 для прямоугольного региона из ARCO:
-    - фильтрует до 6-часовых шагов (00, 06, 12, 18 UTC)
+    - грузит помесячно (избегаем 96k HTTP-запросов)
+    - фильтрует до 6-часовых шагов ПЕРЕД загрузкой
     - применяет scale_factors если заданы
     - возвращает dict {var_name: np.ndarray (T, LON, LAT)}, координаты, кол-во шагов
     """
@@ -125,94 +204,70 @@ def download_region(start_date: str, end_date: str,
     ds = xr.open_zarr(store, consolidated=True)
     print(f"  Zarr открыт за {_time.time() - t0:.1f} с")
 
-    # Координатные имена (в ARCO обычно latitude / longitude)
+    # Координатные имена
     lat_c = "latitude"  if "latitude"  in ds.coords else "lat"
     lon_c = "longitude" if "longitude" in ds.coords else "lon"
 
-    # ── Временная фильтрация ──────────────────────────────────────────
-    ds = ds.sel(time=slice(start_date, end_date))
-    n_raw = ds.sizes["time"]
-    print(f"  Часовых шагов в окне: {n_raw}")
+    months = _month_ranges(start_date, end_date)
+    print(f"  Месяцев: {len(months)} ({months[0][0]}-{months[0][1]:02d} → {months[-1][0]}-{months[-1][1]:02d})")
 
-    # Оставляем только 6-часовые метки (часы 0, 6, 12, 18)
-    times = ds.time.values
-    hours = np.array([t.astype("datetime64[h]").astype(int) % 24 for t in times])
-    mask_6h = np.isin(hours, [0, 6, 12, 18])
-    ds_6h = ds.isel(time=mask_6h)
-    n_6h = ds_6h.sizes["time"]
-    print(f"  После фильтра 6h: {n_6h} шагов")
-    print(f"  Время: {str(ds_6h.time.values[0])[:16]} → {str(ds_6h.time.values[-1])[:16]}")
-
-    # ── Пространственная фильтрация ──────────────────────────────────
-    # В ARCO широта убывает (90 → -90), поэтому slice(max, min)
-    ds_6h = ds_6h.sel({
+    # Determine grid from metadata (no download needed)
+    ds_peek = ds.sel({
         lon_c: slice(lon_min, lon_max),
         lat_c: slice(lat_max, lat_min),
     })
-
-    lons = ds_6h[lon_c].values.astype(np.float32)
-    lats = ds_6h[lat_c].values.astype(np.float32)
+    lons = ds_peek[lon_c].values.astype(np.float32)
+    lats = ds_peek[lat_c].values.astype(np.float32)
+    n_6h_est = len(months) * 30 * 4  # rough estimate
     print(f"  Регион: lon [{lons.min():.2f}, {lons.max():.2f}]  ({len(lons)} точек)")
     print(f"          lat [{lats.min():.2f}, {lats.max():.2f}]  ({len(lats)} точек)")
     print(f"  Сетка: {len(lons)}×{len(lats)} = {len(lons)*len(lats)} нод")
 
-    # ── Скачиваем surface переменные ──────────────────────────────────
+    # ── Surface переменные ────────────────────────────────────────────
     channels = {}
 
     print(f"\n--- Surface переменные ---")
     for arco_name, short_name in SURF_MAP.items():
         t1 = _time.time()
-        print(f"  {short_name:>6s} ({arco_name})...", end=" ", flush=True)
+        print(f"  {short_name:>6s} ({arco_name})...", flush=True)
 
-        if arco_name not in ds_6h.data_vars:
+        if arco_name not in ds.data_vars:
             raise RuntimeError(f"Переменная '{arco_name}' не найдена в ARCO")
 
-        da = ds_6h[arco_name]
-        arr = da.values.astype(np.float32)  # (T, lat, lon) в ARCO
-
-        # Меняем оси: (T, lat, lon) → (T, lon, lat)  — наша конвенция
-        dims = list(da.dims)
-        if dims.index(lat_c) < dims.index(lon_c):
-            arr = np.swapaxes(arr, dims.index(lat_c), dims.index(lon_c))
-
-        # Применяем масштабирование если задано
-        if short_name in scale_factors:
-            arr *= scale_factors[short_name]
+        sf = scale_factors.get(short_name, 1.0)
+        arr = _load_var_monthly(ds, arco_name, lat_c, lon_c,
+                                lon_min, lon_max, lat_min, lat_max,
+                                months, scale_factor=sf)
 
         channels[short_name] = arr
         dt = _time.time() - t1
-        print(f"shape={arr.shape}  "
-              f"range=[{arr.min():.3f}, {arr.max():.3f}]  [{dt:.1f}s]")
+        print(f"  → shape={arr.shape}  range=[{arr.min():.3f}, {arr.max():.3f}]  [{dt:.1f}s]")
 
-    # ── Скачиваем pressure-level переменные ───────────────────────────
+    # ── Pressure-level переменные ─────────────────────────────────────
+    n_6h = channels[list(channels.keys())[0]].shape[0]
+
     print(f"\n--- Pressure-level переменные ---")
     for arco_name, short_name in PLEV_MAP.items():
-        if arco_name not in ds_6h.data_vars:
+        if arco_name not in ds.data_vars:
             raise RuntimeError(f"Переменная '{arco_name}' не найдена в ARCO")
 
-        da = ds_6h[arco_name]
-        level_c = "level" if "level" in da.coords else "pressure_level"
+        level_c = "level" if "level" in ds[arco_name].coords else "pressure_level"
 
         for lev in LEVELS:
             ch = f"{short_name}@{lev}"
             t1 = _time.time()
-            print(f"  {ch:>6s} ({arco_name}@{lev} hPa)...", end=" ", flush=True)
+            print(f"  {ch:>6s} ({arco_name}@{lev} hPa)...", flush=True)
 
-            da_lev = da.sel({level_c: lev})
-            arr = da_lev.values.astype(np.float32)
-
-            dims = list(da_lev.dims)
-            if dims.index(lat_c) < dims.index(lon_c):
-                arr = np.swapaxes(arr, dims.index(lat_c), dims.index(lon_c))
-
-            # Применяем масштабирование если задано
-            if ch in scale_factors:
-                arr *= scale_factors[ch]
+            # Select level first, then monthly load
+            ds_lev = ds.sel({level_c: lev})
+            sf = scale_factors.get(ch, 1.0)
+            arr = _load_var_monthly(ds_lev, arco_name, lat_c, lon_c,
+                                    lon_min, lon_max, lat_min, lat_max,
+                                    months, scale_factor=sf)
 
             channels[ch] = arr
             dt = _time.time() - t1
-            print(f"shape={arr.shape}  "
-                  f"range=[{arr.min():.3f}, {arr.max():.3f}]  [{dt:.1f}s]")
+            print(f"  → shape={arr.shape}  range=[{arr.min():.3f}, {arr.max():.3f}]  [{dt:.1f}s]")
 
     return channels, lons, lats, n_6h
 
