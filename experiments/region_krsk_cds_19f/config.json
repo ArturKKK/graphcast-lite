@@ -1,5 +1,5 @@
 {
-  "batch_size": 4,
+  "batch_size": 1,
   "learning_rate": 3e-4,
   "num_epochs": 50,
   "early_stopping_patience": 10,
