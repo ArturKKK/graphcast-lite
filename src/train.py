@@ -71,15 +71,28 @@ def get_lat_weights(lat_dim, lon_dim, device, flat_lats=None):
     w_expanded = w.view(1, -1).expand(lon_dim, lat_dim).reshape(-1)
     return w_expanded.view(1, -1, 1).to(device)
 
-def weighted_mse_loss(pred, target, lat_weights=None, channel_mask=None):
-    """MSE с весами широты и маской каналов.
+def build_boundary_mask(n_lon, n_lat, width, device):
+    """Создаёт пространственную маску: 0 на краях (буферная зона), 1 внутри.
     
-    channel_mask: если задан — тензор shape (C,) с 0.0 для статических каналов
-                  и 1.0 для динамических. Применяется к последней оси.
+    Сетка flattened в порядке (lon, lat): индекс = lon_idx * n_lat + lat_idx.
+    Возвращает тензор shape (1, G, 1) для broadcast с (N, G, C).
+    """
+    mask_2d = torch.zeros(n_lon, n_lat)
+    mask_2d[width:n_lon-width, width:n_lat-width] = 1.0
+    return mask_2d.reshape(1, -1, 1).to(device)
+
+
+def weighted_mse_loss(pred, target, lat_weights=None, channel_mask=None, spatial_mask=None):
+    """MSE с весами широты, маской каналов и пространственной маской.
+    
+    channel_mask: тензор shape (C,) с 0.0 для статических каналов.
+    spatial_mask: тензор shape (1, G, 1) с 0.0 для буферных точек на краях.
     """
     diff = (pred - target) ** 2
     if channel_mask is not None:
         diff = diff * channel_mask  # broadcast: [..., C] * [C]
+    if spatial_mask is not None:
+        diff = diff * spatial_mask  # broadcast: [N, G, C] * [1, G, 1]
     if lat_weights is not None:
         diff = diff * lat_weights
     return diff.mean()
@@ -114,6 +127,7 @@ def train_epoch(
     lat_weights=None, 
     current_ar_steps=1,
     channel_mask=None,
+    spatial_mask=None,
 ):
     """Один проход обучения. ТЕПЕРЬ С АВТОРЕГРЕССИЕЙ."""  
     model.train()  
@@ -166,7 +180,7 @@ def train_epoch(
             target = y_steps[:, :, step, :]
             
             # Считаем лосс (channel_mask обнуляет градиент по static каналам)
-            loss_batch += weighted_mse_loss(out, target, lat_weights, channel_mask)
+            loss_batch += weighted_mse_loss(out, target, lat_weights, channel_mask, spatial_mask)
             
             # САМОЕ ГЛАВНОЕ: Добавляем наш прогноз в историю для следующего шага
             # [1, 2, 3, 4] -> [2, 3, 4, out]
@@ -188,7 +202,7 @@ def train_epoch(
     avg_loss = total_loss / len(train_dataloader)  
     return avg_loss
 
-def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device, lat_weights=None):
+def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device, lat_weights=None, spatial_mask=None):
     """Оценка модели. Для скорости проверяем только 1-й шаг."""
     model.eval()
 
@@ -213,7 +227,7 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device,
             if outs.dim() == 2: outs = outs.unsqueeze(0)
             
             # Используем тот же лосс
-            loss = weighted_mse_loss(outs, y_step0, lat_weights)
+            loss = weighted_mse_loss(outs, y_step0, lat_weights, spatial_mask=spatial_mask)
             
             total_loss += loss.item()  
             acc_values.append(spatial_corr(outs, y_step0))  
@@ -266,6 +280,19 @@ def train(
                 cm[ch] = 0.0
         channel_mask = cm
         print(f"[Train] static_channels={static_ch} → маска каналов: {int(cm.sum())}/{C_total} dynamic")
+
+    # --- Пространственная маска: обнуляем лосс на краях региона ---
+    spatial_mask = None
+    bmw = getattr(config, 'boundary_mask_width', 0)
+    if bmw > 0 and dataset_metadata is not None:
+        n_lon = getattr(dataset_metadata, 'num_longitudes', None)
+        n_lat = getattr(dataset_metadata, 'num_latitudes', None)
+        if n_lon and n_lat and not getattr(dataset_metadata, 'flat_grid', False):
+            spatial_mask = build_boundary_mask(n_lon, n_lat, bmw, device)
+            inner = int(spatial_mask.sum().item())
+            total = n_lon * n_lat
+            print(f"[Train] boundary_mask_width={bmw} → {inner}/{total} active grid points "
+                  f"(inner {n_lon-2*bmw}×{n_lat-2*bmw})")
 
     loss_fn = nn.MSELoss()
 
@@ -336,11 +363,12 @@ def train(
             model, train_dataloader, optimiser, loss_fn, device, 
             epoch_threshold, epoch, 
             lat_weights=lat_weights, current_ar_steps=ar_steps,
-            channel_mask=channel_mask,
+            channel_mask=channel_mask, spatial_mask=spatial_mask,
         )  
 
         epoch_val_loss, epoch_val_acc = test(  
-            model, val_dataloader, loss_fn, device, lat_weights
+            model, val_dataloader, loss_fn, device, lat_weights,
+            spatial_mask=spatial_mask,
         )  
 
         if print_losses:  

@@ -242,3 +242,4 @@ class ExperimentConfig(BaseModel):
     data_dir: Optional[str] = None       # Путь к датасету (если задан, используется вместо data.dataset_name)
     static_channels: List[int] = []      # Индексы каналов-констант (lsm, z_surf и т.п.):
                                          # не участвуют в loss, при AR carry-forward из входа
+    boundary_mask_width: int = 0         # Сколько точек от края отступить (loss=0 в буферной зоне)

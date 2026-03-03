@@ -1,21 +1,22 @@
 {
   "batch_size": 1,
-  "learning_rate": 1e-4,
-  "num_epochs": 80,
-  "early_stopping_patience": 15,
+  "learning_rate": 2e-4,
+  "num_epochs": 60,
+  "early_stopping_patience": 12,
   "early_stopping_delta": 1e-5,
   "wandb_log": false,
   "random_seed": 42,
   "use_latitude_weighting": false,
   "max_ar_steps": 4,
   "static_channels": [7, 8],
+  "boundary_mask_width": 5,
   "data_dir": "data/datasets/region_krsk_61x41_19f_2010-2020_025deg",
 
   "graph": {
     "grid2mesh_edge_creation": "radius",
     "mesh2grid_edge_creation": "contained",
     "grid2mesh_radius_query": 0.6,
-    "mesh_levels": [3, 6]
+    "mesh_levels": [3, 5]
   },
 
   "pipeline": {
@@ -39,7 +40,7 @@
         "output_dim": 256,
         "activation": "swish",
         "use_layer_norm": true,
-        "num_message_passing_steps": 16,
+        "num_message_passing_steps": 6,
         "edge_feature_dim": 4
       }
     },
