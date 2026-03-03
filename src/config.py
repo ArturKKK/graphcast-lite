@@ -240,3 +240,5 @@ class ExperimentConfig(BaseModel):
     use_latitude_weighting: bool = True  # Включить вес по широте
     max_ar_steps: int = 1                # Максимальное число шагов авторегрессии
     data_dir: Optional[str] = None       # Путь к датасету (если задан, используется вместо data.dataset_name)
+    static_channels: List[int] = []      # Индексы каналов-констант (lsm, z_surf и т.п.):
+                                         # не участвуют в loss, при AR carry-forward из входа

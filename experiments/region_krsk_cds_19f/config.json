@@ -8,13 +8,14 @@
   "random_seed": 42,
   "use_latitude_weighting": false,
   "max_ar_steps": 4,
+  "static_channels": [7, 8],
   "data_dir": "data/datasets/region_krsk_61x41_19f_2010-2020_025deg",
 
   "graph": {
     "grid2mesh_edge_creation": "radius",
     "mesh2grid_edge_creation": "contained",
     "grid2mesh_radius_query": 0.6,
-    "mesh_levels": [3, 5]
+    "mesh_levels": [3, 6]
   },
 
   "pipeline": {

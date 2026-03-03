@@ -71,9 +71,15 @@ def get_lat_weights(lat_dim, lon_dim, device, flat_lats=None):
     w_expanded = w.view(1, -1).expand(lon_dim, lat_dim).reshape(-1)
     return w_expanded.view(1, -1, 1).to(device)
 
-def weighted_mse_loss(pred, target, lat_weights=None):
-    """Обычный MSE, но с учетом весов широты."""
+def weighted_mse_loss(pred, target, lat_weights=None, channel_mask=None):
+    """MSE с весами широты и маской каналов.
+    
+    channel_mask: если задан — тензор shape (C,) с 0.0 для статических каналов
+                  и 1.0 для динамических. Применяется к последней оси.
+    """
     diff = (pred - target) ** 2
+    if channel_mask is not None:
+        diff = diff * channel_mask  # broadcast: [..., C] * [C]
     if lat_weights is not None:
         diff = diff * lat_weights
     return diff.mean()
@@ -158,11 +164,15 @@ def train_epoch(
             # Цель на этот шаг
             target = y_steps[:, :, step, :]
             
-            # Считаем лосс
-            loss_batch += weighted_mse_loss(out, target, lat_weights)
+            # Считаем лосс (channel_mask обнуляет градиент по static каналам)
+            loss_batch += weighted_mse_loss(out, target, lat_weights, channel_mask)
             
             # САМОЕ ГЛАВНОЕ: Добавляем наш прогноз в историю для следующего шага
             # [1, 2, 3, 4] -> [2, 3, 4, out]
+            # Для статических каналов подставляем значения из последнего входного шага
+            if channel_mask is not None:
+                static_vals = curr_state[:, :, -1, :]  # [N, G, C]
+                out = out * channel_mask + static_vals * (1.0 - channel_mask)
             out_unsqueezed = out.unsqueeze(2)
             curr_state = torch.cat([curr_state[:, :, 1:, :], out_unsqueezed], dim=2)
             
@@ -243,6 +253,18 @@ def train(
     ar_steps = 1
     max_ar = config.max_ar_steps # 4
     epochs_per_stage = num_epochs // max_ar if max_ar > 0 else num_epochs
+
+    # --- Маска каналов: 0 для статических, 1 для динамических ---
+    static_ch = getattr(config, 'static_channels', [])
+    channel_mask = None
+    if static_ch:
+        C_total = config.data.num_features_used
+        cm = torch.ones(C_total, device=device)
+        for ch in static_ch:
+            if 0 <= ch < C_total:
+                cm[ch] = 0.0
+        channel_mask = cm
+        print(f"[Train] static_channels={static_ch} → маска каналов: {int(cm.sum())}/{C_total} dynamic")
 
     loss_fn = nn.MSELoss()
 

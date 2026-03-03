@@ -258,6 +258,11 @@ def main():
     if AR_STEPS > P_model:
         print(f"[AR-rollout] Модель выдаёт {P_model} шаг(ов), но мы прогоним {AR_STEPS} шагов авторегрессионно.")
 
+    # --- static channels: carry-forward вместо предсказания ---
+    static_ch = getattr(exp_cfg, 'static_channels', [])
+    if static_ch:
+        print(f"[static] Каналы {static_ch} — статика, carry-forward при AR")
+
     # --- max samples (авто-лимит для больших сеток) ---
     if args.max_samples is not None:
         max_samples = args.max_samples
@@ -415,6 +420,11 @@ def main():
                         if step_out.dim() == 2:
                             step_out = step_out.unsqueeze(0)
                         ar_outs.append(step_out.cpu())
+                        # Carry-forward: статические каналы подставляем из последнего входного шага
+                        if static_ch:
+                            static_vals = curr_state[:, :, -1, :]  # [1, G, C]
+                            for ch in static_ch:
+                                step_out[:, :, ch] = static_vals[:, :, ch]
                         # Сдвигаем окно: [obs0, obs1] → [obs1, pred]
                         curr_state = torch.cat(
                             [curr_state[:, :, 1:, :], step_out.unsqueeze(2)], dim=2
