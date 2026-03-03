@@ -142,12 +142,34 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str,
         **loader_kwargs,
     )
 
+    # --- Автоматическое определение region_bounds для обрезки mesh ---
+    # Если координаты задают маленький регион (не глобальную сетку), вырезаем из
+    # икосаэдра только ближайшие к области mesh-узлы: это примерно на порядок
+    # уменьшает число mesh-вершин и делает GNN-процессор эффективным.
+    real_coords = getattr(dataset_metadata, 'cordinates', None)
+    flat_grid = getattr(dataset_metadata, 'flat_grid', False)
+    region_bounds = None
+    if real_coords is not None:
+        lats_arr, lons_arr = real_coords
+        lat_span = float(lats_arr.max() - lats_arr.min())
+        lon_span = float(lons_arr.max() - lons_arr.min())
+        # Считаем «региональным», если покрытие < 90° по обоим осям
+        if lat_span < 90 and lon_span < 90:
+            region_bounds = (
+                float(lats_arr.min()), float(lats_arr.max()),
+                float(lons_arr.min()), float(lons_arr.max()),
+            )
+            print(f"[region] Обнаружен региональный датасет "
+                  f"lat=[{region_bounds[0]:.1f},{region_bounds[1]:.1f}] "
+                  f"lon=[{region_bounds[2]:.1f},{region_bounds[3]:.1f}] → обрезаем mesh")
+
     model: WeatherPrediction = load_model_from_experiment_config(
         experiment_config=experiment_config,
         device=device,
         dataset_metadata=dataset_metadata,
-        coordinates=getattr(dataset_metadata, 'cordinates', None),
-        flat_grid=getattr(dataset_metadata, 'flat_grid', False),
+        coordinates=real_coords,
+        region_bounds=region_bounds,
+        flat_grid=flat_grid,
     )
 
     model = model.to(device)
