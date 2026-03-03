@@ -112,7 +112,8 @@ def train_epoch(
     epoch,
     # Новые аргументы (с дефолтными значениями, чтобы не ломать старое)
     lat_weights=None, 
-    current_ar_steps=1 
+    current_ar_steps=1,
+    channel_mask=None,
 ):
     """Один проход обучения. ТЕПЕРЬ С АВТОРЕГРЕССИЕЙ."""  
     model.train()  
@@ -334,7 +335,8 @@ def train(
         epoch_train_loss = train_epoch(  
             model, train_dataloader, optimiser, loss_fn, device, 
             epoch_threshold, epoch, 
-            lat_weights=lat_weights, current_ar_steps=ar_steps
+            lat_weights=lat_weights, current_ar_steps=ar_steps,
+            channel_mask=channel_mask,
         )  
 
         epoch_val_loss, epoch_val_acc = test(  
