@@ -1,8 +1,8 @@
 {
   "batch_size": 1,
-  "learning_rate": 3e-4,
-  "num_epochs": 50,
-  "early_stopping_patience": 10,
+  "learning_rate": 1e-4,
+  "num_epochs": 80,
+  "early_stopping_patience": 15,
   "early_stopping_delta": 1e-5,
   "wandb_log": false,
   "random_seed": 42,
@@ -21,37 +21,37 @@
   "pipeline": {
     "encoder": {
       "mlp": {
-        "mlp_hidden_dims": [128, 128],
-        "output_dim": 128,
+        "mlp_hidden_dims": [256, 256],
+        "output_dim": 256,
         "use_layer_norm": true,
         "layer_norm_mode": "node"
       },
       "gcn": {
         "layer_type": "conv_gcn",
-        "hidden_dims": [128, 128],
-        "output_dim": 128,
+        "hidden_dims": [256, 256],
+        "output_dim": 256,
         "activation": "swish"
       }
     },
     "processor": {
       "gcn": {
         "layer_type": "interaction_net",
-        "output_dim": 128,
+        "output_dim": 256,
         "activation": "swish",
         "use_layer_norm": true,
-        "num_message_passing_steps": 8,
+        "num_message_passing_steps": 16,
         "edge_feature_dim": 4
       }
     },
     "decoder": {
       "mlp": {
-        "mlp_hidden_dims": [128, 64],
-        "output_dim": 64,
+        "mlp_hidden_dims": [256, 128],
+        "output_dim": 128,
         "use_layer_norm": false
       },
       "gcn": {
         "layer_type": "conv_gcn",
-        "hidden_dims": [64, 64],
+        "hidden_dims": [128, 128],
         "output_dim": 19,
         "activation": "swish"
       }
