@@ -9,6 +9,8 @@
   "use_latitude_weighting": true,
   "max_ar_steps": 4,
   "data_dir": "data/datasets/multires_krsk_19f",
+  "freeze_processor_epochs": 5,
+  "finetune_processor_lr_factor": 0.1,
 
   "graph": {
     "grid2mesh_edge_creation": "radius",

@@ -133,10 +133,74 @@ Aggregate RMSE считался в ФИЗИЧЕСКИХ единицах: RMSE =
 
 ---
 
-## Эксперимент U3: U-Net + 23f + base_filters=64 (PLAN)
+## Эксперимент U3: U-Net + 23f + base_filters=64
 
 Конфиг: `experiments/unet_region_krsk_23f_v2/config.json`
 - dataset: 23f (с time forcing)
 - base_filters=64 (~7.8M параметров — как U1)
 - static_channels=[7,8], forcing_channels=[19,20,21,22]
-- Гипотеза: архитектура U1 (которая работает) + time forcing → улучшение на +18h/+24h
+
+Результаты не были собраны (перешли к V2).
+
+---
+
+## Эксперимент U4: WeatherUNet V2 (23f, obs=4, attention+spectral)
+
+Конфиг: `experiments/unet_v2_region_krsk/config.json`
+- dataset: 23f, **obs_window=4** (24ч контекста вместо 12h)
+- WeatherUNetV2: ResConvBlock + SE + Self-Attention bottleneck + SpectralConv
+- 25.5M параметров, base_filters=64
+- Loss: MSE + 0.1×spectral_FFT + 0.05×gradient
+- OneCycleLR, 80 эпох, patience=15
+
+Инференс:
+```
+Per-horizon (dynamic channels, normalized skill):
+  +06h: avg_skill=40.5% | ACC=0.9201
+  +12h: avg_skill=37.3% | ACC=0.8384
+  +18h: avg_skill=30.4% | ACC=0.7527
+  +24h: avg_skill=23.9% | ACC=0.6813
+
+Per-horizon per-channel RMSE (physical units):
+       var   unit      +6h     +12h     +18h     +24h
+       t2m      K   2.05°C   2.97°C   3.48°C   3.97°C
+```
+
+### Сравнение GNN 23f vs U-Net V1 vs U-Net V2
+
+| Горизонт | GNN 23f | U-Net V1 (19f) | U-Net V2 (23f) |
+|---|---|---|---|
+| t2m +6h | 2.25°C | 2.19°C | **2.05°C** |
+| t2m +12h | 3.44°C | **2.92°C** | 2.97°C |
+| t2m +18h | 4.39°C | **3.37°C** | 3.48°C |
+| t2m +24h | 5.20°C | **3.82°C** | 3.97°C |
+| ACC +6h | 0.887 | 0.909 | **0.920** |
+| ACC +24h | 0.623 | 0.668 | **0.681** |
+
+### Выводы
+
+1. U-Net V1 (7.8M params) — лучшая региональная модель по совокупности (+6h–+24h)
+2. V2 (25.5M) лучше на +6h (2.05°C, ACC 0.920), но хуже на +24h (3.97 vs 3.82)
+3. 25M параметров при 12.8K train samples — overfit, ошибка накапливается в AR
+4. **Бутылочное горлышко — данные**, а не архитектура
+5. Для продвижения нужно: больше данных (>30 лет), 3h шаг, или ensemble V1
+
+---
+
+## GNN 23f (региональная): итоги файнтюна
+
+Конфиг: `experiments/region_krsk_cds_23f/config.json`
+- 23 фичи (19 метео + 4 time), hidden=128, mesh [3,5], static=[7,8], forcing=[19,20,21,22]
+
+Инференс:
+```
+Skill: 30.95%  |  ACC: 0.7487
+
+Per-horizon:
+  +06h: skill=37.05% | ACC=0.8867
+  +12h: skill=36.68% | ACC=0.7888
+  +18h: skill=31.27% | ACC=0.6966
+  +24h: skill=25.80% | ACC=0.6225
+
+t2m: 2.25°C → 3.44°C → 4.39°C → 5.20°C
+```

@@ -388,10 +388,20 @@ def train(
             print(f"[Init] val_loss={intial_val_loss:.5f} val_acc={initial_val_acc:.4f}")
         _log(f"{'init':>5}  {'--':>2}  {'--':>10}  {intial_val_loss:10.5f}  {initial_val_acc:8.4f}  {'--':>10}  {'--':>8}  {datetime.now().strftime('%H:%M:%S')}")
 
+    # --- Fine-tuning: freeze/unfreeze processor ---
+    freeze_proc_epochs = getattr(config, 'freeze_processor_epochs', 0)
+
     # Основной цикл обучения  
     for epoch in range(start_epoch, num_epochs):  
         print()
-        
+
+        # --- Разморозка processor после freeze_proc_epochs ---
+        if freeze_proc_epochs > 0 and epoch == freeze_proc_epochs:
+            for p in model.processor.parameters():
+                p.requires_grad = True
+            print(f"\n>>> PROCESSOR РАЗМОРОЖЕН (epoch {epoch}). "
+                  f"lr = {optimiser.param_groups[-1]['lr']:.1e} <<<\n")
+
         # --- Увеличение сложности ---
         # Вычисляем правильный AR-уровень для текущей эпохи
         # (важно при resume: epoch может быть > 0 с первой итерации)

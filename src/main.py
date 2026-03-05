@@ -187,8 +187,29 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str,
             print(f"  Unexpected keys ({len(unexpected)}): {unexpected[:5]}...")
         print(f"  Pretrained веса загружены.\n")
 
-    # Создание оптимизатора — алгоритма, который меняет веса модели по градиентам, чтобы минимизировать loss.
-    optimizer = Adam(params=model.parameters(), lr=experiment_config.learning_rate)
+    # Создание оптимизатора с differential lr для fine-tuning
+    freeze_proc = getattr(experiment_config, 'freeze_processor_epochs', 0)
+    proc_lr_factor = getattr(experiment_config, 'finetune_processor_lr_factor', 0.1)
+    base_lr = experiment_config.learning_rate
+
+    if pretrained_ckpt and freeze_proc > 0:
+        # Fine-tuning: differential lr для processor
+        proc_params = list(model.processor.parameters())
+        proc_ids = {id(p) for p in proc_params}
+        other_params = [p for p in model.parameters() if id(p) not in proc_ids]
+
+        # На старте: processor заморожен (lr=0 через requires_grad=False)
+        for p in proc_params:
+            p.requires_grad = False
+        print(f"[Fine-tune] Processor ЗАМОРОЖЕН на {freeze_proc} эпох.")
+        print(f"[Fine-tune] После разморозки processor lr = {base_lr * proc_lr_factor:.1e} (x{proc_lr_factor})")
+
+        optimizer = Adam([
+            {'params': other_params, 'lr': base_lr},
+            {'params': proc_params, 'lr': base_lr * proc_lr_factor},
+        ])
+    else:
+        optimizer = Adam(params=model.parameters(), lr=base_lr)
 
     # Путь к чекпоинту для возобновления
     checkpoint_path = os.path.join(results_save_dir, "checkpoint.pth") if resume else None

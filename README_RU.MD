@@ -264,6 +264,39 @@ python scripts/predict.py experiments/wb2_512x256_19f_ar \
     --data-dir data/datasets/wb2_512x256_19f_ar
 ```
 
+## Fine-tuning на мультирезолюционном датасете
+
+При файнтюне pretrained глобальной модели на новую геометрию (multires, региональные данные)
+граф encoder/decoder полностью перестраивается, а processor mesh-to-mesh остаётся тем же.
+Если обучать все слои c одинаковым lr с первой эпохи, шумные градиенты от ещё не
+адаптированных encoder/decoder разрушают выученные processor-веса.
+
+**Решение — freeze processor + differential lr:**
+
+| Параметр конфига               | Что делает                                              | По умолчанию |
+|--------------------------------|--------------------------------------------------------|--------------|
+| `freeze_processor_epochs`      | Сколько эпох processor заморожен (requires_grad=False) | 0 (выкл)     |
+| `finetune_processor_lr_factor` | Множитель lr для processor после разморозки             | 0.1          |
+
+Расписание (пример `freeze_processor_epochs=5`, `finetune_processor_lr_factor=0.1`):
+- **Эпохи 0–4**: processor заморожен, encoder/decoder адаптируются к новому графу (lr=1e-4)
+- **Эпоха 5+**: processor разморожен с lr=1e-5 (×0.1), encoder/decoder продолжают с lr=1e-4
+
+Запуск:
+```bash
+python -m src.main experiments/multires_krsk_19f \
+    --pretrained experiments/wb2_512x256_19f_ar_v2/best_model.pth
+```
+
+Инференс для Красноярска (45 точек, 0.25°):
+```bash
+python scripts/predict.py experiments/multires_krsk_19f \
+    --data-dir data/datasets/multires_krsk_19f \
+    --region 55.5 56.5 92 94 \
+    --ar-steps 4 \
+    --per-channel
+```
+
 ## Перенос на кластер / S3
 
 Датасет **не сжат** — это сырой float16 numpy memmap. Для переноса на S3:

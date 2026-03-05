@@ -209,3 +209,16 @@ Epoch 0 (AR=1): train_loss=0.14514  val_loss=0.12834  val_ACC=83.2333
 Epoch 1 (AR=1): train_loss=0.11615  val_loss=0.10395  val_ACC=83.2555
 ```
 val_ACC=83.2% с самого начала подтверждает что фикс test() работает корректно.
+
+Инференс (первый прогон — с багом в метриках: aggregate считались по всем 23 каналам):
+```
+Overall: Skill=46.64% (ЗАВЫШЕНО — forcing каналы раздувают)
+  t2m: 3.15°C → 5.00 → 6.67 → 8.17  (хуже чем эксп. 1: 2.66 → 3.14 → 3.69 → 4.33)
+```
+**Причина**: aggregate RMSE/Skill/ACC считались по ВСЕМ 23 каналам:
+- Forcing (sin_hour и т.д.): модель RMSE=0 (carry-forward из GT), baseline RMSE высокий → skill завышен
+- Forcing ACC≈0 (нет пространственной вариации) → ACC занижен
+- Реальный skill по метео-каналам ниже, t2m хуже эксп. 1
+
+**Фикс predict.py**: добавлен `exclude_channels` в StreamingMetrics — static+forcing исключены из aggregate.
+Перезапускаем инференс для честных цифр.
