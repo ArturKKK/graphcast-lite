@@ -98,7 +98,7 @@ def weighted_mse_loss(pred, target, lat_weights=None, channel_mask=None, spatial
     return diff.mean()
 # -------------------------------------
 
-def spatial_corr(pred: torch.Tensor, true: torch.Tensor) -> float:
+def spatial_corr(pred: torch.Tensor, true: torch.Tensor, exclude_channels: list = None) -> float:
     """ (ТВОЯ ФУНКЦИЯ БЕЗ ИЗМЕНЕНИЙ) """  
     if pred.dim() == 3:      # [B, N, F] -> усредним по батчу  
         pred = pred.mean(dim=0)  
@@ -107,6 +107,10 @@ def spatial_corr(pred: torch.Tensor, true: torch.Tensor) -> float:
     p = (pred - pred.mean(dim=0, keepdim=True)) / (pred.std(dim=0, keepdim=True) + 1e-8)  
     t = (true - true.mean(dim=0, keepdim=True)) / (true.std(dim=0, keepdim=True) + 1e-8)  
     acc_per_feat = (p * t).mean(dim=0)  
+    if exclude_channels:
+        mask = [i for i in range(acc_per_feat.shape[0]) if i not in exclude_channels]
+        if mask:
+            return acc_per_feat[mask].mean().item()
     return acc_per_feat.mean().item()
 
 def update_attention_threshold(epoch, max_epochs=30, start_epoch=5, final_threshold=0.1356):
@@ -266,7 +270,8 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device,
             loss = weighted_mse_loss(outs, y_step0, lat_weights, channel_mask=channel_mask, spatial_mask=spatial_mask)
             
             total_loss += loss.item()  
-            acc_values.append(spatial_corr(outs, y_step0))  
+            no_loss_ch = sorted(set(static_channels or []) | set(forcing_channels or []))
+            acc_values.append(spatial_corr(outs, y_step0, exclude_channels=no_loss_ch if no_loss_ch else None))  
 
     avg_loss = total_loss / len(test_dataloader)  
     avg_acc  = sum(acc_values) / max(1, len(acc_values))  
