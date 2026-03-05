@@ -359,16 +359,13 @@ def main():
         for i in range(max_samples):
             X, Y = test_ds[i]
             X = X.unsqueeze(0).to(device)  # (1, obs*C, H, W)
-            Y = Y.view(n_lat, n_lon, -1)   # (H, W, pred*C)
+            Y = Y.reshape(n_lat, n_lon, -1)   # (H, W, pred*C)
             
             B, _, H, W = X.shape
             obs = obs_window
             curr_state = X.view(1, obs, C, H, W)
             
-            Y_steps = Y.permute(2, 0, 1).view(-1, C, H, W)  # (pred, C, H, W)
-            total_pred = Y_steps.shape[0] // C if Y_steps.dim() == 3 else Y_steps.shape[0]
-            # Actually Y is (pred*C, H, W) → reshape to (pred, C, H, W)
-            Y_steps = Y.permute(2, 0, 1).view(pred_steps, C, H, W)
+            Y_steps = Y.permute(2, 0, 1).reshape(pred_steps, C, H, W)
             
             baseline = curr_state[0, -1].cpu()  # (C, H, W) — persistence
             
