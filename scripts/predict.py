@@ -442,7 +442,6 @@ def main():
                         step_out = model(inp, attention_threshold=0.0)  # [G, C] or [1, G, C]
                         if step_out.dim() == 2:
                             step_out = step_out.unsqueeze(0)
-                        ar_outs.append(step_out.cpu())
                         # Carry-forward: статические каналы подставляем из последнего входного шага
                         if static_ch:
                             static_vals = curr_state[:, :, -1, :]  # [1, G, C]
@@ -452,6 +451,8 @@ def main():
                         if forcing_ch and y_for_forcing is not None and ar_step < y_for_forcing.shape[1]:
                             for ch in forcing_ch:
                                 step_out[:, :, ch] = y_for_forcing[:, ar_step, ch].unsqueeze(0)
+                        # Сохраняем предсказание (ПОСЛЕ carry-forward, чтобы метрики были честными)
+                        ar_outs.append(step_out.cpu())
                         # Сдвигаем окно: [obs0, obs1] → [obs1, pred]
                         curr_state = torch.cat(
                             [curr_state[:, :, 1:, :], step_out.unsqueeze(2)], dim=2
