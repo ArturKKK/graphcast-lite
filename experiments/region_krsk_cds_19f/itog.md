@@ -111,51 +111,101 @@ Skill отрицательный, но модель на AR=1 была val_ACC=0
 
 ---
 
-## Эксперимент 4: 259 mesh + hidden 256 + 6 MP + boundary mask (ЗАПУЩЕН)
+## Эксперимент 4: 259 mesh + hidden 256 + 6 MP + boundary mask
 
 Конфиг: hidden=256, lr=2e-4, 60 эпох, max_ar=4, static_channels=[7,8], mesh_levels=[3,5], 6 MP steps, boundary_mask_width=5
 
 Изменения по сравнению с эксп. 1:
-- hidden 128 → 256 (больше ёмкость)
-- message_passing_steps 8 → 6 (меньше over-smoothing для региона)
-- lr 3e-4 → 2e-4
-- epochs 50 → 60, patience 12
-- decoder hidden 64 → 128
-- static_channels=[7,8] (z_surf, lsm не предсказываем)
-- boundary_mask_width=5 (loss=0 на 5 точках от края, inner 51×31 = 1581/2501)
+- hidden 128 → 256, MP steps 8 → 6, lr 3e-4 → 2e-4
+- static_channels=[7,8], boundary_mask_width=5 (inner 51×31)
 
-Результат: ...
+Обучение (38 эпох, AR=3):
+```
+Epoch 38 (AR=3) val_loss=0.11801  val_ACC=0.7425
+```
+
+Инференс (200 samples, AR=4):
+```
+Overall: RMSE=0.510303 | Skill: -4.28%  (по всей сетке)
+Inner zone (1581 pts): RMSE=0.365978 | Skill: 25.37%
+
+Per-horizon (inner zone):
+  +06h: skill=33.37% | t2m=2.95°C | ACC=0.8817
+  +12h: skill=33.89% | t2m=3.43°C | ACC=0.8065
+  +18h: skill=26.13% | t2m=4.13°C | ACC=0.7174
+  +24h: skill=18.36% | t2m=4.69°C | ACC=0.6424
+```
+
+**Вывод: хуже эксп. 1.** Boundary mask навредил — модель не учится на 37% точек (краевая зона), а 6 MP вместо 8 ухудшил распространение сигнала. hidden=256 не скомпенсировал.
 
 ---
 
-## Эксперимент 5: 23 канала + forcing (time features) — ПОДГОТОВЛЕН
+## Эксперимент 5: 23 канала + time forcing (hidden=256, 8 MP, без boundary mask)
 
-Конфиг: `experiments/region_krsk_cds_23f/config.json`
-Датасет: `region_krsk_61x41_23f_2010-2020_025deg` (скрипт: `scripts/add_time_features.py`)
+Конфиг: hidden=256, lr=3e-4, 60 эпох, max_ar=4, 23 каналов
+static_channels=[7,8], forcing_channels=[19,20,21,22], boundary_mask_width=0
+mesh=[3,5] (259 узлов), 8 MP steps
 
-Идея: добавить 4 канала временных признаков (sin_hour, cos_hour, sin_doy, cos_doy),
-чтобы модель знала время суток и сезон. Это позволяет выучить суточный цикл и сезонность.
+Обучение (epoch 15, AR=1 → переход на AR=2):
+```
+val_loss=0.43529  val_ACC=0.5854  ← ОЧЕНЬ ПЛОХО (для сравнения: эксп.1 val_ACC=0.87)
+```
 
-Каналы 19–22 объявлены как `forcing_channels` (не static):
-- loss = 0 (как у static — не предсказываем)
-- carry-forward из **таргета**, а не из последнего входа (значения известны заранее, но меняются каждый шаг)
+Инференс (200 samples, AR=4):
+```
+Overall: Skill=33.78% (завышен из-за time channels в baseline)
 
-Архитектура идентична эксп. 4:
-- hidden=256, mesh=[3,5] (259 узлов), 6 MP steps
-- lr=2e-4, 60 эпох, patience=12, max_ar=4
-- static_channels=[7,8], forcing_channels=[19,20,21,22]
-- boundary_mask_width=5
+Per-horizon per-channel RMSE (physical):
+  t2m:   3.61°C → 3.95 → 4.70 → 5.62  (эксп.1: 2.66 → 3.14 → 3.69 → 4.33)
+  u@850: 2.35   → 4.03 → 5.68 → 7.25  (эксп.1: 1.59 → 2.42 → 3.39 → 4.31)
+  msl:   5.50   → 6.18 → 7.29 → 8.57  (эксп.1: 1.50 → 2.61 → 4.24 → 5.83)
+```
 
-Изменения в коде:
-- `src/config.py`: добавлено поле `forcing_channels`, enum `region_krsk_cds_23f`
-- `src/train.py`: channel_mask объединяет static+forcing; AR carry-forward: static из last input, forcing из target
-- `scripts/predict.py`: аналогичная логика forcing при AR-инференсе
-- `src/main.py`: `region_krsk_cds_23f` добавлен в chunked dataloader list
+**Вывод: значительно хуже эксп. 1 по всем метеоканалам.**
 
-Для запуска на кластере:
-1. Залить обновлённые `src/config.py`, `src/train.py`, `src/main.py`, `scripts/predict.py`
-2. Залить `scripts/add_time_features.py`
-3. Запустить: `python scripts/add_time_features.py --source data/datasets/region_krsk_61x41_19f_2010-2020_025deg --dest data/datasets/region_krsk_61x41_23f_2010-2020_025deg`
-4. `python -m src.main --experiment experiments/region_krsk_cds_23f`
+### Root Cause (найден после эксп. 5)
 
-Результат: ...
+**Критический баг в `test()` (train.py):** функция валидации НЕ применяла carry-forward для static/forcing каналов.
+
+В `train_epoch()` AR-цикл правильно делал carry-forward:
+- static: `curr_state[:,:,ch] = curr_state[:,:,ch]` (копия из предыдущего шага)
+- forcing: `curr_state[:,:,ch] = y_steps[step][:,:,ch]` (из таргета)
+
+Но `test()` этого не делала! Результат:
+- `outs[:,:,7] = X_last[:,:,7] + delta_pred[:,:,7]` — delta необучена (лосс=0) → мусор
+- val_ACC считалась по ВСЕМ каналам включая мусорные → **занижена**
+- Curriculum (переход AR=1→2→3→4) опирается на val_ACC → **запоздалый или неправильный переход**
+- Early stopping тоже нарушен
+
+Это объясняет почему ВСЕ эксперименты с `static_channels` хуже эксп. 1:
+- Эксп. 1 (без static): test() корректна, val_ACC=0.87 — честная
+- Эксп. 2-5 (с static): test() даёт занижённую val_ACC → curriculum сломан
+
+**Фикс:** добавлен carry-forward в `test()` для static_channels (из X_last) и forcing_channels (из y_step0).
+
+---
+
+## Эксперимент 6: 23f + time forcing + static fix (PLAN)
+
+Конфиг: архитектура эксп. 1 (hidden=128) + 23f данные + forcing + **исправленная test()**
+
+- hidden=128, 8 MP steps, mesh [3,5] (259 узлов)
+- lr=3e-4, 50 эпох, patience=10
+- static_channels=[7,8], forcing_channels=[19,20,21,22], boundary_mask_width=0
+- 23f dataset (19 метео + 4 time features), obs=2, pred=1
+- decoder output_dim=23
+
+Гипотеза: эксп. 5 провалился из-за бага в test() (val_ACC занижена → curriculum сломан), а NOT из-за time features.
+С фиксом test() forcing channels должны работать корректно, time features дадут модели информацию о суточном/годовом цикле.
+hidden=128 (а не 256 как в эксп. 5) — проверено, достаточно для региона.
+
+Обучение (начало):
+```
+[Train] static_channels=[7, 8], forcing_channels=[19, 20, 21, 22]
+[Train] → маска каналов: 17/23 dynamic (no-loss: [7, 8, 19, 20, 21, 22])
+[Init] val_loss=0.19513 val_acc=83.1985   ← УЖЕ 83.2%! (эксп. 5 с багом: 58.5%)
+
+Epoch 0 (AR=1): train_loss=0.14514  val_loss=0.12834  val_ACC=83.2333
+Epoch 1 (AR=1): train_loss=0.11615  val_loss=0.10395  val_ACC=83.2555
+```
+val_ACC=83.2% с самого начала подтверждает что фикс test() работает корректно.

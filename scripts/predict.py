@@ -450,8 +450,8 @@ def main():
                             delta_pred = delta_pred.unsqueeze(0)
                         
                         # RESIDUAL LEARNING
-                        X_last = curr_state[:, :, -1, :]
-                        step_out = X_last + delta_pred
+                        step_x_last = curr_state[:, :, -1, :]
+                        step_out = step_x_last + delta_pred
 
                         # Carry-forward: статические каналы подставляем из последнего входного шага
                         if static_ch:
@@ -479,7 +479,8 @@ def main():
                 out = boundary_mask.squeeze(0).cpu() * out + (1.0 - boundary_mask.squeeze(0).cpu()) * bg
 
             # --- update streaming metrics ---
-            out_cpu, y_cpu, bl_cpu = out.cpu(), y.cpu(), X_last.cpu()
+            out_cpu, y_cpu = out.cpu(), y.cpu()
+            bl_cpu = X_last.cpu() if X_last.is_cuda else X_last
 
             # Если out шире, чем y (нет ground truth на все шаги), обрезаем
             if out_cpu.shape[-1] > y_cpu.shape[-1]:
