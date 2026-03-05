@@ -114,11 +114,11 @@ def main():
     with torch.no_grad():
         for i in range(max_samples):
             X, Y = test_ds[i]
+            # X: (obs*C, H, W),  Y: (pred*C, H, W) — already channel-first from Grid2DDataset
             X = X.unsqueeze(0).to(device)  # (1, obs*C, H, W)
-            Y = Y.reshape(H, W, -1)        # (H, W, pred*C)
 
             curr_state = X.view(1, obs_window, C, H, W)
-            Y_steps = Y.permute(2, 0, 1).reshape(pred_steps, C, H, W)  # (pred, C, H, W)
+            Y_steps = Y.reshape(pred_steps, C, H, W)  # (pred, C, H, W)
             baseline = curr_state[0, -1].cpu()  # (C, H, W)
 
             for ar_step in range(min(ar_steps_eval, pred_steps)):
