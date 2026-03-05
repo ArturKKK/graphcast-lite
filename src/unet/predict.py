@@ -102,10 +102,13 @@ def main():
     var_path = os.path.join(data_dir, "variables.json")
     var_names = json.load(open(var_path)) if os.path.exists(var_path) else [f"ch{i}" for i in range(C)]
 
-    # Per-horizon accumulators
+    # Per-horizon accumulators (physical units)
     dyn_count = C - len(no_loss_ch)
     sum_se_h = [np.zeros(C, dtype=np.float64) for _ in range(ar_steps_eval)]
     sum_se_base_h = [np.zeros(C, dtype=np.float64) for _ in range(ar_steps_eval)]
+    # Per-horizon accumulators (normalized units — fair across channels)
+    sum_nse_h = [np.zeros(C, dtype=np.float64) for _ in range(ar_steps_eval)]
+    sum_nse_base_h = [np.zeros(C, dtype=np.float64) for _ in range(ar_steps_eval)]
     # Per-horizon ACC accumulators
     sum_acc_h = [np.zeros(C, dtype=np.float64) for _ in range(ar_steps_eval)]
     acc_count_h = [np.zeros(C, dtype=np.int64) for _ in range(ar_steps_eval)]
@@ -147,6 +150,9 @@ def main():
                     bl_phys = bl_np[c] * std[c] + mean[c]
                     sum_se_h[ar_step][c] += ((pred_phys - gt_phys) ** 2).sum()
                     sum_se_base_h[ar_step][c] += ((bl_phys - gt_phys) ** 2).sum()
+                    # Normalized (unit-agnostic) — all channels contribute equally
+                    sum_nse_h[ar_step][c] += ((out_np[c] - gt_np[c]) ** 2).sum()
+                    sum_nse_base_h[ar_step][c] += ((bl_np[c] - gt_np[c]) ** 2).sum()
 
                     # Spatial ACC (normalized, no denorm needed)
                     p = out_np[c].flatten()
@@ -177,24 +183,25 @@ def main():
     print(f"=== U-Net Inference ({max_samples} samples, AR={ar_steps_eval}) ===")
     print(f"Grid: {H}×{W} | C={C} (dynamic={dyn_count})")
 
-    # Per-horizon skill (dynamic only)
-    print(f"\nPer-horizon (dynamic channels only):")
+    # Per-horizon skill (normalized — fair across channels)
+    print(f"\nPer-horizon (dynamic channels, normalized skill):")
     for h in range(ar_steps_eval):
-        dyn_se = sum(sum_se_h[h][c] for c in range(C) if c not in no_loss_ch)
-        dyn_se_base = sum(sum_se_base_h[h][c] for c in range(C) if c not in no_loss_ch)
-        rmse_pred = np.sqrt(dyn_se / max(count_h[h] * dyn_count, 1))
-        rmse_base = np.sqrt(dyn_se_base / max(count_h[h] * dyn_count, 1))
-        skill = (1.0 - rmse_pred / rmse_base) * 100 if rmse_base > 0 else 0
-        # ACC (dynamic only)
-        accs = []
+        # Per-channel skill, then average (each channel contributes equally)
+        skills_h = []
+        accs_h = []
         for c in range(C):
             if c in no_loss_ch:
                 continue
+            n = max(count_h[h], 1)
+            rmse_c = np.sqrt(sum_nse_h[h][c] / n)
+            rmse_b = np.sqrt(sum_nse_base_h[h][c] / n)
+            sk = (1.0 - rmse_c / rmse_b) * 100 if rmse_b > 1e-12 else 0
+            skills_h.append(sk)
             if acc_count_h[h][c] > 0:
-                accs.append(sum_acc_h[h][c] / acc_count_h[h][c])
-        avg_acc = sum(accs) / max(len(accs), 1)
-        print(f"  +{hours[h]:02d}h: RMSE={rmse_pred:.4f} | base={rmse_base:.4f} | "
-              f"skill={skill:.1f}% | ACC={avg_acc:.4f}")
+                accs_h.append(sum_acc_h[h][c] / acc_count_h[h][c])
+        avg_skill = sum(skills_h) / max(len(skills_h), 1)
+        avg_acc = sum(accs_h) / max(len(accs_h), 1)
+        print(f"  +{hours[h]:02d}h: avg_skill={avg_skill:.1f}% | ACC={avg_acc:.4f}")
 
     # Per-horizon per-channel RMSE (physical)
     print(f"\nPer-horizon per-channel RMSE (physical units):")
@@ -222,23 +229,38 @@ def main():
 
     # Per-channel overall (avg over horizons)
     print(f"\nPer-channel metrics overall (avg over {ar_steps_eval} horizons):")
-    print(f"  {'#':>3} {'var':>10} {'ACC':>8} {'RMSE_phys':>12} {'unit':>8}")
+    print(f"  {'#':>3} {'var':>10} {'ACC':>8} {'skill%':>8} {'RMSE_phys':>12} {'unit':>8}")
+    overall_skills = []
+    overall_accs = []
     for c in range(C):
         name = var_names[c] if c < len(var_names) else f"ch{c}"
         unit = _guess_unit(name)
-        # Average RMSE over horizons
+        # Average metrics over horizons
         rmse_vals = []
+        skill_vals = []
         acc_vals = []
         for h in range(ar_steps_eval):
             if count_h[h] > 0:
                 rmse_vals.append(np.sqrt(sum_se_h[h][c] / count_h[h]))
+                rmse_c = np.sqrt(sum_nse_h[h][c] / count_h[h])
+                rmse_b = np.sqrt(sum_nse_base_h[h][c] / count_h[h])
+                sk = (1.0 - rmse_c / rmse_b) * 100 if rmse_b > 1e-12 else 0
+                skill_vals.append(sk)
             if acc_count_h[h][c] > 0:
                 acc_vals.append(sum_acc_h[h][c] / acc_count_h[h][c])
         avg_rmse = sum(rmse_vals) / max(len(rmse_vals), 1)
+        avg_skill = sum(skill_vals) / max(len(skill_vals), 1)
         avg_acc = sum(acc_vals) / max(len(acc_vals), 1)
         tag = " (static)" if c in static_ch else " (forcing)" if c in forcing_ch else ""
-        print(f"  {c:3d} {name:>10}   {avg_acc:6.4f}   {avg_rmse:10.4f}   {unit:>6}{tag}")
+        print(f"  {c:3d} {name:>10}   {avg_acc:6.4f}   {avg_skill:+6.1f}%   {avg_rmse:10.4f}   {unit:>6}{tag}")
+        if c not in no_loss_ch:
+            overall_skills.append(avg_skill)
+            overall_accs.append(avg_acc)
 
+    # Summary line
+    mean_skill = sum(overall_skills) / max(len(overall_skills), 1)
+    mean_acc = sum(overall_accs) / max(len(overall_accs), 1)
+    print(f"\n  >>> MEAN (dynamic): skill={mean_skill:.1f}% | ACC={mean_acc:.4f}")
     print(f"{'='*70}")
 
 
