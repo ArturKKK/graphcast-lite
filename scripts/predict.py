@@ -53,8 +53,9 @@ def read_coords(meta, data_dir: Path):
 class StreamingMetrics:
     """Накапливает MSE/MAE/ACC потоково — без хранения всех сэмплов в RAM."""
 
-    def __init__(self, num_channels: int):
+    def __init__(self, num_channels: int, exclude_channels: list = None):
         self.C = num_channels
+        self.exclude_channels = set(exclude_channels or [])
         self.n = 0
         self.total_elem = 0
         self.sum_se = 0.0
@@ -67,11 +68,8 @@ class StreamingMetrics:
     def update(self, y_true: torch.Tensor, y_pred: torch.Tensor):
         """y_true, y_pred: [G, C*P] or [G, C]"""
         err = y_pred.float() - y_true.float()
-        self.sum_se += err.pow(2).sum().item()
-        self.sum_ae += err.abs().sum().item()
-        self.total_elem += y_true.numel()
 
-        # per-channel SE & spatial ACC
+        # per-channel SE & spatial ACC (накапливаем для ВСЕХ каналов)
         CP = y_true.shape[1]
         eps = 1e-8
         for c in range(CP):
@@ -86,6 +84,14 @@ class StreamingMetrics:
             corr = (yt_a * yp_a).sum() / (yt_a.norm() * yp_a.norm() + eps)
             self.sum_acc[ch] += corr.item()
             self.acc_count[ch] += 1
+
+        # aggregate: только dynamic каналы (без excluded)
+        dyn_mask = [c for c in range(CP) if (c % self.C) not in self.exclude_channels]
+        if dyn_mask:
+            err_dyn = err[:, dyn_mask]
+            self.sum_se += err_dyn.pow(2).sum().item()
+            self.sum_ae += err_dyn.abs().sum().item()
+            self.total_elem += err_dyn.numel()
         self.n += 1
 
     @property
@@ -112,7 +118,9 @@ class StreamingMetrics:
 
     @property
     def acc(self):
-        return float(self.acc_per_channel.mean())
+        apc = self.acc_per_channel
+        dyn = [c for c in range(self.C) if c not in self.exclude_channels]
+        return float(apc[dyn].mean()) if dyn else 0.0
 
 def main():
     ap = argparse.ArgumentParser()
@@ -349,21 +357,24 @@ def main():
         print(f"[Region] {len(region_idxs)} nodes")
 
     # --- streaming metrics (без хранения всех тензоров) ---
-    sm_pred = StreamingMetrics(C)
-    sm_base = StreamingMetrics(C)
-    sm_pred_r = StreamingMetrics(C) if region_idxs is not None else None
-    sm_base_r = StreamingMetrics(C) if region_idxs is not None else None
+    no_loss_ch = sorted(set(static_ch) | set(forcing_ch))
+    sm_pred = StreamingMetrics(C, exclude_channels=no_loss_ch)
+    sm_base = StreamingMetrics(C, exclude_channels=no_loss_ch)
+    sm_pred_r = StreamingMetrics(C, exclude_channels=no_loss_ch) if region_idxs is not None else None
+    sm_base_r = StreamingMetrics(C, exclude_channels=no_loss_ch) if region_idxs is not None else None
 
     sm_pred_rh, sm_base_rh = [], []  # per-horizon region metrics
 
     sm_pred_h, sm_base_h = [], []
     if AR_STEPS > 1:
         for _ in range(AR_STEPS):
-            sm_pred_h.append(StreamingMetrics(C))
-            sm_base_h.append(StreamingMetrics(C))
+            sm_pred_h.append(StreamingMetrics(C, exclude_channels=no_loss_ch))
+            sm_base_h.append(StreamingMetrics(C, exclude_channels=no_loss_ch))
             if region_idxs is not None:
-                sm_pred_rh.append(StreamingMetrics(C))
-                sm_base_rh.append(StreamingMetrics(C))
+                sm_pred_rh.append(StreamingMetrics(C, exclude_channels=no_loss_ch))
+                sm_base_rh.append(StreamingMetrics(C, exclude_channels=no_loss_ch))
+    if no_loss_ch:
+        print(f"[metrics] Исключены из aggregate метрик: каналы {no_loss_ch} (static+forcing)")
 
     # --- accumulate predictions (if --save) ---
     save_preds_list = [] if (args.save and not args.no_save) else None
