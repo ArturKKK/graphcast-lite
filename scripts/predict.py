@@ -425,8 +425,14 @@ def main():
                         curr_state = torch.cat([curr_state[:, :, 1:, :], out_step.to(device).unsqueeze(2)], dim=2)
                     out = torch.stack(batch_steps, dim=2).view(1, G, -1).squeeze(0)
             else:
-                if AR_STEPS <= P_model:
-                    # Модель сама выдаёт все горизонты
+                if AR_STEPS == P_model and P_model == 1:
+                    # Одношаговая без AR
+                    delta_pred = model(X, attention_threshold=0.0).cpu()
+                    if delta_pred.dim() == 2: delta_pred = delta_pred.unsqueeze(0)
+                    X_reshaped = X.view(1, G, OBS, C)
+                    out = (X_reshaped[:, :, -1, :].cpu() + delta_pred).squeeze(0)
+                elif AR_STEPS <= P_model:
+                    # Многошаговая модель (не поддерживается residual в лоб, оставим как есть)
                     out = model(X, attention_threshold=0.0).cpu()
                 else:
                     # AR-rollout: модель одношаговая, прогоняем несколько раз
@@ -439,9 +445,14 @@ def main():
                         y_for_forcing = y.view(y.shape[0], -1, C)  # [G, steps, C]
                     for ar_step in range(AR_STEPS):
                         inp = curr_state.view(1, G, -1)
-                        step_out = model(inp, attention_threshold=0.0)  # [G, C] or [1, G, C]
-                        if step_out.dim() == 2:
-                            step_out = step_out.unsqueeze(0)
+                        delta_pred = model(inp, attention_threshold=0.0)  # [G, C] or [1, G, C]
+                        if delta_pred.dim() == 2:
+                            delta_pred = delta_pred.unsqueeze(0)
+                        
+                        # RESIDUAL LEARNING
+                        X_last = curr_state[:, :, -1, :]
+                        step_out = X_last + delta_pred
+
                         # Carry-forward: статические каналы подставляем из последнего входного шага
                         if static_ch:
                             static_vals = curr_state[:, :, -1, :]  # [1, G, C]

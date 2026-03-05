@@ -172,11 +172,16 @@ def train_epoch(
             # Вход в модель (плоский)
             inp = curr_state.view(N, G, -1)
             
-            # Прогноз (Модель теперь должна выдавать 1 шаг! C=15)
-            out = model(X=inp, attention_threshold=threshold, epoch=epoch, batch_num=i)
+            # Прогноз (Модель теперь предсказывает дельту/изменение для 1 шага!)
+            delta_pred = model(X=inp, attention_threshold=threshold, epoch=epoch, batch_num=i)
             
             # Если батч пропал
-            if out.dim() == 2: out = out.unsqueeze(0)
+            if delta_pred.dim() == 2: delta_pred = delta_pred.unsqueeze(0)
+            
+            # RESIDUAL LEARNING (КРИТИЧЕСКИ ВАЖНО):
+            # Модель предсказывает только изменения. Добавляем их к последнему известному шагу.
+            X_last = curr_state[:, :, -1, :]
+            out = X_last + delta_pred
             
             # Цель на этот шаг
             target = y_steps[:, :, step, :]
@@ -210,8 +215,14 @@ def train_epoch(
     avg_loss = total_loss / len(train_dataloader)  
     return avg_loss
 
-def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device, lat_weights=None, spatial_mask=None):
-    """Оценка модели. Для скорости проверяем только 1-й шаг."""
+def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device,
+         lat_weights=None, spatial_mask=None, channel_mask=None,
+         static_channels=None, forcing_channels=None):
+    """Оценка модели. Для скорости проверяем только 1-й шаг.
+    
+    static_channels: carry-forward из X_last (значения не меняются)
+    forcing_channels: carry-forward из y (известные будущие значения, напр. время)
+    """
     model.eval()
 
     total_loss = 0  
@@ -231,11 +242,28 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device,
             else:
                 y_step0 = y
 
-            outs = model(X=X, attention_threshold=0.0) 
-            if outs.dim() == 2: outs = outs.unsqueeze(0)
+            # RESIDUAL LEARNING IN TEST:
+            delta_pred = model(X=X, attention_threshold=0.0) 
+            if delta_pred.dim() == 2: delta_pred = delta_pred.unsqueeze(0)
+            
+            # Извлекаем последний шаг из X [N, G, obs*C]
+            obs = model.obs_window if hasattr(model, 'obs_window') else 2
+            X_reshaped = X.view(X.shape[0], X.shape[1], obs, C)
+            X_last = X_reshaped[:, :, -1, :]
+            
+            outs = X_last + delta_pred
+            
+            # Carry-forward для static каналов (как при AR-инференсе)
+            if static_channels:
+                for ch in static_channels:
+                    outs[:, :, ch] = X_last[:, :, ch]
+            # Carry-forward для forcing каналов (из target — известны заранее)
+            if forcing_channels:
+                for ch in forcing_channels:
+                    outs[:, :, ch] = y_step0[:, :, ch]
             
             # Используем тот же лосс
-            loss = weighted_mse_loss(outs, y_step0, lat_weights, spatial_mask=spatial_mask)
+            loss = weighted_mse_loss(outs, y_step0, lat_weights, channel_mask=channel_mask, spatial_mask=spatial_mask)
             
             total_loss += loss.item()  
             acc_values.append(spatial_corr(outs, y_step0))  
@@ -346,7 +374,11 @@ def train(
     _log("-" * 90)
 
     if start_epoch == 0:
-        intial_val_loss, initial_val_acc = test(model, val_dataloader, loss_fn, device, lat_weights)  
+        intial_val_loss, initial_val_acc = test(
+            model, val_dataloader, loss_fn, device, lat_weights, 
+            spatial_mask=spatial_mask, channel_mask=channel_mask,
+            static_channels=static_ch, forcing_channels=forcing_ch,
+        )  
         if print_losses:  
             print(f"[Init] val_loss={intial_val_loss:.5f} val_acc={initial_val_acc:.4f}")
         _log(f"{'init':>5}  {'--':>2}  {'--':>10}  {intial_val_loss:10.5f}  {initial_val_acc:8.4f}  {'--':>10}  {'--':>8}  {datetime.now().strftime('%H:%M:%S')}")
@@ -381,7 +413,8 @@ def train(
 
         epoch_val_loss, epoch_val_acc = test(  
             model, val_dataloader, loss_fn, device, lat_weights,
-            spatial_mask=spatial_mask,
+            spatial_mask=spatial_mask, channel_mask=channel_mask,
+            static_channels=static_ch, forcing_channels=forcing_ch,
         )  
 
         if print_losses:  
