@@ -1,0 +1,15 @@
+{
+  "data_dir": "data/datasets/region_krsk_61x41_23f_2010-2020_025deg",
+  "num_features": 23,
+  "obs_window": 2,
+  "pred_steps": 4,
+  "batch_size": 16,
+  "learning_rate": 1e-3,
+  "num_epochs": 50,
+  "patience": 10,
+  "base_filters": 96,
+  "max_ar_steps": 4,
+  "static_channels": [7, 8],
+  "forcing_channels": [19, 20, 21, 22],
+  "random_seed": 42
+}
