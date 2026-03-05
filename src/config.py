@@ -62,6 +62,7 @@ class DatasetNames(str, Enum):
     wb2_512x256_19f_ar_v2 = "wb2_512x256_19f_ar_v2"
     multires = "multires"  # multi-resolution flat grid (any region)
     region_krsk_cds_19f = "region_krsk_cds_19f"  # Krasnoyarsk 61x41, 0.25°, CDS ERA5
+    region_krsk_cds_23f = "region_krsk_cds_23f"  # То же + 4 time features (sin/cos hour/doy)
 
 
 class GraphBuildingConfig(BaseModel):
@@ -242,4 +243,6 @@ class ExperimentConfig(BaseModel):
     data_dir: Optional[str] = None       # Путь к датасету (если задан, используется вместо data.dataset_name)
     static_channels: List[int] = []      # Индексы каналов-констант (lsm, z_surf и т.п.):
                                          # не участвуют в loss, при AR carry-forward из входа
+    forcing_channels: List[int] = []     # Индексы каналов-форсинга (sin_hour, cos_hour, ...):
+                                         # не участвуют в loss, при AR carry-forward из таргета
     boundary_mask_width: int = 0         # Сколько точек от края отступить (loss=0 в буферной зоне)

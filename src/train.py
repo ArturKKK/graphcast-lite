@@ -128,6 +128,8 @@ def train_epoch(
     current_ar_steps=1,
     channel_mask=None,
     spatial_mask=None,
+    static_channels=None,
+    forcing_channels=None,
 ):
     """Один проход обучения. ТЕПЕРЬ С АВТОРЕГРЕССИЕЙ."""  
     model.train()  
@@ -185,9 +187,15 @@ def train_epoch(
             # САМОЕ ГЛАВНОЕ: Добавляем наш прогноз в историю для следующего шага
             # [1, 2, 3, 4] -> [2, 3, 4, out]
             # Для статических каналов подставляем значения из последнего входного шага
-            if channel_mask is not None:
+            if static_channels:
                 static_vals = curr_state[:, :, -1, :]  # [N, G, C]
-                out = out * channel_mask + static_vals * (1.0 - channel_mask)
+                for ch in static_channels:
+                    out[:, :, ch] = static_vals[:, :, ch]
+            # Для forcing каналов подставляем значения из таргета (known in advance)
+            if forcing_channels and step < total_target_steps:
+                forcing_vals = y_steps[:, :, step, :]  # [N, G, C]
+                for ch in forcing_channels:
+                    out[:, :, ch] = forcing_vals[:, :, ch]
             out_unsqueezed = out.unsqueeze(2)
             curr_state = torch.cat([curr_state[:, :, 1:, :], out_unsqueezed], dim=2)
             
@@ -269,17 +277,21 @@ def train(
     max_ar = config.max_ar_steps # 4
     epochs_per_stage = num_epochs // max_ar if max_ar > 0 else num_epochs
 
-    # --- Маска каналов: 0 для статических, 1 для динамических ---
+    # --- Маска каналов: 0 для статических и forcing, 1 для динамических ---
     static_ch = getattr(config, 'static_channels', [])
+    forcing_ch = getattr(config, 'forcing_channels', [])
+    no_loss_ch = sorted(set(static_ch) | set(forcing_ch))  # объединяем
     channel_mask = None
-    if static_ch:
+    if no_loss_ch:
         C_total = config.data.num_features_used
         cm = torch.ones(C_total, device=device)
-        for ch in static_ch:
+        for ch in no_loss_ch:
             if 0 <= ch < C_total:
                 cm[ch] = 0.0
         channel_mask = cm
-        print(f"[Train] static_channels={static_ch} → маска каналов: {int(cm.sum())}/{C_total} dynamic")
+        n_dynamic = int(cm.sum())
+        print(f"[Train] static_channels={static_ch}, forcing_channels={forcing_ch}")
+        print(f"[Train] → маска каналов: {n_dynamic}/{C_total} dynamic (no-loss: {no_loss_ch})")
 
     # --- Пространственная маска: обнуляем лосс на краях региона ---
     spatial_mask = None
@@ -364,6 +376,7 @@ def train(
             epoch_threshold, epoch, 
             lat_weights=lat_weights, current_ar_steps=ar_steps,
             channel_mask=channel_mask, spatial_mask=spatial_mask,
+            static_channels=static_ch, forcing_channels=forcing_ch,
         )  
 
         epoch_val_loss, epoch_val_acc = test(  

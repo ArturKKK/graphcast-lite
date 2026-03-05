@@ -83,6 +83,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str,
         DatasetNames.wb2_512x256_19f_ar_v2,
         DatasetNames.multires,
         DatasetNames.region_krsk_cds_19f,
+        DatasetNames.region_krsk_cds_23f,
     ):
         # Chunked dataloader для больших сеток (512×256) и мультирезолюционных
         # Для AR-обучения подаём max_ar_steps целевых кадров
