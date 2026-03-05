@@ -258,10 +258,13 @@ def main():
     if AR_STEPS > P_model:
         print(f"[AR-rollout] Модель выдаёт {P_model} шаг(ов), но мы прогоним {AR_STEPS} шагов авторегрессионно.")
 
-    # --- static channels: carry-forward вместо предсказания ---
+    # --- static & forcing channels: carry-forward вместо предсказания ---
     static_ch = getattr(exp_cfg, 'static_channels', [])
+    forcing_ch = getattr(exp_cfg, 'forcing_channels', [])
     if static_ch:
         print(f"[static] Каналы {static_ch} — статика, carry-forward при AR")
+    if forcing_ch:
+        print(f"[forcing] Каналы {forcing_ch} — форсинг (из ground truth при AR)")
 
     # --- max samples (авто-лимит для больших сеток) ---
     if args.max_samples is not None:
@@ -302,9 +305,25 @@ def main():
         mask_tensor = build_boundary_taper_mask(meta.num_latitudes, meta.num_longitudes, args.taper_width, args.taper_width)
         boundary_mask = mask_tensor.view(1, G, 1).float()
 
-    # --- region ---
+    # --- region / boundary-mask inner zone ---
     region_idxs = None
     coords_npz = data_dir / "coords.npz"
+
+    # Автоматическое определение inner-зоны из boundary_mask_width в конфиге
+    bmw = getattr(exp_cfg, 'boundary_mask_width', 0)
+    if bmw > 0 and not args.region and not getattr(meta, 'flat_grid', False):
+        n_lon = meta.num_longitudes
+        n_lat = meta.num_latitudes
+        inner_idxs = []
+        for j in range(bmw, n_lon - bmw):
+            for i in range(bmw, n_lat - bmw):
+                inner_idxs.append(j * n_lat + i)
+        region_idxs = np.array(inner_idxs, dtype=np.int64)
+        inner_lon = n_lon - 2 * bmw
+        inner_lat = n_lat - 2 * bmw
+        print(f"[boundary-mask] boundary_mask_width={bmw} → inner {inner_lon}×{inner_lat} "
+              f"= {len(region_idxs)}/{G} points (метрики только по внутренней зоне)")
+
     if args.region and coords_npz.exists():
         # --region задан явно → фильтруем по bbox из coords.npz (работает и для flat grid)
         z = np.load(coords_npz)
@@ -320,11 +339,11 @@ def main():
                     (c_lons >= lon_min_r) & (c_lons <= lon_max_r))
             region_idxs = np.where(mask)[0]
         print(f"[Region] {len(region_idxs)} nodes (--region [{lat_min_r},{lat_max_r}]N x [{lon_min_r},{lon_max_r}]E)")
-    elif getattr(meta, 'is_regional', None) is not None:
+    elif getattr(meta, 'is_regional', None) is not None and region_idxs is None:
         # Flat multires grid: region mask из metadata (весь ROI)
         region_idxs = np.where(meta.is_regional)[0]
         print(f"[Region] {len(region_idxs)} nodes (from is_regional mask)")
-    elif args.region:
+    elif args.region and region_idxs is None:
         lats, lons = read_coords(meta, data_dir)
         region_idxs = region_node_indices(*args.region, lats, lons)
         print(f"[Region] {len(region_idxs)} nodes")
@@ -414,6 +433,10 @@ def main():
                     # curr_state: [1, G, OBS, C]
                     curr_state = X.view(1, G, OBS, C)
                     ar_outs = []
+                    # Для forcing channels нужен ground truth
+                    y_for_forcing = None
+                    if forcing_ch:
+                        y_for_forcing = y.view(y.shape[0], -1, C)  # [G, steps, C]
                     for ar_step in range(AR_STEPS):
                         inp = curr_state.view(1, G, -1)
                         step_out = model(inp, attention_threshold=0.0)  # [G, C] or [1, G, C]
@@ -425,6 +448,10 @@ def main():
                             static_vals = curr_state[:, :, -1, :]  # [1, G, C]
                             for ch in static_ch:
                                 step_out[:, :, ch] = static_vals[:, :, ch]
+                        # Forcing: подставляем из ground truth (known in advance)
+                        if forcing_ch and y_for_forcing is not None and ar_step < y_for_forcing.shape[1]:
+                            for ch in forcing_ch:
+                                step_out[:, :, ch] = y_for_forcing[:, ar_step, ch].unsqueeze(0)
                         # Сдвигаем окно: [obs0, obs1] → [obs1, pred]
                         curr_state = torch.cat(
                             [curr_state[:, :, 1:, :], step_out.unsqueeze(2)], dim=2
@@ -590,6 +617,8 @@ def main():
         sk_r = 1.0 - (sm_pred_r.rmse / (sm_base_r.rmse + 1e-12))
         if args.region:
             region_label = f"[{args.region[0]},{args.region[1]}]N x [{args.region[2]},{args.region[3]}]E"
+        elif bmw > 0:
+            region_label = f"inner zone (boundary_mask_width={bmw})"
         else:
             region_label = "is_regional mask"
         print(f"\n--- Region {region_label} ({len(region_idxs)} nodes) ---")
