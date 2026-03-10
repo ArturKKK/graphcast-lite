@@ -143,6 +143,9 @@ def main():
                     help="Число AR-шагов для авторегрессионного инференса. "
                          "Если модель одношаговая (P=1), можно прогнать N шагов, "
                          "подавая выход обратно на вход. Напр. --ar-steps 4 для +24h.")
+    ap.add_argument("--no-residual", action="store_true",
+                    help="Модель предсказывает полное поле, а не дельту. "
+                         "Не прибавлять X_last к выходу модели.")
 
     # --- УСВОЕНИЕ ---
     ap.add_argument("--assim-method", default="none", choices=["none", "nudging", "oi"])
@@ -438,10 +441,13 @@ def main():
             else:
                 if AR_STEPS == P_model and P_model == 1:
                     # Одношаговая без AR
-                    delta_pred = model(X, attention_threshold=0.0).cpu()
-                    if delta_pred.dim() == 2: delta_pred = delta_pred.unsqueeze(0)
-                    X_reshaped = X.view(1, G, OBS, C)
-                    out = (X_reshaped[:, :, -1, :].cpu() + delta_pred).squeeze(0)
+                    pred = model(X, attention_threshold=0.0).cpu()
+                    if pred.dim() == 2: pred = pred.unsqueeze(0)
+                    if args.no_residual:
+                        out = pred.squeeze(0)
+                    else:
+                        X_reshaped = X.view(1, G, OBS, C)
+                        out = (X_reshaped[:, :, -1, :].cpu() + pred).squeeze(0)
                 elif AR_STEPS <= P_model:
                     # Многошаговая модель (не поддерживается residual в лоб, оставим как есть)
                     out = model(X, attention_threshold=0.0).cpu()
@@ -461,8 +467,11 @@ def main():
                             delta_pred = delta_pred.unsqueeze(0)
                         
                         # RESIDUAL LEARNING
-                        step_x_last = curr_state[:, :, -1, :]
-                        step_out = step_x_last + delta_pred
+                        if args.no_residual:
+                            step_out = delta_pred
+                        else:
+                            step_x_last = curr_state[:, :, -1, :]
+                            step_out = step_x_last + delta_pred
 
                         # Carry-forward: статические каналы подставляем из последнего входного шага
                         if static_ch:
