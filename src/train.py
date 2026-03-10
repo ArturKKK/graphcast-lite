@@ -134,6 +134,7 @@ def train_epoch(
     spatial_mask=None,
     static_channels=None,
     forcing_channels=None,
+    use_residual=True,
 ):
     """Один проход обучения. ТЕПЕРЬ С АВТОРЕГРЕССИЕЙ."""  
     model.train()  
@@ -182,10 +183,12 @@ def train_epoch(
             # Если батч пропал
             if delta_pred.dim() == 2: delta_pred = delta_pred.unsqueeze(0)
             
-            # RESIDUAL LEARNING (КРИТИЧЕСКИ ВАЖНО):
-            # Модель предсказывает только изменения. Добавляем их к последнему известному шагу.
-            X_last = curr_state[:, :, -1, :]
-            out = X_last + delta_pred
+            # RESIDUAL LEARNING (опционально):
+            if use_residual:
+                X_last = curr_state[:, :, -1, :]
+                out = X_last + delta_pred
+            else:
+                out = delta_pred
             
             # Цель на этот шаг
             target = y_steps[:, :, step, :]
@@ -221,7 +224,7 @@ def train_epoch(
 
 def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device,
          lat_weights=None, spatial_mask=None, channel_mask=None,
-         static_channels=None, forcing_channels=None):
+         static_channels=None, forcing_channels=None, use_residual=True):
     """Оценка модели. Для скорости проверяем только 1-й шаг.
     
     static_channels: carry-forward из X_last (значения не меняются)
@@ -231,6 +234,7 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device,
 
     total_loss = 0  
     acc_values = []  
+    raw_rmse_values = []
 
     with torch.no_grad():  
         for batch in test_dataloader:  
@@ -246,16 +250,21 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device,
             else:
                 y_step0 = y
 
-            # RESIDUAL LEARNING IN TEST:
-            delta_pred = model(X=X, attention_threshold=0.0) 
-            if delta_pred.dim() == 2: delta_pred = delta_pred.unsqueeze(0)
+            # MODEL PREDICTION:
+            pred = model(X=X, attention_threshold=0.0) 
+            if pred.dim() == 2: pred = pred.unsqueeze(0)
             
-            # Извлекаем последний шаг из X [N, G, obs*C]
-            obs = model.obs_window if hasattr(model, 'obs_window') else 2
-            X_reshaped = X.view(X.shape[0], X.shape[1], obs, C)
-            X_last = X_reshaped[:, :, -1, :]
-            
-            outs = X_last + delta_pred
+            if use_residual:
+                # Извлекаем последний шаг из X [N, G, obs*C]
+                obs = model.obs_window if hasattr(model, 'obs_window') else 2
+                X_reshaped = X.view(X.shape[0], X.shape[1], obs, C)
+                X_last = X_reshaped[:, :, -1, :]
+                outs = X_last + pred
+            else:
+                obs = model.obs_window if hasattr(model, 'obs_window') else 2
+                X_reshaped = X.view(X.shape[0], X.shape[1], obs, C)
+                X_last = X_reshaped[:, :, -1, :]
+                outs = pred
             
             # Carry-forward для static каналов (как при AR-инференсе)
             if static_channels:
@@ -269,14 +278,19 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device,
             # Используем тот же лосс
             loss = weighted_mse_loss(outs, y_step0, lat_weights, channel_mask=channel_mask, spatial_mask=spatial_mask)
             
+            # Невзвешенный RMSE для диагностики (чтобы видеть реальную картину)
+            raw_mse = ((outs - y_step0) ** 2).mean().item()
+            raw_rmse_values.append(raw_mse)
+            
             total_loss += loss.item()  
             no_loss_ch = sorted(set(static_channels or []) | set(forcing_channels or []))
             acc_values.append(spatial_corr(outs, y_step0, exclude_channels=no_loss_ch if no_loss_ch else None))  
 
     avg_loss = total_loss / len(test_dataloader)  
-    avg_acc  = sum(acc_values) / max(1, len(acc_values))  
+    avg_acc  = sum(acc_values) / max(1, len(acc_values))
+    avg_raw_rmse = (sum(raw_rmse_values) / max(1, len(raw_rmse_values))) ** 0.5
 
-    return avg_loss, avg_acc
+    return avg_loss, avg_acc, avg_raw_rmse
 
 def train(
     model: WeatherPrediction,
@@ -340,6 +354,7 @@ def train(
                   f"(inner {n_lon-2*bmw}×{n_lat-2*bmw})")
 
     loss_fn = nn.MSELoss()
+    use_residual = getattr(config, 'use_residual', True)
 
     train_losses = []  
     val_losses = []  
@@ -379,13 +394,14 @@ def train(
     _log("-" * 90)
 
     if start_epoch == 0:
-        intial_val_loss, initial_val_acc = test(
+        intial_val_loss, initial_val_acc, init_raw_rmse = test(
             model, val_dataloader, loss_fn, device, lat_weights, 
             spatial_mask=spatial_mask, channel_mask=channel_mask,
             static_channels=static_ch, forcing_channels=forcing_ch,
+            use_residual=use_residual,
         )  
         if print_losses:  
-            print(f"[Init] val_loss={intial_val_loss:.5f} val_acc={initial_val_acc:.4f}")
+            print(f"[Init] val_loss={intial_val_loss:.5f} val_acc={initial_val_acc:.4f} raw_RMSE={init_raw_rmse:.4f}")
         _log(f"{'init':>5}  {'--':>2}  {'--':>10}  {intial_val_loss:10.5f}  {initial_val_acc:8.4f}  {'--':>10}  {'--':>8}  {datetime.now().strftime('%H:%M:%S')}")
 
     # --- Fine-tuning: freeze/unfreeze processor ---
@@ -424,16 +440,18 @@ def train(
             lat_weights=lat_weights, current_ar_steps=ar_steps,
             channel_mask=channel_mask, spatial_mask=spatial_mask,
             static_channels=static_ch, forcing_channels=forcing_ch,
+            use_residual=use_residual,
         )  
 
-        epoch_val_loss, epoch_val_acc = test(  
+        epoch_val_loss, epoch_val_acc, epoch_raw_rmse = test(  
             model, val_dataloader, loss_fn, device, lat_weights,
             spatial_mask=spatial_mask, channel_mask=channel_mask,
             static_channels=static_ch, forcing_channels=forcing_ch,
+            use_residual=use_residual,
         )  
 
         if print_losses:  
-            print(f"[Epoch {epoch+1}] train_loss={epoch_train_loss:.5f}  val_loss={epoch_val_loss:.5f}  val_ACC={epoch_val_acc:.4f}")  
+            print(f"[Epoch {epoch+1}] train_loss={epoch_train_loss:.5f}  val_loss={epoch_val_loss:.5f}  val_ACC={epoch_val_acc:.4f}  raw_RMSE={epoch_raw_rmse:.4f}")  
 
         train_losses.append(epoch_train_loss)  
         val_losses.append(epoch_val_loss)  

@@ -248,3 +248,5 @@ class ExperimentConfig(BaseModel):
     boundary_mask_width: int = 0         # Сколько точек от края отступить (loss=0 в буферной зоне)
     freeze_processor_epochs: int = 0     # Число эпох, на которых processor заморожен (fine-tuning)
     finetune_processor_lr_factor: float = 0.1  # lr множитель для processor после разморозки
+    use_residual: bool = True              # True = модель предсказывает дельту (out = X_last + pred)
+                                           # False = модель предсказывает полное поле (out = pred)
