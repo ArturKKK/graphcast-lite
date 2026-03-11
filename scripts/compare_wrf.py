@@ -58,7 +58,12 @@ UNIT_DISPLAY = {
 def load_predictions_and_truth(data_dir, pred_path, exp_dir, ar_steps):
     """
     Загружает предсказания и ground truth, денормализует.
-    Returns: pred_phys, truth_phys — dict{var_name: np.ndarray (n_samples, n_region_nodes, n_horizons)}
+    Поддерживает:
+      - Новый формат predictions.pt (dict с "predictions" + "ground_truth")
+      - Старый формат (голый тензор, truth из data.npy)
+      - Flat grid (multires) и регулярную сетку
+    Returns: pred_region, truth_region — np.ndarray (n_samples, n_region_nodes, P, C) в физ.единицах
+             var_names, P, n_samples
     """
     data_dir = Path(data_dir)
     exp_dir = Path(exp_dir)
@@ -68,110 +73,128 @@ def load_predictions_and_truth(data_dir, pred_path, exp_dir, ar_steps):
     sc_keys = set(sc.keys())
 
     if "mean" in sc_keys:
-        mean = sc["mean"].astype(np.float32)  # (19,)
+        mean = sc["mean"].astype(np.float32)
         std = sc["std"].astype(np.float32)
-        scaler_mode = "chunked"
+    elif "y_mean" in sc_keys:
+        mean = sc["y_mean"].astype(np.float32)
+        std = sc["y_scale"].astype(np.float32)
     else:
-        raise ValueError("Expected chunked scalers (mean/std) for 19-var model")
+        raise ValueError("Expected scalers with 'mean'/'std' or 'y_mean'/'y_scale'")
 
     # Загружаем variables
     with open(data_dir / "variables.json") as f:
         var_names = json.load(f)
 
-    # Загружаем coords
+    # Загружаем coords + определяем flat grid
     coords = np.load(data_dir / "coords.npz")
-    lons = coords["longitude"]
-    lats = coords["latitude"]
-    n_lon, n_lat = len(lons), len(lats)
+    lons = coords["longitude"].astype(np.float32)
+    lats = coords["latitude"].astype(np.float32)
 
-    # Индексы точек в WRF домене
-    lat_mask = (lats >= WRF_LAT_MIN) & (lats <= WRF_LAT_MAX)
-    lon_mask = (lons >= WRF_LON_MIN) & (lons <= WRF_LON_MAX)
-    lat_idx = np.where(lat_mask)[0]
-    lon_idx = np.where(lon_mask)[0]
+    # Flat grid: coords имеют shape (N_nodes,) и len(lats) == G
+    # Regular grid: coords имеют 1D оси, len(lats) == n_lat, len(lons) == n_lon
+    info_path = data_dir / "dataset_info.json"
+    flat_grid = False
+    if info_path.exists():
+        with open(info_path) as f:
+            info = json.load(f)
+        flat_grid = info.get("flat_grid", False)
 
-    region_indices = []
-    for j in lon_idx:
-        for i in lat_idx:
-            region_indices.append(j * n_lat + i)
-    region_indices = np.array(region_indices)
+    if flat_grid:
+        # Flat grid: lats/lons are per-node (N,) — filter directly by bbox
+        mask = ((lats >= WRF_LAT_MIN) & (lats <= WRF_LAT_MAX) &
+                (lons >= WRF_LON_MIN) & (lons <= WRF_LON_MAX))
+        region_indices = np.where(mask)[0]
+        print("Region (flat grid): lat [%.1f, %.1f], lon [%.1f, %.1f]" % (
+            WRF_LAT_MIN, WRF_LAT_MAX, WRF_LON_MIN, WRF_LON_MAX))
+        print("  %d nodes in region" % len(region_indices))
+    else:
+        # Regular grid
+        n_lon, n_lat = len(lons), len(lats)
+        lat_mask = (lats >= WRF_LAT_MIN) & (lats <= WRF_LAT_MAX)
+        lon_mask = (lons >= WRF_LON_MIN) & (lons <= WRF_LON_MAX)
+        lat_idx = np.where(lat_mask)[0]
+        lon_idx = np.where(lon_mask)[0]
 
-    print("Region: lat [%.1f, %.1f], lon [%.1f, %.1f]" % (
-        WRF_LAT_MIN, WRF_LAT_MAX, WRF_LON_MIN, WRF_LON_MAX))
-    print("  lat points: %d, lon points: %d, total nodes: %d" % (
-        len(lat_idx), len(lon_idx), len(region_indices)))
+        region_indices = []
+        for j in lon_idx:
+            for i in lat_idx:
+                region_indices.append(j * n_lat + i)
+        region_indices = np.array(region_indices)
 
-    # Загружаем predictions
-    preds_raw = torch.load(pred_path, map_location="cpu")
-    print("Predictions shape: %s" % str(preds_raw.shape))
+        print("Region (regular grid): lat [%.1f, %.1f], lon [%.1f, %.1f]" % (
+            WRF_LAT_MIN, WRF_LAT_MAX, WRF_LON_MIN, WRF_LON_MAX))
+        print("  lat points: %d, lon points: %d, total nodes: %d" % (
+            len(lat_idx), len(lon_idx), len(region_indices)))
 
-    # preds_raw: (n_samples, G, C*P) or (n_samples, G, C)
+    # Загружаем predictions — поддержка нового dict формата
+    bundle = torch.load(pred_path, map_location="cpu")
+
+    if isinstance(bundle, dict) and "predictions" in bundle:
+        # Новый формат: dict с predictions + ground_truth (оба нормализованы)
+        preds_raw = bundle["predictions"]
+        truth_raw = bundle["ground_truth"]
+        C = bundle.get("n_features", len(var_names))
+        print("Predictions (dict): pred=%s, truth=%s" % (
+            str(preds_raw.shape), str(truth_raw.shape)))
+    else:
+        # Старый формат: голый тензор, truth реконструируем из data.npy
+        preds_raw = bundle
+        truth_raw = None
+        C = len(var_names)
+        print("Predictions (legacy tensor): %s" % str(preds_raw.shape))
+
     if preds_raw.dim() == 2:
         preds_raw = preds_raw.unsqueeze(0)
 
     n_samples = preds_raw.shape[0]
     G = preds_raw.shape[1]
-    CP = preds_raw.shape[2]
-    C = len(var_names)
-    P = CP // C
+    P = preds_raw.shape[2] // C
 
     print("Samples: %d, Grid: %d, Channels: %d, Horizons: %d" % (n_samples, G, C, P))
 
-    # Денормализуем
-    # predictions нормализованы как (x - mean) / std
-    # Обратно: x_phys = pred * std + mean
-    preds_np = preds_raw.numpy()  # (n_samples, G, C*P)
+    # Денормализуем predictions
+    preds_4d = preds_raw.numpy().reshape(n_samples, G, P, C)
+    preds_phys = preds_4d * std[np.newaxis, np.newaxis, np.newaxis, :C] + mean[np.newaxis, np.newaxis, np.newaxis, :C]
 
-    # Reshape to (n_samples, G, P, C)
-    preds_4d = preds_np.reshape(n_samples, G, P, C)
-
-    # Денормализация
-    preds_phys = preds_4d * std[np.newaxis, np.newaxis, np.newaxis, :] + mean[np.newaxis, np.newaxis, np.newaxis, :]
-
-    # Загружаем ground truth из датасета
-    # Для chunked: нужно прочитать data.npy и восстановить truth
-    info_path = data_dir / "dataset_info.json"
-    if info_path.exists():
-        with open(info_path) as f:
-            info = json.load(f)
+    # Денормализуем ground truth
+    if truth_raw is not None:
+        # Из predictions.pt dict
+        if truth_raw.dim() == 2:
+            truth_raw = truth_raw.unsqueeze(0)
+        truth_4d = truth_raw.numpy().reshape(n_samples, G, P, C)
+        truth_phys = truth_4d * std[np.newaxis, np.newaxis, np.newaxis, :C] + mean[np.newaxis, np.newaxis, np.newaxis, :C]
+    elif info_path.exists() and not flat_grid:
+        # Старый путь: реконструкция из data.npy (только regular grid)
         shape = (info["n_time"], info["n_lon"], info["n_lat"], info["n_feat"])
         data = np.memmap(str(data_dir / "data.npy"), dtype=np.float16, mode="r", shape=shape)
+        n_lon_d, n_lat_d = info["n_lon"], info["n_lat"]
+        data_flat = data.reshape(shape[0], n_lon_d * n_lat_d, shape[3]).astype(np.float32)
 
-        # data shape: (T, LON, LAT, F)
-        # Flatten spatial: (T, LON*LAT, F) = (T, G, F)
-        data_flat = data.reshape(shape[0], n_lon * n_lat, shape[3]).astype(np.float32)
-
-        # Нужно знать какие timesteps соответствуют каким samples
-        # predict.py c chunked dataset: test_only split = последние 20%, вторая половина
-        obs_w = 2  # obs_window для v2 модели
+        obs_w = 2
         total_samples = shape[0] - obs_w - ar_steps + 1
         split_idx = int(total_samples * 0.8)
-        test_start = split_idx
         test_all = total_samples - split_idx
         val_size = test_all // 2
-        test_only_start = test_start + val_size
+        test_only_start = split_idx + val_size
 
-        print("Dataset: T=%d, total_samples=%d, test_only starts at sample %d" % (
-            shape[0], total_samples, test_only_start))
-
-        # Восстанавливаем ground truth для каждого test sample
         n_test_samples = min(n_samples, test_all - val_size)
         truth_phys = np.zeros((n_test_samples, G, P, C), dtype=np.float32)
-
         for i in range(n_test_samples):
-            global_t = test_only_start + i  # индекс оконного семпла
+            global_t = test_only_start + i
             for p in range(P):
-                t_idx = global_t + obs_w + p  # абсолютный timestep
+                t_idx = global_t + obs_w + p
                 if t_idx < shape[0]:
-                    frame = data_flat[t_idx]  # (G, F)
-                    truth_phys[i, :, p, :] = frame
+                    truth_phys[i, :, p, :] = data_flat[t_idx]
 
         del data, data_flat
+        n_samples = n_test_samples
+        preds_phys = preds_phys[:n_test_samples]
     else:
-        raise RuntimeError("dataset_info.json not found, can't load ground truth")
+        raise RuntimeError("No ground truth available: predictions.pt has no 'ground_truth' key "
+                           "and dataset_info.json not found or flat_grid=True")
 
     # Извлекаем region
-    pred_region = preds_phys[:, region_indices, :, :]   # (n_samples, n_reg, P, C)
+    pred_region = preds_phys[:, region_indices, :, :]
     truth_region = truth_phys[:, region_indices, :, :]
 
     return pred_region, truth_region, var_names, P, n_samples
