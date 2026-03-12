@@ -518,36 +518,40 @@ def main():
 
         row = "%-8s | %-6s" % (var, unit)
 
-        our_rmses = []
-        wrf_rmses = []
+        our_errs = []
+        wrf_errs = []
         for h in range(min(P, 4)):
-            # Our RMSE для этого горизонта (по всем сэмплам)
-            p_h = pred_mean[:, h, vi]
-            t_h = truth_mean[:, h, vi]
-            our_r, _, _ = compute_metrics(p_h, t_h)
-            our_rmses.append(our_r)
-
-            # WRF для конкретного сэмпла
             if wrf_data and var in wrf_data and wrf_si is not None and wrf_si < n_samples:
+                # Our prediction for the SAME sample as WRF (fair comparison)
+                era5_val = truth_mean[wrf_si, h, vi]
+                our_val = pred_mean[wrf_si, h, vi]
+                our_err = abs(our_val - era5_val)
+                our_errs.append(our_err)
+
                 wrf_vals = wrf_data[var]
                 if var == "sp":
                     wrf_vals = wrf_vals / 100.0
-                era5_val = truth_mean[wrf_si, h, vi]
                 if h + 1 < len(wrf_vals):
                     wrf_val = wrf_vals[h + 1]
-                    wrf_r = abs(wrf_val - era5_val)
-                    wrf_rmses.append(wrf_r)
-                    row += " | %7.3f  | %7.3f " % (our_r, wrf_r)
+                    wrf_err = abs(wrf_val - era5_val)
+                    wrf_errs.append(wrf_err)
+                    row += " | %7.3f  | %7.3f " % (our_err, wrf_err)
                 else:
-                    row += " | %7.3f  |    N/A " % our_r
+                    row += " | %7.3f  |    N/A " % our_err
             else:
+                # Fallback: all-sample RMSE if no WRF match
+                p_h = pred_mean[:, h, vi]
+                t_h = truth_mean[:, h, vi]
+                our_r, _, _ = compute_metrics(p_h, t_h)
+                our_errs.append(our_r)
                 row += " | %7.3f  |    N/A " % our_r
 
         # AVG
-        our_avg = np.mean(our_rmses) if our_rmses else 0
-        wrf_avg = np.mean(wrf_rmses) if wrf_rmses else 0
-        if wrf_rmses:
-            row += " | %7.3f | %7.3f" % (our_avg, wrf_avg)
+        our_avg = np.mean(our_errs) if our_errs else 0
+        wrf_avg = np.mean(wrf_errs) if wrf_errs else 0
+        if wrf_errs:
+            winner = " <- us" if our_avg < wrf_avg else " <- WRF"
+            row += " | %7.3f | %7.3f%s" % (our_avg, wrf_avg, winner)
         else:
             row += " | %7.3f |    N/A" % our_avg
 
@@ -555,8 +559,26 @@ def main():
 
     print("=" * 70)
     if wrf_si is not None:
-        print("NOTE: WRF values are for sample #%d (matching WRF period)." % wrf_si)
-        print("      Our RMSE is across all %d test samples." % n_samples)
+        print("NOTE: Both Our and WRF values are for sample #%d (same WRF period)." % wrf_si)
+        print("      Fair comparison: same init time, same verification period.")
+
+    # --- Additional: Our model's all-sample RMSE (for robustness) ---
+    print("\n  Our model — all %d samples (region-averaged), per-horizon:" % n_samples)
+    for var in compare_vars:
+        vi = var_names.index(var)
+        info = VAR_MAPPING[var]
+        unit = "hPa" if var == "sp" else info["unit"]
+        vals = []
+        for h in range(min(P, 4)):
+            p_h = pred_mean[:, h, vi]
+            t_h = truth_mean[:, h, vi]
+            r, _, _ = compute_metrics(p_h, t_h)
+            vals.append(r)
+        avg = np.mean(vals)
+        line = "    %-5s (%s): " % (var, unit)
+        line += " | ".join("+%02dh=%.3f" % ((h+1)*6, vals[h]) for h in range(len(vals)))
+        line += " | AVG=%.3f" % avg
+        print(line)
     print()
 
 
