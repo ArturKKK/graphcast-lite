@@ -164,6 +164,8 @@ class TimeseriesChunkDataset(Dataset):
             test_indices = self._sample_indices[split_idx:]
             val_size = len(test_indices) // 2
             self._sample_indices = test_indices[val_size:]
+        elif split == "all":
+            pass  # keep all samples — useful for WRF comparison on specific dates
         else:
             raise ValueError(f"Unknown split: {split}")
 
@@ -227,10 +229,14 @@ def load_chunked_datasets(
     pred_steps: int = 1,
     n_features: Optional[int] = None,
     test_fraction: float = 0.2,
+    test_split: str = "test_only",
 ) -> Tuple[Dataset, Dataset, Dataset, DatasetMetadata]:
     """
     Convenience function matching the interface of load_train_and_test_datasets.
     
+    Args:
+        test_split: which split to use as the "test" dataset returned.
+                    Options: "test_only" (default), "val", "test", "train", "all".
     Returns: (train_dataset, val_dataset, test_dataset, dataset_metadata)
     """
     # Load coords for metadata
@@ -262,7 +268,7 @@ def load_chunked_datasets(
     )
     test_ds = TimeseriesChunkDataset(
         data_path, obs_window=obs_window, pred_steps=pred_steps,
-        split="test_only", n_features=n_feat, test_fraction=test_fraction,
+        split=test_split, n_features=n_feat, test_fraction=test_fraction,
     )
 
     if is_flat:

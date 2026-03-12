@@ -358,9 +358,12 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--predictions", required=True, help="predictions.pt from predict.py")
     p.add_argument("--data-dir", required=True, help="regional dataset dir")
-    p.add_argument("--wrf-path", default=None, help="WRF netcdf file (optional)")
+    p.add_argument("--wrf-path", default=None, help="WRF netcdf or JSON file (optional)")
     p.add_argument("--experiment-dir", required=True)
     p.add_argument("--ar-steps", type=int, default=4, help="number of AR horizons")
+    p.add_argument("--wrf-sample", type=int, default=None,
+                   help="Force specific sample index for WRF comparison (0-based). "
+                        "Default: auto-detect from WRF dates + dataset time_start.")
     args = p.parse_args()
 
     print("=" * 70)
@@ -372,6 +375,11 @@ def main():
         args.data_dir, args.predictions, args.experiment_dir, args.ar_steps)
 
     C = len(var_names)
+
+    # Load predictions bundle for sample_offsets
+    bundle = torch.load(args.predictions, map_location="cpu")
+    sample_offsets = bundle.get("sample_offsets", list(range(n_samples))) if isinstance(bundle, dict) else list(range(n_samples))
+    obs_window = bundle.get("obs_window", 2) if isinstance(bundle, dict) else 2
 
     # Усредняем наши предсказания и truth по пространству (region → скаляр)
     pred_mean = pred_region.mean(axis=1)   # (n_samples, P, C)
@@ -388,23 +396,15 @@ def main():
         vi = var_names.index(var)
         info = VAR_MAPPING[var]
 
-        # Наши значения: уже в единицах scalers (для sp -> hPa, для t2m -> K)
         p_vals = pred_mean[:, :, vi].flatten()
         t_vals = truth_mean[:, :, vi].flatten()
 
-        # sp в нашем датасете хранится в hPa (scale 0.01 при сборке)
-        if var == "sp":
-            # переводим в Pa для единообразия с WRF, или в hPa для красоты
-            unit = "hPa"
-        else:
-            unit = info["unit"]
-
+        unit = "hPa" if var == "sp" else info["unit"]
         rmse, mae, bias = compute_metrics(p_vals, t_vals)
 
         print("  %-5s: RMSE=%.3f %s | MAE=%.3f | bias=%+.3f | mean_truth=%.1f" % (
             var, rmse, unit, mae, bias, t_vals.mean()))
 
-        # Per-horizon
         for h in range(min(P, 4)):
             p_h = pred_mean[:, h, vi]
             t_h = truth_mean[:, h, vi]
@@ -412,90 +412,255 @@ def main():
             print("    +%02dh: RMSE=%.3f | MAE=%.3f | bias=%+.3f" % ((h+1)*6, r, m, b))
 
     # 3. WRF comparison (if available)
+    wrf_data = None
     if args.wrf_path:
         wrf_data = load_wrf(args.wrf_path, P)
 
         if wrf_data:
-            print("\n" + "=" * 70)
-            print("WRF vs ERA5 metrics (domain-averaged)")
-            print("=" * 70)
+            # --- Определяем какой сэмпл соответствует WRF периоду ---
+            wrf_sample_idx = args.wrf_sample
 
-            # WRF имеет фиксированный период (Jan 20-21 2023)
-            # Нужно найти наш сэмпл, который покрывает этот период
-            # Это зависит от start_date датасета и номера сэмпла
-            # Пока: сравниваем средние по всем доступным шагам
+            if wrf_sample_idx is None:
+                # Авто-определение: читаем time_start из dataset_info.json
+                # и WRF start time, находим подходящий сэмпл
+                wrf_sample_idx = _find_wrf_matching_sample(
+                    args.data_dir, args.wrf_path, sample_offsets, obs_window, P)
 
-            for var in compare_vars:
-                if var not in wrf_data:
-                    continue
+            if wrf_sample_idx is not None and wrf_sample_idx < n_samples:
+                print("\n" + "=" * 70)
+                print("WRF vs ERA5 vs Ours — per-horizon (sample #%d, offset=%s)" % (
+                    wrf_sample_idx, sample_offsets[wrf_sample_idx] if wrf_sample_idx < len(sample_offsets) else "?"))
+                print("=" * 70)
 
-                vi = var_names.index(var)
-                info = VAR_MAPPING[var]
+                # Наши данные для этого сэмпла (domain-averaged)
+                our_pred_h = pred_mean[wrf_sample_idx]   # (P, C)
+                our_truth_h = truth_mean[wrf_sample_idx]  # (P, C)
 
-                wrf_vals = wrf_data[var]  # (n_6h_steps,)
+                # WRF: 5 значений (init + 4 forecast), берём forecast (skip init)
+                # WRF idx: 0=init(+00h), 1=+06h, 2=+12h, 3=+18h, 4=+24h
+                # Наши горизонты: 0=+06h, 1=+12h, 2=+18h, 3=+24h
 
-                # Truth для тех же горизонтов (берём первые n_6h из наших)
-                n_wrf = len(wrf_vals)
+                for var in compare_vars:
+                    if var not in wrf_data:
+                        continue
 
-                # Наш truth (среднее по сэмплам для каждого горизонта)
-                our_truth_h = truth_mean[:, :min(P, n_wrf), vi].mean(axis=0)  # (P,)
-                our_pred_h = pred_mean[:, :min(P, n_wrf), vi].mean(axis=0)
+                    vi = var_names.index(var)
+                    info = VAR_MAPPING[var]
+                    wrf_vals = wrf_data[var]  # (5,) — init,+6,+12,+18,+24h
 
-                # Для sp: наши данные в hPa, WRF в Pa
-                if var == "sp":
-                    wrf_compare = wrf_vals[:min(P, n_wrf)] / 100.0  # Pa -> hPa
-                    unit = "hPa"
-                else:
-                    wrf_compare = wrf_vals[:min(P, n_wrf)]
-                    unit = info["unit"]
+                    if var == "sp":
+                        wrf_vals_compare = wrf_vals / 100.0  # Pa -> hPa
+                        unit = "hPa"
+                    else:
+                        wrf_vals_compare = wrf_vals
+                        unit = info["unit"]
 
-                n_compare = min(len(our_truth_h), len(wrf_compare))
-                wrf_c = wrf_compare[:n_compare]
-                era5_c = our_truth_h[:n_compare]
-                ours_c = our_pred_h[:n_compare]
+                    print("\n  %s (%s):" % (var, unit))
+                    print("    Horizon | ERA5 truth | Our pred | WRF pred | Our err | WRF err")
+                    print("    " + "-" * 65)
 
-                rmse_wrf, mae_wrf, bias_wrf = compute_metrics(wrf_c, era5_c)
-                rmse_ours, mae_ours, bias_ours = compute_metrics(ours_c, era5_c)
+                    n_wrf = len(wrf_vals_compare)
+                    n_horizons = min(P, n_wrf - 1)  # skip WRF init
 
-                print("")
-                print("  %s (%s):" % (var, unit))
-                print("    WRF vs ERA5:  RMSE=%.3f | MAE=%.3f | bias=%+.3f" % (
-                    rmse_wrf, mae_wrf, bias_wrf))
-                print("    Ours vs ERA5: RMSE=%.3f | MAE=%.3f | bias=%+.3f" % (
-                    rmse_ours, mae_ours, bias_ours))
-                if rmse_wrf > 0:
-                    print("    Our/WRF RMSE ratio: %.2f (< 1 = we win)" % (rmse_ours / rmse_wrf))
+                    our_errs = []
+                    wrf_errs = []
+                    for h in range(n_horizons):
+                        era5_val = our_truth_h[h, vi]
+                        our_val = our_pred_h[h, vi]
+                        wrf_val = wrf_vals_compare[h + 1]  # +1 to skip WRF init (+00h)
+
+                        our_err = abs(our_val - era5_val)
+                        wrf_err = abs(wrf_val - era5_val)
+                        our_errs.append(our_err)
+                        wrf_errs.append(wrf_err)
+
+                        winner = "<- us" if our_err < wrf_err else "<- WRF" if wrf_err < our_err else "   tie"
+                        print("    +%02dh    | %8.2f   | %8.2f | %8.2f  | %6.2f  | %6.2f  %s" % (
+                            (h+1)*6, era5_val, our_val, wrf_val, our_err, wrf_err, winner))
+
+                    if our_errs:
+                        our_rmse = np.sqrt(np.mean(np.array(our_errs)**2))
+                        wrf_rmse = np.sqrt(np.mean(np.array(wrf_errs)**2))
+                        print("    AVG     |            |          |          | %6.2f  | %6.2f  %s" % (
+                            our_rmse, wrf_rmse,
+                            "<- us" if our_rmse < wrf_rmse else "<- WRF"))
+            else:
+                print("\nWARNING: Could not find WRF-matching sample in predictions.")
+                print("  Available sample offsets: %s" % sample_offsets)
+                print("  Use --split all when running predict.py, or --wrf-sample N")
 
     # 4. Summary table
     print("\n" + "=" * 70)
     print("SUMMARY TABLE (for thesis)")
     print("=" * 70)
-    print("%-8s | %-12s | %-12s | %-12s" % ("Var", "Unit", "Our RMSE", "WRF RMSE"))
-    print("-" * 50)
+
+    # Header
+    header = "%-8s | %-6s" % ("Var", "Unit")
+    sep = "-" * 10
+    for h in range(min(P, 4)):
+        header += " | Our +%02dh | WRF +%02dh" % ((h+1)*6, (h+1)*6)
+        sep += "-" * 22
+    header += " | Our AVG | WRF AVG"
+    sep += "-" * 20
+    print(header)
+    print(sep)
+
+    # Определяем wrf_sample для таблицы
+    wrf_si = args.wrf_sample
+    if wrf_si is None and wrf_data:
+        wrf_si = _find_wrf_matching_sample(
+            args.data_dir, args.wrf_path, sample_offsets, obs_window, P)
+
     for var in compare_vars:
         vi = var_names.index(var)
         info = VAR_MAPPING[var]
-        p_vals = pred_mean[:, :, vi].flatten()
-        t_vals = truth_mean[:, :, vi].flatten()
-        rmse_ours, _, _ = compute_metrics(p_vals, t_vals)
-
         unit = "hPa" if var == "sp" else info["unit"]
-        wrf_rmse_str = "N/A"
 
-        if args.wrf_path and wrf_data and var in wrf_data:
-            wrf_vals = wrf_data[var]
-            our_truth_h = truth_mean[:, :min(P, len(wrf_vals)), vi].mean(axis=0)
-            if var == "sp":
-                wrf_c = wrf_vals[:min(P, len(wrf_vals))] / 100.0
+        row = "%-8s | %-6s" % (var, unit)
+
+        our_rmses = []
+        wrf_rmses = []
+        for h in range(min(P, 4)):
+            # Our RMSE для этого горизонта (по всем сэмплам)
+            p_h = pred_mean[:, h, vi]
+            t_h = truth_mean[:, h, vi]
+            our_r, _, _ = compute_metrics(p_h, t_h)
+            our_rmses.append(our_r)
+
+            # WRF для конкретного сэмпла
+            if wrf_data and var in wrf_data and wrf_si is not None and wrf_si < n_samples:
+                wrf_vals = wrf_data[var]
+                if var == "sp":
+                    wrf_vals = wrf_vals / 100.0
+                era5_val = truth_mean[wrf_si, h, vi]
+                if h + 1 < len(wrf_vals):
+                    wrf_val = wrf_vals[h + 1]
+                    wrf_r = abs(wrf_val - era5_val)
+                    wrf_rmses.append(wrf_r)
+                    row += " | %7.3f  | %7.3f " % (our_r, wrf_r)
+                else:
+                    row += " | %7.3f  |    N/A " % our_r
             else:
-                wrf_c = wrf_vals[:min(P, len(wrf_vals))]
-            n_c = min(len(our_truth_h), len(wrf_c))
-            rmse_wrf, _, _ = compute_metrics(wrf_c[:n_c], our_truth_h[:n_c])
-            wrf_rmse_str = "%.3f" % rmse_wrf
+                row += " | %7.3f  |    N/A " % our_r
 
-        print("%-8s | %-12s | %-12.3f | %-12s" % (var, unit, rmse_ours, wrf_rmse_str))
+        # AVG
+        our_avg = np.mean(our_rmses) if our_rmses else 0
+        wrf_avg = np.mean(wrf_rmses) if wrf_rmses else 0
+        if wrf_rmses:
+            row += " | %7.3f | %7.3f" % (our_avg, wrf_avg)
+        else:
+            row += " | %7.3f |    N/A" % our_avg
+
+        print(row)
 
     print("=" * 70)
+    if wrf_si is not None:
+        print("NOTE: WRF values are for sample #%d (matching WRF period)." % wrf_si)
+        print("      Our RMSE is across all %d test samples." % n_samples)
+    print()
+
+
+def _find_wrf_matching_sample(data_dir, wrf_path, sample_offsets, obs_window, P):
+    """
+    Auto-detect which sample in predictions.pt corresponds to the WRF forecast period.
+    
+    Logic:
+      - dataset_info.json has time_start (e.g. '2023-01-18' or '2023-01-18T00:00')
+      - WRF JSON has 'times' list with first entry (e.g. '2023-01-20_00:00:00')
+      - Each 6h timestep in dataset = 6 hours
+      - Sample at offset t has predictions at [t+obs_window, ..., t+obs_window+P-1]
+      - We need sample whose predictions[0] = WRF +06h (i.e. t+obs_window maps to WRF init + 6h)
+      - Or more precisely: pred[h] should match WRF[h+1] (WRF[0] = init)
+    """
+    from datetime import datetime, timedelta
+
+    data_dir = Path(data_dir)
+
+    # Parse dataset time_start
+    info_path = data_dir / "dataset_info.json"
+    if not info_path.exists():
+        print("  WARNING: dataset_info.json not found, cannot auto-detect WRF sample")
+        return None
+
+    with open(info_path) as f:
+        info = json.load(f)
+
+    time_start_str = info.get("time_start", "")
+    if not time_start_str:
+        print("  WARNING: time_start not found in dataset_info.json")
+        return None
+
+    # Parse time_start (various formats)
+    for fmt in ["%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%d", "%Y-%m-%d %H:%M:%S"]:
+        try:
+            ds_start = datetime.strptime(time_start_str, fmt)
+            break
+        except ValueError:
+            continue
+    else:
+        print("  WARNING: cannot parse time_start='%s'" % time_start_str)
+        return None
+
+    # Parse WRF start time
+    wrf_init_time = None
+    wrf_path = Path(wrf_path)
+    if wrf_path.suffix == ".json":
+        with open(wrf_path) as f:
+            wrf_json = json.load(f)
+        times = wrf_json.get("times", [])
+        if times:
+            t_str = times[0].replace("_", "T")[:19]
+            for fmt in ["%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%d"]:
+                try:
+                    wrf_init_time = datetime.strptime(t_str, fmt)
+                    break
+                except ValueError:
+                    continue
+
+    if wrf_init_time is None:
+        print("  WARNING: cannot determine WRF init time, cannot auto-detect sample")
+        return None
+
+    dt_6h = timedelta(hours=6)
+
+    # WRF forecast targets (skip init):
+    # WRF +06h = wrf_init + 6h, +12h = wrf_init + 12h, etc.
+    wrf_first_forecast = wrf_init_time + dt_6h  # first forecast horizon
+
+    # For sample at offset t: prediction[0] = ds_start + (t + obs_window) * 6h
+    # We want prediction[0] = wrf_first_forecast
+    # → t + obs_window = (wrf_first_forecast - ds_start) / 6h
+    # → t = (wrf_first_forecast - ds_start) / 6h - obs_window
+
+    delta = wrf_first_forecast - ds_start
+    delta_steps = delta.total_seconds() / (6 * 3600)
+
+    target_offset = int(round(delta_steps)) - obs_window
+
+    print("\n  [WRF date matching]")
+    print("    Dataset start: %s" % ds_start.isoformat())
+    print("    WRF init:      %s" % wrf_init_time.isoformat())
+    print("    WRF +06h:      %s" % wrf_first_forecast.isoformat())
+    print("    Target offset: %d (need pred[0] at global time %d)" % (
+        target_offset, target_offset + obs_window))
+
+    # Find matching sample in predictions
+    for i, off in enumerate(sample_offsets):
+        if off == target_offset:
+            print("    ✓ Found: sample #%d (offset=%d)" % (i, off))
+            return i
+
+    # Try ±1 if exact match not found
+    for delta_off in [-1, 1, -2, 2]:
+        for i, off in enumerate(sample_offsets):
+            if off == target_offset + delta_off:
+                print("    ~ Approximate match: sample #%d (offset=%d, wanted %d)" % (
+                    i, off, target_offset))
+                return i
+
+    print("    ✗ No matching sample found! Offsets in predictions: %s" % sample_offsets[:10])
+    print("      Need offset=%d. Try: predict.py --split all" % target_offset)
+    return None
 
 
 if __name__ == "__main__":

@@ -146,6 +146,10 @@ def main():
     ap.add_argument("--no-residual", action="store_true",
                     help="Модель предсказывает полное поле, а не дельту. "
                          "Не прибавлять X_last к выходу модели.")
+    ap.add_argument("--split", default="test_only",
+                    choices=["test_only", "val", "test", "train", "all"],
+                    help="Какой split датасета использовать для инференса (default: test_only). "
+                         "'all' = все сэмплы (для WRF сравнения на конкретных датах).")
 
     # --- УСВОЕНИЕ ---
     ap.add_argument("--assim-method", default="none", choices=["none", "nudging", "oi"])
@@ -208,6 +212,7 @@ def main():
             obs_window=exp_cfg.data.obs_window_used,
             pred_steps=ds_pred_steps,
             n_features=exp_cfg.data.num_features_used,
+            test_split=args.split,
         )
     else:
         train_ds, val_ds, test_ds, meta = load_train_and_test_datasets(
