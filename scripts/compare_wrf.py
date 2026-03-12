@@ -90,14 +90,19 @@ def load_predictions_and_truth(data_dir, pred_path, exp_dir, ar_steps):
     lons = coords["longitude"].astype(np.float32)
     lats = coords["latitude"].astype(np.float32)
 
-    # Flat grid: coords имеют shape (N_nodes,) и len(lats) == G
+    # Flat grid: coords имеют shape (N_nodes,) и len(lats) == len(lons) == N
     # Regular grid: coords имеют 1D оси, len(lats) == n_lat, len(lons) == n_lon
     info_path = data_dir / "dataset_info.json"
     flat_grid = False
     if info_path.exists():
         with open(info_path) as f:
             info = json.load(f)
-        flat_grid = info.get("flat_grid", False)
+        flat_grid = info.get("flat_grid", info.get("flat", False))
+    # Auto-detect: if lats and lons have same length AND it doesn't equal n_lat*n_lon
+    # of a plausible regular grid, it's flat
+    if not flat_grid and len(lats) == len(lons) and len(lats) > max(512, 256):
+        flat_grid = True
+        print("  (auto-detected flat grid: %d nodes)" % len(lats))
 
     if flat_grid:
         # Flat grid: lats/lons are per-node (N,) — filter directly by bbox
@@ -200,11 +205,61 @@ def load_predictions_and_truth(data_dir, pred_path, exp_dir, ar_steps):
     return pred_region, truth_region, var_names, P, n_samples
 
 
+def _load_wrf_json(wrf_path, n_horizons):
+    """Загрузка WRF из JSON-экспорта (wrf_d03_jan2023.json)."""
+    with open(wrf_path) as f:
+        wrf_json = json.load(f)
+
+    domain_mean = wrf_json.get("domain_mean", {})
+    times = wrf_json.get("times", [])
+    print("\nWRF dataset (JSON):")
+    print("  Times: %d, domain: %s" % (len(times), wrf_json.get("domain", "")))
+
+    # Маппинг JSON ключей → наше имя
+    JSON_KEY_MAP = {
+        "t2_K":    "t2m",
+        "u10_ms":  "10u",
+        "v10_ms":  "10v",
+        "psfc_Pa": "sp",
+    }
+
+    wrf_data = {}
+    for json_key, our_name in JSON_KEY_MAP.items():
+        if json_key not in domain_mean:
+            print("  WARNING: %s not found in WRF JSON" % json_key)
+            continue
+
+        hourly = np.array(domain_mean[json_key], dtype=np.float32)
+        n_wrf_steps = len(hourly)
+
+        # WRF почасовой → нужны 6h шаги: 0, 6, 12, 18, 24
+        if n_wrf_steps >= 25:
+            idx_6h = [0, 6, 12, 18, 24]
+        elif n_wrf_steps >= 5:
+            idx_6h = list(range(min(5, n_wrf_steps)))
+        else:
+            idx_6h = list(range(n_wrf_steps))
+
+        wrf_6h = hourly[idx_6h]
+        wrf_data[our_name] = wrf_6h
+
+        print("  %s (%s): %d hourly -> %d 6h-steps, mean=%.2f" % (
+            our_name, json_key, n_wrf_steps, len(wrf_6h), wrf_6h.mean()))
+
+    return wrf_data
+
+
 def load_wrf(wrf_path, n_horizons):
     """
-    Загружает WRF netcdf, извлекает T2/U10/V10/PSFC, усредняет по домену.
+    Загружает WRF данные. Поддерживает:
+      - JSON экспорт (wrf_d03_jan2023.json) — domain_mean с почасовыми значениями
+      - netCDF (xarray / netCDF4) — полные 3D поля
     Returns: dict{our_var_name: np.ndarray (n_6h_steps,)} усреднённые по домену значения
     """
+    # JSON формат?
+    if str(wrf_path).endswith(".json"):
+        return _load_wrf_json(wrf_path, n_horizons)
+
     try:
         import xarray as xr
     except ImportError:
