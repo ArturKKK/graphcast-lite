@@ -676,7 +676,10 @@ class DualMeshModel(nn.Module):
         )
 
         # ── 7. Combine: global + regional correction ──
-        output = global_pred.clone()
-        output[self.roi_mask] = output[self.roi_mask] + roi_correction
+        # Functional approach: создаём full-grid correction через zeros + indexing,
+        # затем складываем. Гарантирует gradient flow через roi_correction.
+        correction_full = torch.zeros_like(global_pred)
+        correction_full[self.roi_mask] = roi_correction
+        output = global_pred + correction_full
 
         return output
