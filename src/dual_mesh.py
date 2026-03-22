@@ -608,20 +608,24 @@ class DualMeshModel(nn.Module):
 
         Returns: (N_grid, output_channels)
         """
-        # ── 1. Глобальный прогноз (может быть detached если заморожен) ──
-        global_pred = self.global_model(X=X, attention_threshold=attention_threshold, **kwargs)
-        # global_pred: (N_grid, output_channels)
+        # ── 1. Глобальный прогноз + mesh латенты (без графа вычислений) ──
+        # global_model заморожен → torch.no_grad() убирает лишние буферы активаций
+        # и исключает backward-проход по 6M параметрам
+        with torch.no_grad():
+            global_pred = self.global_model(X=X, attention_threshold=attention_threshold, **kwargs)
+            # global_pred: (N_grid, output_channels)
 
-        # ── 2. Извлекаем глобальные mesh латенты после encoder ──
-        # Прогоняем encoder ещё раз, чтобы получить mesh features
-        # (или кешируем — но для простоты прогоняем)
-        X_sq = X.squeeze()
-        X_preprocessed = self.global_model._preprocess_input(grid_node_features=X_sq)
-        encoded = self.global_model.encoder.forward(
-            X=X_preprocessed, edge_index=self.global_model.encoding_graph,
-        )
-        global_grid_latent = encoded[:self.global_model._num_grid_nodes]
-        global_mesh_latent = encoded[self.global_model._num_grid_nodes:]
+            # ── 2. Извлекаем глобальные mesh латенты (encoder прогоняется ещё раз) ──
+            X_sq = X.squeeze()
+            X_preprocessed = self.global_model._preprocess_input(grid_node_features=X_sq)
+            encoded = self.global_model.encoder.forward(
+                X=X_preprocessed, edge_index=self.global_model.encoding_graph,
+            )
+            global_grid_latent = encoded[:self.global_model._num_grid_nodes]
+            global_mesh_latent = encoded[self.global_model._num_grid_nodes:]
+
+        # detach не нужен — уже вне графа из-за no_grad
+        global_pred = global_pred.detach()
 
         # ── 3. Regional encoding ──
         # Берём raw features ROI grid точек + их глобальные латенты
@@ -637,9 +641,8 @@ class DualMeshModel(nn.Module):
 
         # ── 4. Cross-message: global mesh → regional mesh ──
         cross_edge_attr = self.cross_edge_encoder(self.cross_edge_features)
-        global_mesh_detached = global_mesh_latent.detach()  # не хотим градиенты через глобальный encoder
         reg_mesh_features = self.cross_message(
-            h_global=global_mesh_detached,
+            h_global=global_mesh_latent,
             h_regional=reg_mesh_features,
             cross_edge_index=self.cross_edge_index,
             cross_edge_attr=cross_edge_attr,
