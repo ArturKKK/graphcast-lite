@@ -210,25 +210,28 @@ def build_regional_grid_mesh_edges(
     reg_lats: np.ndarray,
     reg_lons: np.ndarray,
     roi: Tuple[float, float, float, float],
-    radius_factor: float = 0.6,
-    reg_mesh: TriangularMesh = None,
+    k_encode: int = 4,
+    k_decode: int = 3,
+    **kwargs,  # backward compat: ignore old radius_factor/reg_mesh
 ) -> Tuple[np.ndarray, torch.Tensor, torch.Tensor]:
     """Строит рёбра Grid(ROI)→RegionalMesh и RegionalMesh→Grid(ROI).
+
+    Encoding (Grid→Mesh): для каждого mesh-узла ищем k_encode ближайших
+    grid-точек ROI → каждый mesh-узел гарантированно получает данные.
+
+    Decoding (Mesh→Grid): для каждой grid-точки ROI ищем k_decode ближайших
+    mesh-узлов → каждая grid-точка гарантированно получает прогноз.
 
     Returns
     -------
     roi_grid_mask : np.ndarray (bool, N_grid)
-        Маска grid-точек, попадающих в ROI
-    encoding_edges : torch.Tensor [2, E]
-        Grid(ROI) → RegMesh (sender=grid_roi_local, receiver=reg_mesh)
-    decoding_edges : torch.Tensor [2, E]
-        RegMesh → Grid(ROI) (sender=reg_mesh, receiver=grid_roi_local)
+    encoding_edges : torch.Tensor [2, E] — [grid_roi_local, reg_mesh]
+    decoding_edges : torch.Tensor [2, E] — [reg_mesh, grid_roi_local]
     """
     from scipy.spatial import cKDTree
 
     lat_min, lat_max, lon_min, lon_max = roi
 
-    # Маска grid-точек в ROI
     roi_mask = (
         (grid_lats >= lat_min) & (grid_lats <= lat_max) &
         (grid_lons >= lon_min) & (grid_lons <= lon_max)
@@ -242,7 +245,6 @@ def build_regional_grid_mesh_edges(
     roi_lats = grid_lats[roi_indices]
     roi_lons = grid_lons[roi_indices]
 
-    # --- Encoding: Grid(ROI) → RegMesh (radius-based) ---
     def to_xyz(lats, lons):
         lat_r = np.radians(lats)
         lon_r = np.radians(lons)
@@ -253,63 +255,41 @@ def build_regional_grid_mesh_edges(
 
     reg_xyz = to_xyz(reg_lats, reg_lons)
     roi_xyz = to_xyz(roi_lats, roi_lons)
+    n_mesh = len(reg_lats)
 
-    # Радиус: макс. расстояние между соседями в региональном меше × factor
-    if reg_mesh is not None and len(reg_mesh.faces) > 0:
-        edges = get_edges_from_faces(reg_mesh.faces)
-        v = reg_mesh.vertices
-        edge_lengths = np.linalg.norm(v[edges[0]] - v[edges[1]], axis=-1)
-        max_edge_dist = edge_lengths.max()
-    else:
-        # Fallback: estimate from average distance
-        tree_tmp = cKDTree(reg_xyz)
-        dists, _ = tree_tmp.query(reg_xyz, k=2)
-        max_edge_dist = dists[:, 1].max()
+    # --- Encoding: Grid(ROI) → RegMesh ---
+    # Mesh-centric: для каждого mesh-узла ищем k_encode ближайших grid-точек
+    tree_grid = cKDTree(roi_xyz)
+    k_enc = min(k_encode, n_roi)
+    _, grid_neighbors = tree_grid.query(reg_xyz, k=k_enc)
+    if grid_neighbors.ndim == 1:
+        grid_neighbors = grid_neighbors[:, None]
 
-    radius = max_edge_dist * radius_factor
-
-    # Для каждой grid(ROI) точки — все reg_mesh узлы в радиусе
-    tree = cKDTree(reg_xyz)
-    enc_grid_idx = []
-    enc_mesh_idx = []
-    for i, xyz in enumerate(roi_xyz):
-        neighbors = tree.query_ball_point(xyz, radius)
-        for j in neighbors:
-            enc_grid_idx.append(i)
-            enc_mesh_idx.append(j)
-
-    # Если radius слишком мал — fallback на k=3 nearest
-    if len(enc_grid_idx) < n_roi:
-        print(f"[WARNING] Radius encoding found {len(enc_grid_idx)} edges for {n_roi} ROI points. Using k=3 fallback.")
-        dists, inds = tree.query(roi_xyz, k=3)
-        enc_grid_idx = np.repeat(np.arange(n_roi), 3).tolist()
-        enc_mesh_idx = inds.flatten().tolist()
+    enc_grid_idx = grid_neighbors.flatten().tolist()
+    enc_mesh_idx = np.repeat(np.arange(n_mesh), k_enc).tolist()
 
     encoding_edges = torch.tensor(
         np.stack([enc_grid_idx, enc_mesh_idx], axis=0), dtype=torch.int64
     )
 
-    # --- Decoding: RegMesh → Grid(ROI) (k=3 nearest) ---
-    tree_grid = cKDTree(roi_xyz)
-    dists, mesh_neighbors = tree_grid.query(reg_xyz, k=min(3, n_roi))
+    # --- Decoding: RegMesh → Grid(ROI) ---
+    # Grid-centric: для каждой grid-точки ищем k_decode ближайших mesh-узлов
+    tree_mesh = cKDTree(reg_xyz)
+    k_dec = min(k_decode, n_mesh)
+    _, mesh_neighbors = tree_mesh.query(roi_xyz, k=k_dec)
     if mesh_neighbors.ndim == 1:
         mesh_neighbors = mesh_neighbors[:, None]
-    
-    dec_mesh_idx = []
-    dec_grid_idx = []
-    for i in range(len(reg_lats)):
-        for j in mesh_neighbors[i]:
-            if j < n_roi:
-                dec_mesh_idx.append(i)
-                dec_grid_idx.append(j)
+
+    dec_mesh_idx = mesh_neighbors.flatten().tolist()
+    dec_grid_idx = np.repeat(np.arange(n_roi), k_dec).tolist()
 
     decoding_edges = torch.tensor(
         np.stack([dec_mesh_idx, dec_grid_idx], axis=0), dtype=torch.int64
     )
 
     print(f"[RegionalGridMesh] ROI grid points: {n_roi}")
-    print(f"  Encoding edges (grid→reg_mesh): {encoding_edges.shape[1]}")
-    print(f"  Decoding edges (reg_mesh→grid): {decoding_edges.shape[1]}")
+    print(f"  Encoding edges (grid→reg_mesh): {encoding_edges.shape[1]} ({n_mesh}×{k_enc} mesh-centric KNN)")
+    print(f"  Decoding edges (reg_mesh→grid): {decoding_edges.shape[1]} ({n_roi}×{k_dec} grid-centric KNN)")
 
     return roi_mask, encoding_edges, decoding_edges
 
@@ -546,7 +526,6 @@ class DualMeshModel(nn.Module):
             reg_lats=reg_lats,
             reg_lons=reg_lons,
             roi=roi,
-            reg_mesh=self.reg_mesh,
         )
         self.register_buffer("roi_mask", torch.tensor(roi_mask, dtype=torch.bool))
         self.register_buffer("reg_encoding_edges", enc_edges)
