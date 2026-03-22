@@ -3,7 +3,7 @@
 scripts/predict_dual_mesh.py
 
 Инференс DualMeshModel: глобальная + региональная модель.
-Per-channel метрики, физические единицы, сравнение global vs regional.
+Per-channel метрики, физические единицы, per-horizon (AR rollout).
 
 Использование:
   python scripts/predict_dual_mesh.py experiments/dual_mesh_krsk \
@@ -11,7 +11,7 @@ Per-channel метрики, физические единицы, сравнен�
     --regional-ckpt experiments/dual_mesh_krsk/results/best_regional.pth \
     --roi 50 60 83 98 \
     --data-dir data/datasets/multires_krsk_19f \
-    --per-channel --max-samples 200
+    --per-channel --max-samples 200 --ar-steps 4
 """
 
 import argparse
@@ -123,6 +123,8 @@ def main():
     ap.add_argument("--hidden-dim", type=int, default=256)
     ap.add_argument("--no-residual", action="store_true")
     ap.add_argument("--per-channel", action="store_true")
+    ap.add_argument("--ar-steps", type=int, default=1,
+                    help="Число AR-шагов. 1=+6h, 4=+24h. Выход подаётся обратно на вход.")
     args = ap.parse_args()
 
     exp_dir = args.experiment_dir
@@ -140,7 +142,7 @@ def main():
     _, _, test_ds, meta = load_chunked_datasets(
         data_path=data_dir,
         obs_window=exp_cfg.data.obs_window_used,
-        pred_steps=1,
+        pred_steps=args.ar_steps,
         n_features=exp_cfg.data.num_features_used,
     )
 
@@ -201,6 +203,8 @@ def main():
     # --- Inference setup ---
     G = len(grid_lats)
     C = exp_cfg.data.num_features_used
+    OBS = exp_cfg.data.obs_window_used
+    AR_STEPS = args.ar_steps
     use_residual = not args.no_residual and getattr(exp_cfg, 'use_residual', True)
 
     roi_mask = dual_model.roi_mask.cpu().numpy()
@@ -208,13 +212,15 @@ def main():
 
     max_samples = min(args.max_samples, len(test_ds))
     print(f"\n[predict] {max_samples}/{len(test_ds)} test samples, ROI={n_roi} points")
-    print(f"  use_residual={use_residual}, C={C}, G={G}")
+    print(f"  use_residual={use_residual}, C={C}, G={G}, AR={AR_STEPS} steps (+{AR_STEPS*6}h)")
 
-    # Streaming metrics: global, regional (DualMesh), baseline
-    sm_global = StreamingMetrics(C)       # DualMesh на всём шаре
-    sm_region = StreamingMetrics(C)       # DualMesh только в ROI
-    sm_base_global = StreamingMetrics(C)  # baseline (persistence) на всём шаре
-    sm_base_region = StreamingMetrics(C)  # baseline только в ROI
+    # Streaming metrics: overall (across all horizons)
+    sm_region = StreamingMetrics(C)
+    sm_base_region = StreamingMetrics(C)
+
+    # Per-horizon metrics (regional only — that's what we care about)
+    sm_region_h = [StreamingMetrics(C) for _ in range(AR_STEPS)]
+    sm_base_h = [StreamingMetrics(C) for _ in range(AR_STEPS)]
 
     loader = torch.utils.data.DataLoader(test_ds, batch_size=1, shuffle=False)
 
@@ -225,60 +231,80 @@ def main():
 
             X, y = X.to(device), y.to(device)
             y = y.squeeze(0) if y.dim() == 4 else y
-            if y.shape[-1] > C:
-                y_step0 = y.view(y.shape[0], G, -1, C)[:, :, 0, :].squeeze(0)
-            else:
-                y_step0 = y.squeeze(0)
+            y = y.squeeze(0) if y.dim() == 3 else y
+            # y: (G, P*C) where P = pred_steps from dataset
 
-            pred = dual_model(X)
-            if pred.dim() == 3:
-                pred = pred.squeeze(0)
+            y_total_steps = y.shape[-1] // C
+            effective_P = min(AR_STEPS, y_total_steps)
 
-            X_sq = X.squeeze(0)
-            baseline = X_sq[:, -C:]
+            X_sq = X.squeeze(0)  # (G, OBS*C)
+            baseline_last = X_sq[:, -C:]  # persistence: last obs
 
-            if use_residual:
-                out = baseline + pred
-            else:
-                out = pred
+            # --- AR rollout ---
+            curr_state = X_sq.clone()  # (G, OBS*C)
+            ar_outs = []
 
-            # CPU for metrics
-            out_cpu = out.cpu()
-            y_cpu = y_step0.cpu()
-            bl_cpu = baseline.cpu()
+            for ar_step in range(effective_P):
+                inp = curr_state.unsqueeze(0)  # (1, G, OBS*C)
+                pred = dual_model(inp)
+                if pred.dim() == 3:
+                    pred = pred.squeeze(0)
+                # pred: (G, C)
 
-            # Global metrics
-            sm_global.update(y_cpu, out_cpu)
-            sm_base_global.update(y_cpu, bl_cpu)
+                if use_residual:
+                    step_out = curr_state[:, -C:] + pred
+                else:
+                    step_out = pred
 
-            # Regional metrics
-            sm_region.update(y_cpu[roi_mask], out_cpu[roi_mask])
-            sm_base_region.update(y_cpu[roi_mask], bl_cpu[roi_mask])
+                ar_outs.append(step_out.cpu())
+
+                # Shift observation window: drop oldest, append prediction
+                if OBS > 1:
+                    curr_state = torch.cat([curr_state[:, C:], step_out], dim=-1)
+                else:
+                    curr_state = step_out
+
+            # --- Metrics ---
+            bl_cpu = baseline_last.cpu()
+
+            for p in range(effective_P):
+                y_p = y[:, p*C:(p+1)*C].cpu()  # ground truth for horizon p
+                out_p = ar_outs[p]
+
+                # Per-horizon
+                sm_region_h[p].update(y_p[roi_mask], out_p[roi_mask])
+                sm_base_h[p].update(y_p[roi_mask], bl_cpu[roi_mask])
+
+                # Overall (all horizons combined)
+                sm_region.update(y_p[roi_mask], out_p[roi_mask])
+                sm_base_region.update(y_p[roi_mask], bl_cpu[roi_mask])
 
             if (i + 1) % 50 == 0:
                 sk_r = 1.0 - sm_region.rmse / (sm_base_region.rmse + 1e-12)
                 print(f"  [{i+1}/{max_samples}] region RMSE={sm_region.rmse:.6f} ACC={sm_region.acc:.4f} skill={sk_r*100:.2f}%")
 
     # === RESULTS ===
-    skill_global = 1.0 - sm_global.rmse / (sm_base_global.rmse + 1e-12)
     skill_region = 1.0 - sm_region.rmse / (sm_base_region.rmse + 1e-12)
 
     print()
     print("=" * 60)
-    print(f"=== Inference summary ({sm_global.n} samples) ===")
+    print(f"=== Inference summary ({sm_region.n} samples, AR={AR_STEPS}) ===")
     print(f"Grid: G={G} | C={C} | ROI={n_roi} points")
     print()
-    print(f"  GLOBAL (all {G} points):")
-    print(f"    RMSE={sm_global.rmse:.6f} | MAE={sm_global.mae:.6f}")
-    print(f"    Baseline RMSE={sm_base_global.rmse:.6f}")
-    print(f"    Skill={skill_global*100:.2f}%")
-    print(f"    ACC={sm_global.acc:.4f} | base ACC={sm_base_global.acc:.4f}")
-    print()
-    print(f"  REGIONAL ({n_roi} ROI points):")
+    print(f"  REGIONAL overall (avg across {AR_STEPS} horizons):")
     print(f"    RMSE={sm_region.rmse:.6f} | MAE={sm_region.mae:.6f}")
     print(f"    Baseline RMSE={sm_base_region.rmse:.6f}")
     print(f"    Skill={skill_region*100:.2f}%")
     print(f"    ACC={sm_region.acc:.4f} | base ACC={sm_base_region.acc:.4f}")
+
+    # Per-horizon summary
+    print(f"\n  Per-horizon (regional):")
+    for p in range(AR_STEPS):
+        sp, sb = sm_region_h[p], sm_base_h[p]
+        if sp.n == 0:
+            continue
+        sk = 1.0 - sp.rmse / (sb.rmse + 1e-12)
+        print(f"    +{(p+1)*6:02d}h: RMSE={sp.rmse:.6f} | base={sb.rmse:.6f} | skill={sk*100:.2f}% | ACC={sp.acc:.4f} (base {sb.acc:.4f})")
     print("=" * 60)
 
     # === PER-CHANNEL ===
@@ -293,18 +319,80 @@ def main():
             scl = np.load(scalers_path)
             std = scl["std"].astype(np.float64)[:C]
 
-        rmse_gl = sm_global.rmse_per_channel
+        # --- Per-horizon per-channel table (ключевая) ---
+        if AR_STEPS > 1 and std is not None:
+            key_vars = ["t2m", "10u", "10v", "msl", "z@500", "t@850", "u@850", "v@850", "z@850"]
+            key_idx = [i for i, v in enumerate(var_order[:C]) if v in key_vars]
+
+            print(f"\nPer-horizon per-channel RMSE (physical units, regional):")
+            header = f"  {'var':>10s} {'unit':>6s}"
+            for p in range(AR_STEPS):
+                header += f" {'+'+ str((p+1)*6) + 'h':>8s}"
+            print(header)
+
+            for c in key_idx:
+                name = var_order[c]
+                unit = UNITS.get(name, "?")
+                row = f"  {name:>10s} {unit:>6s}"
+                for p in range(AR_STEPS):
+                    if sm_region_h[p].n == 0:
+                        row += f" {'N/A':>8s}"
+                        continue
+                    phys_rmse = sm_region_h[p].rmse_per_channel[c] * std[c]
+                    if "z@" in name or name == "z_surf":
+                        row += f" {phys_rmse/9.81:7.1f}m"
+                    elif name == "t2m" or name.startswith("t@"):
+                        row += f" {phys_rmse:6.2f}°C"
+                    else:
+                        row += f" {phys_rmse:8.4f}"
+                print(row)
+
+            # Per-horizon per-channel ACC
+            print(f"\nPer-horizon per-channel ACC (regional):")
+            header = f"  {'var':>10s}"
+            for p in range(AR_STEPS):
+                header += f" {'+'+ str((p+1)*6) + 'h':>8s}"
+            print(header)
+            for c in key_idx:
+                name = var_order[c]
+                row = f"  {name:>10s}"
+                for p in range(AR_STEPS):
+                    if sm_region_h[p].n == 0:
+                        row += f" {'N/A':>8s}"
+                        continue
+                    row += f" {sm_region_h[p].acc_per_channel[c]:8.4f}"
+                print(row)
+
+            # Per-horizon per-channel Skill
+            print(f"\nPer-horizon per-channel Skill (regional):")
+            header = f"  {'var':>10s}"
+            for p in range(AR_STEPS):
+                header += f" {'+'+ str((p+1)*6) + 'h':>8s}"
+            print(header)
+            for c in key_idx:
+                name = var_order[c]
+                row = f"  {name:>10s}"
+                for p in range(AR_STEPS):
+                    sp, sb = sm_region_h[p], sm_base_h[p]
+                    if sp.n == 0:
+                        row += f" {'N/A':>8s}"
+                        continue
+                    r_pred = sp.rmse_per_channel[c]
+                    r_base = sb.rmse_per_channel[c]
+                    sk_c = (1 - r_pred / (r_base + 1e-12)) * 100
+                    row += f" {sk_c:7.2f}%"
+                print(row)
+
+        # --- Overall per-channel (averaged across horizons) ---
         rmse_rg = sm_region.rmse_per_channel
         rmse_bl = sm_base_region.rmse_per_channel
-        acc_gl = sm_global.acc_per_channel
         acc_rg = sm_region.acc_per_channel
 
         if std is not None:
-            print(f"\nPer-channel metrics (physical units):")
-            print(f"  {'#':>3s} {'var':>10s} {'unit':>8s}  {'ACC_glob':>8s} {'ACC_reg':>8s}  {'RMSE_glob':>10s} {'RMSE_reg':>10s} {'RMSE_base':>10s} {'Skill':>7s}")
+            print(f"\nPer-channel overall (physical units, avg over {AR_STEPS} horizons):")
+            print(f"  {'#':>3s} {'var':>10s} {'unit':>8s}  {'ACC':>8s}  {'RMSE':>10s} {'RMSE_base':>10s} {'Skill':>7s}")
             for c, name in enumerate(var_order[:C]):
                 unit = UNITS.get(name, "?")
-                phys_gl = rmse_gl[c] * std[c]
                 phys_rg = rmse_rg[c] * std[c]
                 phys_bl = rmse_bl[c] * std[c]
                 sk_c = (1 - phys_rg / (phys_bl + 1e-12)) * 100
@@ -313,32 +401,34 @@ def main():
                     extra = f"  ({phys_rg/9.81:.1f} gpm)"
                 elif name == "t2m" or name.startswith("t@"):
                     extra = f"  ({phys_rg:.2f} °C)"
-                print(f"  {c:3d} {name:>10s} {unit:>8s}  {acc_gl[c]:8.4f} {acc_rg[c]:8.4f}  {phys_gl:10.4f} {phys_rg:10.4f} {phys_bl:10.4f} {sk_c:6.2f}%{extra}")
-        else:
-            print(f"\nPer-channel ACC & RMSE (normalized, no scalers found):")
-            for c, name in enumerate(var_order[:C]):
-                print(f"  {c:2d} {name:>10s}  ACC_g={acc_gl[c]:.4f} ACC_r={acc_rg[c]:.4f}  RMSE_g={rmse_gl[c]:.4f} RMSE_r={rmse_rg[c]:.4f}")
+                print(f"  {c:3d} {name:>10s} {unit:>8s}  {acc_rg[c]:8.4f}  {phys_rg:10.4f} {phys_bl:10.4f} {sk_c:6.2f}%{extra}")
 
     # Save results
     results = {
-        "n_samples": sm_global.n,
+        "n_samples": sm_region.n,
+        "ar_steps": AR_STEPS,
         "roi": list(roi),
-        "global": {
-            "rmse": sm_global.rmse, "mae": sm_global.mae, "acc": sm_global.acc,
-            "baseline_rmse": sm_base_global.rmse, "skill": skill_global,
-        },
-        "regional": {
+        "regional_overall": {
             "rmse": sm_region.rmse, "mae": sm_region.mae, "acc": sm_region.acc,
             "baseline_rmse": sm_base_region.rmse, "skill": skill_region,
         },
+        "per_horizon": [],
     }
+    for p in range(AR_STEPS):
+        sp, sb = sm_region_h[p], sm_base_h[p]
+        if sp.n == 0:
+            continue
+        sk = 1.0 - sp.rmse / (sb.rmse + 1e-12)
+        results["per_horizon"].append({
+            "horizon_h": (p+1)*6,
+            "rmse": sp.rmse, "acc": sp.acc,
+            "baseline_rmse": sb.rmse, "skill": sk,
+        })
     if args.per_channel:
         results["per_channel"] = {
             "variables": var_order[:C],
             "regional_rmse_norm": sm_region.rmse_per_channel.tolist(),
             "regional_acc": sm_region.acc_per_channel.tolist(),
-            "global_rmse_norm": sm_global.rmse_per_channel.tolist(),
-            "global_acc": sm_global.acc_per_channel.tolist(),
         }
 
     results_path = os.path.join(exp_dir, "results", "predict_results.json")

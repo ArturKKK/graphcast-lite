@@ -54,11 +54,19 @@ def train_dual_epoch(
     device: torch.device,
     lat_weights=None,
     use_residual: bool = False,
+    check_grads: bool = False,
 ):
-    """Один проход обучения DualMeshModel."""
+    """Один проход обучения DualMeshModel.
+
+    КЛЮЧЕВОЕ ОТЛИЧИЕ от старой версии: loss считается ТОЛЬКО по ROI точкам.
+    Это устраняет gradient dilution (раньше 97.9% loss приходилось на
+    замороженные глобальные точки, размывая градиент в ~48 раз).
+    """
     model.train()
     # Глобальная модель всегда в eval (BatchNorm/Dropout если есть)
     model.global_model.eval()
+
+    roi_mask = model.roi_mask  # (G,) bool tensor on device
 
     total_loss = 0
     n_batches = 0
@@ -91,8 +99,25 @@ def train_dual_epoch(
         else:
             out = pred
 
-        loss = weighted_mse_loss(out, y_step0, lat_weights)
+        # Loss ТОЛЬКО по ROI — региональный модуль влияет только на эти точки
+        out_roi = out[:, roi_mask, :]
+        y_roi = y_step0[:, roi_mask, :]
+        loss = weighted_mse_loss(out_roi, y_roi, None)  # lat_weights не нужны для ROI
+
         loss.backward()
+
+        # Gradient sanity check (первый батч первой эпохи)
+        if check_grads and n_batches == 0:
+            print("[GradCheck] out.requires_grad:", out.requires_grad)
+            for name, p in model.named_parameters():
+                if p.requires_grad and p.grad is not None:
+                    gn = p.grad.norm().item()
+                    if gn > 0:
+                        print(f"  {name}: grad_norm={gn:.6f}")
+                        break  # показать хоть один ненулевой
+            else:
+                print("  WARNING: все градиенты нулевые!")
+
         optimizer.step()
 
         total_loss += loss.item()
@@ -109,11 +134,13 @@ def eval_dual(
     use_residual: bool = False,
     region_mask=None,
 ):
-    """Оценка на val/test."""
+    """Оценка на val/test. Loss считается ТОЛЬКО по ROI."""
     model.eval()
     total_loss = 0
     n_batches = 0
     acc_values = []
+
+    roi_mask = model.roi_mask  # (G,) bool tensor on device
 
     with torch.no_grad():
         for X, y in dataloader:
@@ -140,7 +167,10 @@ def eval_dual(
             else:
                 out = pred
 
-            loss = weighted_mse_loss(out, y_step0, lat_weights)
+            # Loss ТОЛЬКО по ROI (согласовано с train)
+            out_roi = out[:, roi_mask, :]
+            y_roi = y_step0[:, roi_mask, :]
+            loss = weighted_mse_loss(out_roi, y_roi, None)
             total_loss += loss.item()
             n_batches += 1
 
@@ -308,6 +338,7 @@ def main():
         train_loss = train_dual_epoch(
             dual_model, train_loader, optimizer, device,
             lat_weights=lat_weights, use_residual=use_residual,
+            check_grads=(epoch == 0),
         )
 
         val_loss, val_acc = eval_dual(

@@ -602,21 +602,33 @@ class DualMeshModel(nn.Module):
         print(f"[DualMesh] ROI grid points: {self.n_roi_grid}")
         print(f"[DualMesh] Regional mesh nodes: {self.n_reg_mesh}")
 
+        # Проверка zero-degree узлов (encoding/decoding)
+        enc_deg = torch.bincount(enc_edges[1], minlength=self.n_reg_mesh)
+        dec_deg = torch.bincount(dec_edges[1], minlength=self.n_roi_grid)
+        enc_zero = (enc_deg == 0).sum().item()
+        dec_zero = (dec_deg == 0).sum().item()
+        if enc_zero > 0:
+            print(f"  WARNING: {enc_zero}/{self.n_reg_mesh} reg mesh nodes have ZERO encoding edges (dead nodes)!")
+        if dec_zero > 0:
+            print(f"  WARNING: {dec_zero}/{self.n_roi_grid} ROI grid points have ZERO decoding edges (no output)!")
+        print(f"  Encoding edge degree: min={enc_deg.min().item()} max={enc_deg.max().item()} mean={enc_deg.float().mean().item():.1f}")
+        print(f"  Decoding edge degree: min={dec_deg.min().item()} max={dec_deg.max().item()} mean={dec_deg.float().mean().item():.1f}")
+
     def forward(self, X: torch.Tensor, attention_threshold=0.0, **kwargs):
         """
         X: (1, N_grid, T*F) — входные данные.
 
         Returns: (N_grid, output_channels)
         """
+        assert X.shape[0] == 1, f"DualMeshModel supports batch_size=1 only, got {X.shape[0]}"
+
         # ── 1. Глобальный прогноз + mesh латенты (без графа вычислений) ──
-        # global_model заморожен → torch.no_grad() убирает лишние буферы активаций
-        # и исключает backward-проход по 6M параметрам
         with torch.no_grad():
             global_pred = self.global_model(X=X, attention_threshold=attention_threshold, **kwargs)
             # global_pred: (N_grid, output_channels)
 
             # ── 2. Извлекаем глобальные mesh латенты (encoder прогоняется ещё раз) ──
-            X_sq = X.squeeze()
+            X_sq = X[0]  # (G, T*F) — explicit indexing, не squeeze()
             X_preprocessed = self.global_model._preprocess_input(grid_node_features=X_sq)
             encoded = self.global_model.encoder.forward(
                 X=X_preprocessed, edge_index=self.global_model.encoding_graph,
