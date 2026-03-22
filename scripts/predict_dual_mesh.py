@@ -3,13 +3,15 @@
 scripts/predict_dual_mesh.py
 
 Инференс DualMeshModel: глобальная + региональная модель.
+Per-channel метрики, физические единицы, сравнение global vs regional.
 
 Использование:
   python scripts/predict_dual_mesh.py experiments/dual_mesh_krsk \
-    --pretrained experiments/multires_nores_freeze6/results/best_model.pth \
+    --pretrained experiments/multires_nores_freeze6/best_model.pth \
     --regional-ckpt experiments/dual_mesh_krsk/results/best_regional.pth \
     --roi 50 60 83 98 \
-    --data-dir data/datasets/multires_krsk_19f
+    --data-dir data/datasets/multires_krsk_19f \
+    --per-channel --max-samples 200
 """
 
 import argparse
@@ -31,6 +33,79 @@ from src.utils import load_from_json_file
 from src.data.dataloader_chunked import load_chunked_datasets
 from src.main import load_model_from_experiment_config
 from src.dual_mesh import DualMeshModel
+
+UNITS = {
+    "t2m": "K", "10u": "m/s", "10v": "m/s", "msl": "Pa",
+    "tp": "m", "sp": "Pa", "tcwv": "kg/m²",
+    "z_surf": "m²/s²", "lsm": "-",
+    "t@850": "K", "u@850": "m/s", "v@850": "m/s",
+    "z@850": "m²/s²", "q@850": "kg/kg",
+    "t@500": "K", "u@500": "m/s", "v@500": "m/s",
+    "z@500": "m²/s²", "q@500": "kg/kg",
+}
+
+
+class StreamingMetrics:
+    """Накапливает MSE/MAE/ACC потоково — без хранения всех сэмплов в RAM."""
+
+    def __init__(self, num_channels: int):
+        self.C = num_channels
+        self.n = 0
+        self.total_elem = 0
+        self.sum_se = 0.0
+        self.sum_ae = 0.0
+        self.sum_se_per_ch = np.zeros(num_channels, dtype=np.float64)
+        self.elem_per_ch = np.zeros(num_channels, dtype=np.int64)
+        self.sum_acc = np.zeros(num_channels, dtype=np.float64)
+        self.acc_count = np.zeros(num_channels, dtype=np.int64)
+
+    def update(self, y_true: torch.Tensor, y_pred: torch.Tensor):
+        """y_true, y_pred: [G, C]"""
+        err = y_pred.float() - y_true.float()
+        CP = y_true.shape[1]
+        eps = 1e-8
+        for c in range(CP):
+            yt = y_true[:, c].float()
+            yp = y_pred[:, c].float()
+            ch = c % self.C
+            se_c = (yp - yt).pow(2).sum().item()
+            self.sum_se_per_ch[ch] += se_c
+            self.elem_per_ch[ch] += yt.numel()
+            yt_a = yt - yt.mean()
+            yp_a = yp - yp.mean()
+            corr = (yt_a * yp_a).sum() / (yt_a.norm() * yp_a.norm() + eps)
+            self.sum_acc[ch] += corr.item()
+            self.acc_count[ch] += 1
+
+        self.sum_se += err.pow(2).sum().item()
+        self.sum_ae += err.abs().sum().item()
+        self.total_elem += err.numel()
+        self.n += 1
+
+    @property
+    def mse(self):
+        return self.sum_se / max(self.total_elem, 1)
+
+    @property
+    def rmse(self):
+        return float(np.sqrt(self.mse))
+
+    @property
+    def mae(self):
+        return self.sum_ae / max(self.total_elem, 1)
+
+    @property
+    def rmse_per_channel(self):
+        mse_pc = self.sum_se_per_ch / np.maximum(self.elem_per_ch, 1)
+        return np.sqrt(mse_pc)
+
+    @property
+    def acc_per_channel(self):
+        return self.sum_acc / np.maximum(self.acc_count, 1)
+
+    @property
+    def acc(self):
+        return float(self.acc_per_channel.mean())
 
 
 def main():
@@ -114,7 +189,6 @@ def main():
     ckpt_path = args.regional_ckpt or os.path.join(exp_dir, "results", "best_regional.pth")
     if os.path.exists(ckpt_path):
         reg_state = torch.load(ckpt_path, map_location=device)
-        # Load only regional keys
         missing, unexpected = dual_model.load_state_dict(reg_state, strict=False)
         n_loaded = len(reg_state) - len(unexpected)
         print(f"Loaded {n_loaded} regional weight tensors from {ckpt_path}")
@@ -124,10 +198,9 @@ def main():
     dual_model = dual_model.to(device)
     dual_model.eval()
 
-    # --- Inference ---
+    # --- Inference setup ---
     G = len(grid_lats)
     C = exp_cfg.data.num_features_used
-    OBS = exp_cfg.data.obs_window_used
     use_residual = not args.no_residual and getattr(exp_cfg, 'use_residual', True)
 
     roi_mask = dual_model.roi_mask.cpu().numpy()
@@ -135,14 +208,13 @@ def main():
 
     max_samples = min(args.max_samples, len(test_ds))
     print(f"\n[predict] {max_samples}/{len(test_ds)} test samples, ROI={n_roi} points")
+    print(f"  use_residual={use_residual}, C={C}, G={G}")
 
-    # Streaming metrics
-    sum_se_global = 0.0
-    sum_se_region = 0.0
-    sum_se_base_region = 0.0
-    n_elem_global = 0
-    n_elem_region = 0
-    acc_values = []
+    # Streaming metrics: global, regional (DualMesh), baseline
+    sm_global = StreamingMetrics(C)       # DualMesh на всём шаре
+    sm_region = StreamingMetrics(C)       # DualMesh только в ROI
+    sm_base_global = StreamingMetrics(C)  # baseline (persistence) на всём шаре
+    sm_base_region = StreamingMetrics(C)  # baseline только в ROI
 
     loader = torch.utils.data.DataLoader(test_ds, batch_size=1, shuffle=False)
 
@@ -153,76 +225,127 @@ def main():
 
             X, y = X.to(device), y.to(device)
             y = y.squeeze(0) if y.dim() == 4 else y
-            y_step0 = y.view(y.shape[0], G, -1, C)[:, :, 0, :].squeeze(0) if y.shape[-1] > C else y.squeeze(0)
+            if y.shape[-1] > C:
+                y_step0 = y.view(y.shape[0], G, -1, C)[:, :, 0, :].squeeze(0)
+            else:
+                y_step0 = y.squeeze(0)
 
             pred = dual_model(X)
-            if pred.dim() == 2:
-                pass  # (G, C)
-            else:
+            if pred.dim() == 3:
                 pred = pred.squeeze(0)
 
-            if use_residual:
-                X_sq = X.squeeze(0)
-                X_last = X_sq[:, -C:]
-                out = X_last + pred
-            else:
-                out = pred
-
-            # Baseline (persistence)
             X_sq = X.squeeze(0)
             baseline = X_sq[:, -C:]
 
-            err_sq = (out - y_step0).pow(2)
-            base_err_sq = (baseline - y_step0).pow(2)
+            if use_residual:
+                out = baseline + pred
+            else:
+                out = pred
 
-            sum_se_global += err_sq.sum().item()
-            n_elem_global += err_sq.numel()
+            # CPU for metrics
+            out_cpu = out.cpu()
+            y_cpu = y_step0.cpu()
+            bl_cpu = baseline.cpu()
 
-            sum_se_region += err_sq[roi_mask].sum().item()
-            sum_se_base_region += base_err_sq[roi_mask].sum().item()
-            n_elem_region += err_sq[roi_mask].numel()
+            # Global metrics
+            sm_global.update(y_cpu, out_cpu)
+            sm_base_global.update(y_cpu, bl_cpu)
 
-            # Regional ACC
-            pred_r = out[roi_mask]
-            true_r = y_step0[roi_mask]
-            p_a = pred_r - pred_r.mean(0, keepdim=True)
-            t_a = true_r - true_r.mean(0, keepdim=True)
-            corr = (p_a * t_a).sum(0) / (p_a.norm(dim=0) * t_a.norm(dim=0) + 1e-8)
-            acc_values.append(corr.mean().item())
+            # Regional metrics
+            sm_region.update(y_cpu[roi_mask], out_cpu[roi_mask])
+            sm_base_region.update(y_cpu[roi_mask], bl_cpu[roi_mask])
 
             if (i + 1) % 50 == 0:
-                print(f"  {i+1}/{max_samples} done...")
+                sk_r = 1.0 - sm_region.rmse / (sm_base_region.rmse + 1e-12)
+                print(f"  [{i+1}/{max_samples}] region RMSE={sm_region.rmse:.6f} ACC={sm_region.acc:.4f} skill={sk_r*100:.2f}%")
 
-    rmse_global = (sum_se_global / n_elem_global) ** 0.5
-    rmse_region = (sum_se_region / n_elem_region) ** 0.5
-    rmse_base_region = (sum_se_base_region / n_elem_region) ** 0.5
-    skill = 1 - rmse_region / rmse_base_region
-    acc = sum(acc_values) / len(acc_values)
+    # === RESULTS ===
+    skill_global = 1.0 - sm_global.rmse / (sm_base_global.rmse + 1e-12)
+    skill_region = 1.0 - sm_region.rmse / (sm_base_region.rmse + 1e-12)
 
-    print(f"\n{'='*50}")
-    print(f"Results ({max_samples} samples)")
-    print(f"  Global RMSE:   {rmse_global:.4f}")
-    print(f"  Regional RMSE: {rmse_region:.4f}")
-    print(f"  Baseline RMSE: {rmse_base_region:.4f}")
-    print(f"  Skill:         {skill*100:.2f}%")
-    print(f"  Regional ACC:  {acc:.4f}")
-    print(f"{'='*50}")
+    print()
+    print("=" * 60)
+    print(f"=== Inference summary ({sm_global.n} samples) ===")
+    print(f"Grid: G={G} | C={C} | ROI={n_roi} points")
+    print()
+    print(f"  GLOBAL (all {G} points):")
+    print(f"    RMSE={sm_global.rmse:.6f} | MAE={sm_global.mae:.6f}")
+    print(f"    Baseline RMSE={sm_base_global.rmse:.6f}")
+    print(f"    Skill={skill_global*100:.2f}%")
+    print(f"    ACC={sm_global.acc:.4f} | base ACC={sm_base_global.acc:.4f}")
+    print()
+    print(f"  REGIONAL ({n_roi} ROI points):")
+    print(f"    RMSE={sm_region.rmse:.6f} | MAE={sm_region.mae:.6f}")
+    print(f"    Baseline RMSE={sm_base_region.rmse:.6f}")
+    print(f"    Skill={skill_region*100:.2f}%")
+    print(f"    ACC={sm_region.acc:.4f} | base ACC={sm_base_region.acc:.4f}")
+    print("=" * 60)
 
+    # === PER-CHANNEL ===
+    if args.per_channel:
+        data_dir_path = Path(data_dir)
+        var_path = data_dir_path / "variables.json"
+        var_order = json.loads(var_path.read_text()) if var_path.exists() else [f"ch{c}" for c in range(C)]
+
+        scalers_path = data_dir_path / "scalers.npz"
+        std = None
+        if scalers_path.exists():
+            scl = np.load(scalers_path)
+            std = scl["std"].astype(np.float64)[:C]
+
+        rmse_gl = sm_global.rmse_per_channel
+        rmse_rg = sm_region.rmse_per_channel
+        rmse_bl = sm_base_region.rmse_per_channel
+        acc_gl = sm_global.acc_per_channel
+        acc_rg = sm_region.acc_per_channel
+
+        if std is not None:
+            print(f"\nPer-channel metrics (physical units):")
+            print(f"  {'#':>3s} {'var':>10s} {'unit':>8s}  {'ACC_glob':>8s} {'ACC_reg':>8s}  {'RMSE_glob':>10s} {'RMSE_reg':>10s} {'RMSE_base':>10s} {'Skill':>7s}")
+            for c, name in enumerate(var_order[:C]):
+                unit = UNITS.get(name, "?")
+                phys_gl = rmse_gl[c] * std[c]
+                phys_rg = rmse_rg[c] * std[c]
+                phys_bl = rmse_bl[c] * std[c]
+                sk_c = (1 - phys_rg / (phys_bl + 1e-12)) * 100
+                extra = ""
+                if "z@" in name or name == "z_surf":
+                    extra = f"  ({phys_rg/9.81:.1f} gpm)"
+                elif name == "t2m" or name.startswith("t@"):
+                    extra = f"  ({phys_rg:.2f} °C)"
+                print(f"  {c:3d} {name:>10s} {unit:>8s}  {acc_gl[c]:8.4f} {acc_rg[c]:8.4f}  {phys_gl:10.4f} {phys_rg:10.4f} {phys_bl:10.4f} {sk_c:6.2f}%{extra}")
+        else:
+            print(f"\nPer-channel ACC & RMSE (normalized, no scalers found):")
+            for c, name in enumerate(var_order[:C]):
+                print(f"  {c:2d} {name:>10s}  ACC_g={acc_gl[c]:.4f} ACC_r={acc_rg[c]:.4f}  RMSE_g={rmse_gl[c]:.4f} RMSE_r={rmse_rg[c]:.4f}")
+
+    # Save results
     results = {
-        "rmse_global": rmse_global,
-        "rmse_region": rmse_region,
-        "rmse_baseline_region": rmse_base_region,
-        "skill": skill,
-        "regional_acc": acc,
-        "n_samples": max_samples,
+        "n_samples": sm_global.n,
         "roi": list(roi),
+        "global": {
+            "rmse": sm_global.rmse, "mae": sm_global.mae, "acc": sm_global.acc,
+            "baseline_rmse": sm_base_global.rmse, "skill": skill_global,
+        },
+        "regional": {
+            "rmse": sm_region.rmse, "mae": sm_region.mae, "acc": sm_region.acc,
+            "baseline_rmse": sm_base_region.rmse, "skill": skill_region,
+        },
     }
+    if args.per_channel:
+        results["per_channel"] = {
+            "variables": var_order[:C],
+            "regional_rmse_norm": sm_region.rmse_per_channel.tolist(),
+            "regional_acc": sm_region.acc_per_channel.tolist(),
+            "global_rmse_norm": sm_global.rmse_per_channel.tolist(),
+            "global_acc": sm_global.acc_per_channel.tolist(),
+        }
 
     results_path = os.path.join(exp_dir, "results", "predict_results.json")
     os.makedirs(os.path.dirname(results_path), exist_ok=True)
     with open(results_path, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"Saved to {results_path}")
+    print(f"\nSaved to {results_path}")
 
 
 if __name__ == "__main__":
