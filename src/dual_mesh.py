@@ -436,6 +436,10 @@ class RegionalDecoder(nn.Module):
             nn.SiLU(),
             nn.Linear(hidden_dim, output_dim),
         )
+        # Zero-init last layer: correction starts at exactly zero
+        # (standard residual learning technique — ResNet, GraphCast)
+        nn.init.zeros_(self.mlp[-1].weight)
+        nn.init.zeros_(self.mlp[-1].bias)
 
     def forward(self, mesh_features: torch.Tensor, edge_index: torch.Tensor,
                 n_grid_nodes: int):
