@@ -44,7 +44,83 @@ from src.utils import load_from_json_file, save_to_json_file
 from src.data.dataloader_chunked import load_chunked_datasets
 from src.main import load_model_from_experiment_config, set_random_seeds
 from src.dual_mesh import DualMeshModel
+from copy import deepcopy
 from src.train import get_lat_weights, weighted_mse_loss, spatial_corr
+
+
+def overfit_test(model, dataloader, device, use_residual=False, n_steps=200, lr=0.01):
+    """Overfit на 1 сэмпл — если loss падает, модель МОЖЕТ учиться."""
+    print("\n" + "="*60)
+    print("[OverfitTest] 1 sample, {} steps, lr={}...".format(n_steps, lr))
+    print("="*60)
+
+    roi_mask = model.roi_mask
+
+    # Берём первый батч
+    X, y = next(iter(dataloader))
+    X, y = X.to(device), y.to(device)
+    y = y.squeeze(0) if y.dim() == 4 else y
+    N, G, feat_dim = X.shape
+    C = feat_dim // model.obs_window
+    total_target_steps = y.shape[-1] // C
+    if total_target_steps > 1:
+        y_step0 = y.view(N, G, total_target_steps, C)[:, :, 0, :]
+    else:
+        y_step0 = y
+
+    # Сохраняем state dict и optimizer
+    saved_state = deepcopy({k: v for k, v in model.state_dict().items()
+                            if not k.startswith("global_model.")})
+
+    regional_params = [p for n, p in model.named_parameters()
+                       if not n.startswith("global_model.") and p.requires_grad]
+    opt = Adam(regional_params, lr=lr)
+
+    model.train()
+    model.global_model.eval()
+
+    for step in range(n_steps):
+        opt.zero_grad()
+        pred = model(X)
+        if pred.dim() == 2:
+            pred = pred.unsqueeze(0)
+        if use_residual:
+            X_reshaped = X.view(N, G, model.obs_window, C)
+            out = X_reshaped[:, :, -1, :] + pred
+        else:
+            out = pred
+        out_roi = out[:, roi_mask, :]
+        y_roi = y_step0[:, roi_mask, :]
+        loss = weighted_mse_loss(out_roi, y_roi, None)
+        loss.backward()
+        opt.step()
+
+        if step % 20 == 0 or step == n_steps - 1:
+            with torch.no_grad():
+                # Correction magnitude
+                global_pred = model.global_model(X=X, attention_threshold=0.0)
+                if global_pred.dim() == 2:
+                    global_pred = global_pred.unsqueeze(0)
+                if use_residual:
+                    X_reshaped = X.view(N, G, model.obs_window, C)
+                    global_out = X_reshaped[:, :, -1, :] + global_pred
+                else:
+                    global_out = global_pred
+                global_roi = global_out[:, roi_mask, :]
+                correction = out_roi - global_roi
+            print(f"    step {step:3d}: loss={loss.item():.6f}  "
+                  f"|correction|={correction.abs().mean().item():.6f}  "
+                  f"max={correction.abs().max().item():.4f}")
+
+    # Восстанавливаем веса
+    current_state = model.state_dict()
+    for k, v in saved_state.items():
+        current_state[k].copy_(v)
+
+    loss_start = None  # just for clarity
+    print("="*60)
+    print("[OverfitTest] DONE. Model weights RESTORED to initial state.")
+    print("="*60 + "\n")
 
 
 def train_dual_epoch(
@@ -134,6 +210,34 @@ def train_dual_epoch(
 
         total_loss += loss.item()
         n_batches += 1
+
+        # Последний батч — замеряем correction magnitude
+        last_out_roi = out_roi.detach()
+        last_y_roi = y_roi.detach()
+        last_X = X
+
+    # Замер коррекции в конце эпохи (по последнему батчу)
+    if n_batches > 0:
+        with torch.no_grad():
+            model.eval()
+            global_pred = model.global_model(X=last_X, attention_threshold=0.0)
+            if global_pred.dim() == 2:
+                global_pred = global_pred.unsqueeze(0)
+            if use_residual:
+                N_x, G_x, fd = last_X.shape
+                C_x = fd // model.obs_window
+                X_reshaped = last_X.view(N_x, G_x, model.obs_window, C_x)
+                global_out = X_reshaped[:, :, -1, :] + global_pred
+            else:
+                global_out = global_pred
+            global_roi = global_out[:, model.roi_mask, :]
+            correction = last_out_roi - global_roi
+            baseline_loss = weighted_mse_loss(global_roi, last_y_roi, None).item()
+            model.train()
+            model.global_model.eval()
+        print(f"  [Correction] mean_abs={correction.abs().mean().item():.6f}, "
+              f"max_abs={correction.abs().max().item():.4f}, "
+              f"baseline_mse={baseline_loss:.6f}")
 
     return total_loss / max(n_batches, 1)
 
@@ -342,6 +446,9 @@ def main():
         print(msg)
         with open(log_path, "a") as f:
             f.write(msg + "\n")
+
+    # --- Overfit test: ДОКАЗАТЕЛЬСТВО что модель может учиться ---
+    overfit_test(dual_model, train_loader, device, use_residual=use_residual)
 
     _log(f"{'epoch':>5}  {'train_loss':>10}  {'val_loss':>10}  {'val_ACC':>8}  {'best':>10}")
     _log("-" * 55)
