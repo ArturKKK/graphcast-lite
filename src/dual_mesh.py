@@ -427,18 +427,23 @@ class RegionalEncoder(nn.Module):
 
 
 class RegionalDecoder(nn.Module):
-    """Декодер: Regional Mesh → Grid(ROI) с IDW-взвешенной агрегацией.
+    """Декодер: Regional Mesh → Grid(ROI) с IDW-агрегацией и skip connection.
 
-    Вместо scatter_mean использует inverse-distance weighting:
-    каждая grid-точка получает взвешенную комбинацию k ближайших mesh-нод,
-    где ближние ноды вносят больший вклад. Это убирает потолок точности,
-    который scatter_mean создавал при малом числе mesh-нод.
+    Каждая grid-точка получает:
+    - mesh_agg (hidden_dim): IDW-взвешенные фичи от k ближайших mesh-нод (контекст)
+    - grid_skip (skip_dim): собственные raw-фичи, минуя mesh (per-point identity)
+
+    Без skip connection все grid-точки с одинаковыми mesh-соседями получают
+    одинаковую коррекцию — потолок точности. Skip даёт каждой точке уникальную
+    «личность» для point-specific коррекций.
     """
 
-    def __init__(self, input_dim: int, output_dim: int, hidden_dim: int = 256):
+    def __init__(self, input_dim: int, output_dim: int, hidden_dim: int = 256,
+                 skip_dim: int = 0):
         super().__init__()
+        mlp_input = input_dim + skip_dim
         self.mlp = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
+            nn.Linear(mlp_input, hidden_dim),
             nn.SiLU(),
             nn.Linear(hidden_dim, output_dim),
         )
@@ -448,21 +453,24 @@ class RegionalDecoder(nn.Module):
         nn.init.zeros_(self.mlp[-1].bias)
 
     def forward(self, mesh_features: torch.Tensor, edge_index: torch.Tensor,
-                n_grid_nodes: int, idw_weights: torch.Tensor = None):
+                n_grid_nodes: int, idw_weights: torch.Tensor = None,
+                grid_features: torch.Tensor = None):
         """
         mesh_features: (N_mesh, D)
         edge_index: (2, E) — [mesh_idx, grid_idx]
         idw_weights: (E,) — precomputed normalized IDW weights per edge
+        grid_features: (N_grid, skip_dim) — per-point features that bypass mesh
         """
         mesh_msg = mesh_features[edge_index[0]]  # (E, D)
         if idw_weights is not None:
-            # IDW-взвешенная агрегация: sum(w_i * msg_i), weights already normalized per grid node
-            mesh_msg = mesh_msg * idw_weights.unsqueeze(-1)  # (E, D)
+            mesh_msg = mesh_msg * idw_weights.unsqueeze(-1)
             grid_agg = scatter(mesh_msg, edge_index[1], dim=0,
                                dim_size=n_grid_nodes, reduce="sum")
         else:
             grid_agg = scatter(mesh_msg, edge_index[1], dim=0,
                                dim_size=n_grid_nodes, reduce="mean")
+        if grid_features is not None:
+            grid_agg = torch.cat([grid_agg, grid_features], dim=-1)
         return self.mlp(grid_agg)
 
 
@@ -592,6 +600,7 @@ class DualMeshModel(nn.Module):
             input_dim=hidden_dim,
             output_dim=self.output_channels,
             hidden_dim=hidden_dim,
+            skip_dim=reg_enc_input_dim,  # raw features + global latent bypass mesh
         ).to(device)
 
         # Перенос буферов на device
@@ -698,12 +707,13 @@ class DualMeshModel(nn.Module):
             edge_attr_raw=self.reg_processing_edge_features,
         )
 
-        # ── 6. Regional decoding → correction for ROI grid (IDW-взвешенное) ──
+        # ── 6. Regional decoding → correction for ROI grid (IDW + skip) ──
         roi_correction = self.reg_decoder(
             mesh_features=reg_mesh_features,
             edge_index=self.reg_decoding_edges,
             n_grid_nodes=self.n_roi_grid,
             idw_weights=self.dec_idw_weights,
+            grid_features=roi_input,  # skip connection: per-point identity
         )
 
         # ── 7. Combine: global + regional correction ──
