@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import subprocess
 import sys
@@ -52,6 +53,17 @@ class BundleData:
     roi_mask: np.ndarray
 
 
+@dataclass
+class PreflightReport:
+    failures: list[str]
+    warnings: list[str]
+    checks: list[str]
+
+    @property
+    def ok(self) -> bool:
+        return not self.failures
+
+
 def run_logged(name: str, cmd: list[str], log_path: Path, cwd: Path | None = None) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     print(f"\n=== {name} ===")
@@ -75,6 +87,126 @@ def require_path(path: Path, label: str) -> Path:
     if not path.exists():
         raise FileNotFoundError(f"Missing {label}: {path}")
     return path
+
+
+def resolve_path(raw_path: str) -> Path:
+    path = Path(raw_path)
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+def check_python_modules(module_names: list[str], failures: list[str], checks: list[str]) -> None:
+    for module_name in module_names:
+        if importlib.util.find_spec(module_name) is None:
+            failures.append(f"Missing Python module: {module_name}")
+        else:
+            checks.append(f"OK module: {module_name}")
+
+
+def check_required_path(path: Path, label: str, failures: list[str], checks: list[str]) -> None:
+    if path.exists():
+        checks.append(f"OK {label}: {path}")
+    else:
+        failures.append(f"Missing {label}: {path}")
+
+
+def check_dataset_dir(path: Path, label: str, failures: list[str], checks: list[str]) -> None:
+    if not path.exists():
+        failures.append(f"Missing {label}: {path}")
+        return
+    if not path.is_dir():
+        failures.append(f"{label} is not a directory: {path}")
+        return
+
+    checks.append(f"OK {label}: {path}")
+    required_files = ["coords.npz", "scalers.npz", "variables.json"]
+    for file_name in required_files:
+        check_required_path(path / file_name, f"{label}/{file_name}", failures, checks)
+
+    has_data_source = (path / "data.npy").exists() or (path / "dataset_info.json").exists()
+    if has_data_source:
+        checks.append(f"OK {label}: found data.npy or dataset_info.json")
+    else:
+        failures.append(f"Missing {label} payload: expected data.npy or dataset_info.json in {path}")
+
+
+def check_experiment_dir(path: Path, label: str, failures: list[str], checks: list[str]) -> None:
+    if not path.exists():
+        failures.append(f"Missing {label}: {path}")
+        return
+    if not path.is_dir():
+        failures.append(f"{label} is not a directory: {path}")
+        return
+
+    checks.append(f"OK {label}: {path}")
+    check_required_path(path / "config.json", f"{label}/config.json", failures, checks)
+    check_required_path(path / "best_model.pth", f"{label}/best_model.pth", failures, checks)
+
+
+def run_preflight(
+    freeze_exp: Path,
+    nofreeze_exp: Path,
+    main_data: Path,
+    jan_data: Path,
+    wrf_json: Path,
+) -> PreflightReport:
+    failures: list[str] = []
+    warnings: list[str] = []
+    checks: list[str] = []
+
+    check_python_modules(["numpy", "torch", "matplotlib", "scipy", "torch_geometric"], failures, checks)
+    check_required_path(REPO_ROOT / "scripts/predict.py", "predict script", failures, checks)
+    check_required_path(REPO_ROOT / "scripts/plot_region_multires.py", "plot script", failures, checks)
+    check_required_path(REPO_ROOT / "scripts/compare_wrf.py", "WRF compare script", failures, checks)
+    check_experiment_dir(freeze_exp, "freeze experiment", failures, checks)
+    check_experiment_dir(nofreeze_exp, "nofreeze experiment", failures, checks)
+    check_dataset_dir(main_data, "main dataset", failures, checks)
+
+    if jan_data.exists():
+        check_dataset_dir(jan_data, "Jan2023 dataset", failures, checks)
+    else:
+        warnings.append(f"Jan2023 dataset missing, WRF step will be skipped: {jan_data}")
+
+    if wrf_json.exists():
+        checks.append(f"OK WRF JSON: {wrf_json}")
+    else:
+        warnings.append(f"WRF JSON missing, WRF step will be skipped: {wrf_json}")
+
+    return PreflightReport(failures=failures, warnings=warnings, checks=checks)
+
+
+def write_preflight_report(path: Path, report: PreflightReport) -> None:
+    lines = ["# Preflight Report", ""]
+    lines.append("Status: OK" if report.ok else "Status: FAILED")
+    lines.append("")
+    lines.append("Checks:")
+    lines.extend(f"- {line}" for line in report.checks)
+    lines.append("")
+    lines.append("Warnings:")
+    if report.warnings:
+        lines.extend(f"- {line}" for line in report.warnings)
+    else:
+        lines.append("- none")
+    lines.append("")
+    lines.append("Failures:")
+    if report.failures:
+        lines.extend(f"- {line}" for line in report.failures)
+    else:
+        lines.append("- none")
+    write_summary(path, lines)
+
+
+def print_preflight_report(report: PreflightReport) -> None:
+    print("\n=== preflight ===")
+    for line in report.checks:
+        print(f"[OK] {line}")
+    for line in report.warnings:
+        print(f"[WARN] {line}")
+    for line in report.failures:
+        print(f"[FAIL] {line}")
+    if report.ok:
+        print("Preflight passed.")
+    else:
+        print("Preflight failed.")
 
 
 def bbox_mask(latitudes: np.ndarray, longitudes: np.ndarray, bbox: tuple[float, float, float, float]) -> np.ndarray:
@@ -370,10 +502,12 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
-    freeze_exp = require_path(REPO_ROOT / args.freeze_exp, "freeze experiment")
-    nofreeze_exp = require_path(REPO_ROOT / args.nofreeze_exp, "nofreeze experiment")
-    main_data = require_path(REPO_ROOT / args.main_data, "main dataset")
-    out_dir = REPO_ROOT / args.out_dir
+    freeze_exp = resolve_path(args.freeze_exp)
+    nofreeze_exp = resolve_path(args.nofreeze_exp)
+    main_data = resolve_path(args.main_data)
+    jan_data = resolve_path(args.jan_data)
+    wrf_json = resolve_path(args.wrf_json)
+    out_dir = resolve_path(args.out_dir)
     logs_dir = out_dir / "logs"
     slides_dir = out_dir / "slides"
     artifact_dir = out_dir / "artifacts"
@@ -384,6 +518,12 @@ def main() -> None:
     slides_dir.mkdir(parents=True, exist_ok=True)
     artifact_dir.mkdir(parents=True, exist_ok=True)
     da_dir.mkdir(parents=True, exist_ok=True)
+
+    preflight = run_preflight(freeze_exp, nofreeze_exp, main_data, jan_data, wrf_json)
+    write_preflight_report(logs_dir / "preflight.log", preflight)
+    print_preflight_report(preflight)
+    if not preflight.ok:
+        raise SystemExit(f"Preflight failed. Fix required inputs and rerun. See {logs_dir / 'preflight.log'}")
 
     freeze_metrics_log = logs_dir / "freeze6_metrics.log"
     nofreeze_metrics_log = logs_dir / "nofreeze_metrics.log"
@@ -464,8 +604,6 @@ def main() -> None:
         logs_dir / "nofreeze_plots.log",
     )
 
-    jan_data = REPO_ROOT / args.jan_data
-    wrf_json = REPO_ROOT / args.wrf_json
     wrf_summary = None
     if jan_data.exists() and wrf_json.exists():
         run_logged(
