@@ -321,6 +321,8 @@ def main():
                     help="Region of Interest: lat_min lat_max lon_min lon_max")
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--batch-size", type=int, default=None)
+    ap.add_argument("--overfit-only", action="store_true",
+                    help="Run only overfit test (1 sample, 200 steps) and exit")
     args = ap.parse_args()
 
     exp_dir = args.experiment_dir
@@ -449,6 +451,10 @@ def main():
 
     # --- Overfit test: ДОКАЗАТЕЛЬСТВО что модель может учиться ---
     overfit_test(dual_model, train_loader, device, use_residual=use_residual)
+
+    if args.overfit_only:
+        print("\n[--overfit-only] Done. Exiting without full training.")
+        return
 
     _log(f"{'epoch':>5}  {'train_loss':>10}  {'val_loss':>10}  {'val_ACC':>8}  {'best':>10}")
     _log("-" * 55)
