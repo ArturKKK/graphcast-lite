@@ -109,13 +109,25 @@ def train_dual_epoch(
         # Gradient sanity check (первый батч первой эпохи)
         if check_grads and n_batches == 0:
             print("[GradCheck] out.requires_grad:", out.requires_grad)
+            # Grad norms для КАЖДОГО модуля — увидим, идут ли градиенты upstream
+            module_grads = {}
             for name, p in model.named_parameters():
                 if p.requires_grad and p.grad is not None:
                     gn = p.grad.norm().item()
-                    if gn > 0:
-                        print(f"  {name}: grad_norm={gn:.6f}")
-                        break  # показать хоть один ненулевой
-            else:
+                    # Группируем по модулю
+                    module = name.split('.')[0]
+                    if module not in module_grads:
+                        module_grads[module] = []
+                    module_grads[module].append((name, gn))
+
+            for module, grads in sorted(module_grads.items()):
+                max_gn = max(g for _, g in grads)
+                mean_gn = sum(g for _, g in grads) / len(grads)
+                top_param = max(grads, key=lambda x: x[1])
+                print(f"  [{module}] {len(grads)} params, max_grad={max_gn:.6f}, mean_grad={mean_gn:.6f}")
+                print(f"    top: {top_param[0]} = {top_param[1]:.6f}")
+
+            if not module_grads:
                 print("  WARNING: все градиенты нулевые!")
 
         optimizer.step()

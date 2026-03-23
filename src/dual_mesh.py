@@ -436,9 +436,11 @@ class RegionalDecoder(nn.Module):
             nn.SiLU(),
             nn.Linear(hidden_dim, output_dim),
         )
-        # Zero-init last layer: correction starts at exactly zero
-        # (standard residual learning technique — ResNet, GraphCast)
-        nn.init.zeros_(self.mlp[-1].weight)
+        # Small-scale init: correction starts near zero (good for residual learning)
+        # but weights are NON-ZERO so gradients flow to upstream modules.
+        # Zero-init was WRONG here: ∂L/∂input = W^T · ∂L/∂output ≈ 0 when W=0,
+        # which killed gradient flow to encoder/processor/cross-message.
+        nn.init.normal_(self.mlp[-1].weight, std=0.01)
         nn.init.zeros_(self.mlp[-1].bias)
 
     def forward(self, mesh_features: torch.Tensor, edge_index: torch.Tensor,
@@ -597,33 +599,58 @@ class DualMeshModel(nn.Module):
         print(f"  Encoding edge degree: min={enc_deg.min().item()} max={enc_deg.max().item()} mean={enc_deg.float().mean().item():.1f}")
         print(f"  Decoding edge degree: min={dec_deg.min().item()} max={dec_deg.max().item()} mean={dec_deg.float().mean().item():.1f}")
 
+    def _get_global_latents(self, X_sq: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Извлекает глобальные латенты ПОСЛЕ процессора (12 MP шагов).
+
+        Раньше брали encoder output — это только проекция raw features → latent.
+        Теперь берём processed mesh latents, которые содержат реальную
+        физическую информацию после message passing на глобальном меше.
+
+        Returns
+        -------
+        global_grid_latent : (N_grid, D) — encoder grid latents
+        global_mesh_latent : (N_mesh, D) — PROCESSED mesh latents (после processor)
+        """
+        gm = self.global_model
+
+        X_preprocessed = gm._preprocess_input(grid_node_features=X_sq)
+        encoded = gm.encoder.forward(X=X_preprocessed, edge_index=gm.encoding_graph)
+
+        global_grid_latent = encoded[:gm._num_grid_nodes]
+        mesh_latent = encoded[gm._num_grid_nodes:]
+
+        # Прогоняем через processor (Model → GraphLayer → InteractionNetProcessor)
+        result = gm.processor.forward(
+            X=mesh_latent,
+            edge_index=gm.processing_graph,
+            attention_threshold=0.0,
+            edge_attr=gm._processing_edge_features,
+        )
+        # SparseGAT возвращает (X, edge_index), остальные — просто X
+        processed_mesh_latent = result[0] if isinstance(result, tuple) else result
+
+        return global_grid_latent, processed_mesh_latent
+
     def forward(self, X: torch.Tensor, attention_threshold=0.0, **kwargs):
         """
         X: (1, N_grid, T*F) — входные данные.
 
-        Returns: (N_grid, output_channels)
+        Returns: (N_grid, output_channels) — full field (global_pred + correction in ROI)
         """
         assert X.shape[0] == 1, f"DualMeshModel supports batch_size=1 only, got {X.shape[0]}"
 
-        # ── 1. Глобальный прогноз + mesh латенты (без графа вычислений) ──
+        # ── 1. Глобальный прогноз (без графа вычислений) ──
         with torch.no_grad():
             global_pred = self.global_model(X=X, attention_threshold=attention_threshold, **kwargs)
-            # global_pred: (N_grid, output_channels)
 
-            # ── 2. Извлекаем глобальные mesh латенты (encoder прогоняется ещё раз) ──
-            X_sq = X[0]  # (G, T*F) — explicit indexing, не squeeze()
-            X_preprocessed = self.global_model._preprocess_input(grid_node_features=X_sq)
-            encoded = self.global_model.encoder.forward(
-                X=X_preprocessed, edge_index=self.global_model.encoding_graph,
-            )
-            global_grid_latent = encoded[:self.global_model._num_grid_nodes]
-            global_mesh_latent = encoded[self.global_model._num_grid_nodes:]
+            # ── 2. Извлекаем PROCESSED глобальные mesh латенты ──
+            X_sq = X[0]  # (G, T*F)
+            global_grid_latent, global_mesh_latent = self._get_global_latents(X_sq)
 
-        # detach не нужен — уже вне графа из-за no_grad
         global_pred = global_pred.detach()
 
         # ── 3. Regional encoding ──
-        # Берём raw features ROI grid точек + их глобальные латенты
+        # ROI grid: raw features + глобальные grid латенты (encoder-level)
         roi_raw = X_sq[self.roi_mask]  # (n_roi, T*F)
         roi_global_latent = global_grid_latent[self.roi_mask]  # (n_roi, D)
         roi_input = torch.cat([roi_raw, roi_global_latent], dim=-1)
@@ -634,7 +661,7 @@ class DualMeshModel(nn.Module):
             n_mesh_nodes=self.n_reg_mesh,
         )
 
-        # ── 4. Cross-message: global mesh → regional mesh ──
+        # ── 4. Cross-message: PROCESSED global mesh → regional mesh ──
         cross_edge_attr = self.cross_edge_encoder(self.cross_edge_features)
         reg_mesh_features = self.cross_message(
             h_global=global_mesh_latent,
@@ -659,10 +686,10 @@ class DualMeshModel(nn.Module):
         )
 
         # ── 7. Combine: global + regional correction ──
-        # Functional approach: создаём full-grid correction через zeros + indexing,
-        # затем складываем. Гарантирует gradient flow через roi_correction.
-        correction_full = torch.zeros_like(global_pred)
-        correction_full[self.roi_mask] = roi_correction
+        # index_add гарантированно дифференцируем (в отличие от in-place boolean assignment)
+        roi_idx = self.roi_mask.nonzero(as_tuple=True)[0]  # (n_roi,)
+        correction_full = torch.zeros_like(global_pred)  # (G, C)
+        correction_full = correction_full.index_add(0, roi_idx, roi_correction)
         output = global_pred + correction_full
 
         return output
