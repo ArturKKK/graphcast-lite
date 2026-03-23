@@ -213,7 +213,7 @@ def build_regional_grid_mesh_edges(
     k_encode: int = 4,
     k_decode: int = 3,
     **kwargs,  # backward compat: ignore old radius_factor/reg_mesh
-) -> Tuple[np.ndarray, torch.Tensor, torch.Tensor]:
+) -> Tuple[np.ndarray, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Строит рёбра Grid(ROI)→RegionalMesh и RegionalMesh→Grid(ROI).
 
     Encoding (Grid→Mesh): для каждого mesh-узла ищем k_encode ближайших
@@ -227,6 +227,7 @@ def build_regional_grid_mesh_edges(
     roi_grid_mask : np.ndarray (bool, N_grid)
     encoding_edges : torch.Tensor [2, E] — [grid_roi_local, reg_mesh]
     decoding_edges : torch.Tensor [2, E] — [reg_mesh, grid_roi_local]
+    decoding_distances : torch.Tensor [E] — Euclidean distances for each decoding edge
     """
     from scipy.spatial import cKDTree
 
@@ -276,7 +277,7 @@ def build_regional_grid_mesh_edges(
     # Grid-centric: для каждой grid-точки ищем k_decode ближайших mesh-узлов
     tree_mesh = cKDTree(reg_xyz)
     k_dec = min(k_decode, n_mesh)
-    _, mesh_neighbors = tree_mesh.query(roi_xyz, k=k_dec)
+    dec_distances, mesh_neighbors = tree_mesh.query(roi_xyz, k=k_dec)
     if mesh_neighbors.ndim == 1:
         mesh_neighbors = mesh_neighbors[:, None]
 
@@ -287,11 +288,13 @@ def build_regional_grid_mesh_edges(
         np.stack([dec_mesh_idx, dec_grid_idx], axis=0), dtype=torch.int64
     )
 
+    dec_distances_flat = torch.tensor(dec_distances.flatten(), dtype=torch.float32)
+
     print(f"[RegionalGridMesh] ROI grid points: {n_roi}")
     print(f"  Encoding edges (grid→reg_mesh): {encoding_edges.shape[1]} ({n_mesh}×{k_enc} mesh-centric KNN)")
     print(f"  Decoding edges (reg_mesh→grid): {decoding_edges.shape[1]} ({n_roi}×{k_dec} grid-centric KNN)")
 
-    return roi_mask, encoding_edges, decoding_edges
+    return roi_mask, encoding_edges, decoding_edges, dec_distances_flat
 
 
 # ─── 4. Cross-Message модуль ──────────────────────────────────────────
@@ -424,9 +427,12 @@ class RegionalEncoder(nn.Module):
 
 
 class RegionalDecoder(nn.Module):
-    """Декодер: Regional Mesh → Grid(ROI).
+    """Декодер: Regional Mesh → Grid(ROI) с IDW-взвешенной агрегацией.
 
-    Собирает фичи с mesh nodes и прогоняет через MLP → output_dim.
+    Вместо scatter_mean использует inverse-distance weighting:
+    каждая grid-точка получает взвешенную комбинацию k ближайших mesh-нод,
+    где ближние ноды вносят больший вклад. Это убирает потолок точности,
+    который scatter_mean создавал при малом числе mesh-нод.
     """
 
     def __init__(self, input_dim: int, output_dim: int, hidden_dim: int = 256):
@@ -438,20 +444,25 @@ class RegionalDecoder(nn.Module):
         )
         # Small-scale init: correction starts near zero (good for residual learning)
         # but weights are NON-ZERO so gradients flow to upstream modules.
-        # Zero-init was WRONG here: ∂L/∂input = W^T · ∂L/∂output ≈ 0 when W=0,
-        # which killed gradient flow to encoder/processor/cross-message.
         nn.init.normal_(self.mlp[-1].weight, std=0.01)
         nn.init.zeros_(self.mlp[-1].bias)
 
     def forward(self, mesh_features: torch.Tensor, edge_index: torch.Tensor,
-                n_grid_nodes: int):
+                n_grid_nodes: int, idw_weights: torch.Tensor = None):
         """
         mesh_features: (N_mesh, D)
         edge_index: (2, E) — [mesh_idx, grid_idx]
+        idw_weights: (E,) — precomputed normalized IDW weights per edge
         """
-        mesh_msg = mesh_features[edge_index[0]]
-        grid_agg = scatter(mesh_msg, edge_index[1], dim=0,
-                           dim_size=n_grid_nodes, reduce="mean")
+        mesh_msg = mesh_features[edge_index[0]]  # (E, D)
+        if idw_weights is not None:
+            # IDW-взвешенная агрегация: sum(w_i * msg_i), weights already normalized per grid node
+            mesh_msg = mesh_msg * idw_weights.unsqueeze(-1)  # (E, D)
+            grid_agg = scatter(mesh_msg, edge_index[1], dim=0,
+                               dim_size=n_grid_nodes, reduce="sum")
+        else:
+            grid_agg = scatter(mesh_msg, edge_index[1], dim=0,
+                               dim_size=n_grid_nodes, reduce="mean")
         return self.mlp(grid_agg)
 
 
@@ -526,7 +537,7 @@ class DualMeshModel(nn.Module):
         self.n_global_mesh = n_global_mesh
 
         # ── 4. Grid(ROI) ↔ RegMesh edges ──
-        roi_mask, enc_edges, dec_edges = build_regional_grid_mesh_edges(
+        roi_mask, enc_edges, dec_edges, dec_distances = build_regional_grid_mesh_edges(
             grid_lats=grid_lats,
             grid_lons=grid_lons,
             reg_lats=reg_lats,
@@ -537,6 +548,15 @@ class DualMeshModel(nn.Module):
         self.register_buffer("reg_encoding_edges", enc_edges)
         self.register_buffer("reg_decoding_edges", dec_edges)
         self.n_roi_grid = int(roi_mask.sum())
+
+        # IDW weights for decoding: w_i = 1/d_i, normalized per grid node
+        eps = 1e-8
+        inv_dist = 1.0 / (dec_distances + eps)
+        # Нормализуем: для каждой grid-точки сумма весов = 1
+        weight_sums = scatter(inv_dist, dec_edges[1], dim=0,
+                              dim_size=self.n_roi_grid, reduce="sum")
+        idw_weights = inv_dist / (weight_sums[dec_edges[1]] + eps)
+        self.register_buffer("dec_idw_weights", idw_weights)
 
         # ── 5. Regional modules (trainable) ──
         # Input dim для регионального энкодера: T*F + global encoder latent dim
@@ -678,11 +698,12 @@ class DualMeshModel(nn.Module):
             edge_attr_raw=self.reg_processing_edge_features,
         )
 
-        # ── 6. Regional decoding → correction for ROI grid ──
+        # ── 6. Regional decoding → correction for ROI grid (IDW-взвешенное) ──
         roi_correction = self.reg_decoder(
             mesh_features=reg_mesh_features,
             edge_index=self.reg_decoding_edges,
             n_grid_nodes=self.n_roi_grid,
+            idw_weights=self.dec_idw_weights,
         )
 
         # ── 7. Combine: global + regional correction ──
