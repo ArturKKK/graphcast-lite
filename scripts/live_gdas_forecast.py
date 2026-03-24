@@ -50,7 +50,11 @@ GROUP_FILTERS = {
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Download recent GDAS analyses and run live GraphCast-lite inference")
     parser.add_argument("--experiment-dir", default="experiments/multires_nores_freeze6")
-    parser.add_argument("--data-dir", required=True)
+    parser.add_argument(
+        "--data-dir",
+        default=None,
+        help="Full dataset dir. Optional when --runtime-bundle is provided",
+    )
     parser.add_argument("--runtime-bundle", default=None, help="Optional lightweight bundle dir exported from cluster for live inference")
     parser.add_argument("--ckpt", default=None)
     parser.add_argument("--cache-dir", default="results/live_gdas/cache")
@@ -62,7 +66,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout", type=int, default=600)
     parser.add_argument("--keep-grib", action="store_true")
     parser.add_argument("--cycle", default=None, help="Optional cycle anchor in ISO form, e.g. 2026-03-23T12:00:00+00:00")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.data_dir is None and args.runtime_bundle is None:
+        parser.error("either --data-dir or --runtime-bundle must be provided")
+    return args
 
 
 def cycle_floor_6h(dt_utc: datetime) -> datetime:
@@ -257,7 +264,7 @@ def build_metadata_from_arrays(
 
 
 def load_runtime_assets(
-    data_dir: Path,
+    data_dir: Path | None,
     runtime_bundle_dir: Path | None,
     obs_window: int,
     pred_window: int,
@@ -273,6 +280,12 @@ def load_runtime_assets(
         var_order = get_var_order_from_bundle(runtime_bundle_dir)
         latitudes, longitudes, is_regional = load_coords_from_bundle(runtime_bundle_dir)
         template_static = load_template_static_from_bundle(runtime_bundle_dir)
+        missing_static = [name for name in ["z_surf", "lsm"] if name in var_order and name not in template_static]
+        if missing_static:
+            raise FileNotFoundError(
+                "Runtime bundle is incomplete: missing static fields "
+                f"{missing_static} in {runtime_bundle_dir / 'static_fields.npz'}"
+            )
         metadata = build_metadata_from_arrays(
             latitudes=latitudes,
             longitudes=longitudes,
@@ -282,6 +295,9 @@ def load_runtime_assets(
             is_regional=is_regional,
         )
         return x_mean, x_std, y_mean, y_std, var_order, latitudes, longitudes, template_static, metadata
+
+    if data_dir is None:
+        raise ValueError("data_dir must be provided when runtime_bundle_dir is not set")
 
     for required_name in ["coords.npz", "scalers.npz", "variables.json"]:
         required_path = data_dir / required_name
@@ -492,7 +508,7 @@ def summarize_city(out_path: Path, prediction_phys: np.ndarray, latitudes: np.nd
 def main() -> None:
     args = parse_args()
     experiment_dir = Path(args.experiment_dir)
-    data_dir = Path(args.data_dir)
+    data_dir = Path(args.data_dir) if args.data_dir else None
     runtime_bundle_dir = Path(args.runtime_bundle) if args.runtime_bundle else None
     cache_dir = Path(args.cache_dir)
     out_dir = Path(args.out_dir)
