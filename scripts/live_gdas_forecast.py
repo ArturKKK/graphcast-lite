@@ -175,11 +175,14 @@ def download_file(url: str, dest: Path, timeout: int) -> Path:
 def open_cfgrib_dataset(grib_path: Path, payload_name: str) -> xr.Dataset | None:
     for filter_by_keys in GROUP_FILTERS[payload_name]:
         try:
-            return xr.open_dataset(
+            ds = xr.open_dataset(
                 grib_path,
                 engine="cfgrib",
                 backend_kwargs={"filter_by_keys": filter_by_keys, "indexpath": ""},
             )
+            if len(ds.data_vars) == 0:
+                continue
+            return ds
         except Exception:
             continue
     return None
@@ -462,7 +465,11 @@ def extract_live_channels(
                 warnings.append(f"Missing {name} in GDAS payload; filling zeros")
             extracted[name] = np.zeros_like(node_lats, dtype=np.float32)
             continue
-        extracted[name] = interp_to_nodes(da, node_lats, node_lons)
+        values = interp_to_nodes(da, node_lats, node_lons)
+        # Training scalers for this experiment expect pressure in hPa, while GDAS provides Pa.
+        if name in {"msl", "sp"}:
+            values = values / 100.0
+        extracted[name] = values
     return extracted, warnings
 
 
@@ -536,7 +543,6 @@ def summarize_city(out_path: Path, prediction_phys: np.ndarray, latitudes: np.nd
                     values = values - 273.15
                     unit = "C"
                 elif name == "msl":
-                    values = values / 100.0
                     unit = "hPa"
                 else:
                     unit = "m/s"
