@@ -20,6 +20,7 @@ import torch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+DATA_ROOT = Path("/data")
 
 CITY_BBOX = (55.5, 56.5, 92.0, 94.0)
 ROI_BBOX = (50.0, 60.0, 83.0, 98.0)
@@ -108,7 +109,20 @@ def require_path(path: Path, label: str) -> Path:
 
 def resolve_path(raw_path: str) -> Path:
     path = Path(raw_path)
-    return path if path.is_absolute() else REPO_ROOT / path
+    if path.is_absolute():
+        return path
+
+    repo_path = REPO_ROOT / path
+    if repo_path.exists():
+        return repo_path
+
+    # On cluster, datasets commonly live under /data rather than inside the repo.
+    if path.parts and path.parts[0] == "data":
+        data_path = DATA_ROOT.joinpath(*path.parts[1:])
+        if data_path.exists():
+            return data_path
+
+    return repo_path
 
 
 def format_path(path: Path | None) -> str:
@@ -610,8 +624,8 @@ def main() -> None:
     parser.add_argument("--freeze-exp", default="experiments/multires_nores_freeze6")
     parser.add_argument("--nofreeze-exp", default="experiments/multires_nores_nofreeze")
     parser.add_argument("--main-data", default="data/datasets/multires_krsk_19f")
-    parser.add_argument("--global-exp", default="experiments/wb2_64x32_ar_15f_4obs_4pred")
-    parser.add_argument("--global-data", default="data/datasets/wb2_64x32_zq_15f_4obs_4pred")
+    parser.add_argument("--global-exp", default="experiments/wb2_512x256_19f_ar_v2")
+    parser.add_argument("--global-data", default="data/datasets/global_512x256_19f_2010-2021_07deg")
     parser.add_argument("--global-region", nargs=4, type=float, default=CITY_BBOX)
     parser.add_argument("--global-ar-steps", type=int, default=12)
     parser.add_argument("--global-max-samples", type=int, default=200)
@@ -662,8 +676,8 @@ def main() -> None:
     global_dir.mkdir(parents=True, exist_ok=True)
 
     preflight = run_preflight(freeze_exp, nofreeze_exp, main_data, jan_data, wrf_json)
-    check_experiment_dir(global_exp, "global coarse experiment", preflight.failures, preflight.checks)
-    check_dataset_dir(global_data, "global coarse dataset", preflight.failures, preflight.checks)
+    check_experiment_dir(global_exp, "global baseline experiment", preflight.failures, preflight.checks)
+    check_dataset_dir(global_data, "global baseline dataset", preflight.failures, preflight.checks)
     if args.include_live:
         if live_dir.exists():
             preflight.checks.append(f"OK live 3-day directory: {live_dir}")
@@ -698,7 +712,7 @@ def main() -> None:
     )
 
     run_logged_if_needed(
-        "global coarse 3-day metrics",
+        "global baseline 3-day metrics",
         build_predict_cmd(
             global_exp,
             global_data,
@@ -931,7 +945,7 @@ def main() -> None:
         "",
         f"Main metrics log (freeze6): {format_path(freeze_metrics_log)}",
         f"Main metrics log (nofreeze): {format_path(nofreeze_metrics_log)}",
-        f"Global coarse 3-day metrics: {format_path(global_metrics_log)}",
+        f"Global baseline 3-day metrics: {format_path(global_metrics_log)}",
         f"Freeze6 artifact bundle: {format_path(freeze_bundle)}",
         f"Nofreeze artifact bundle: {format_path(nofreeze_bundle)}",
         f"Heavy artifact storage: {format_path(artifact_store_dir)}",
@@ -945,7 +959,7 @@ def main() -> None:
         "Model notes:",
         "- freeze6 and nofreeze are both evaluated for presentation tables; freeze6 remains the stronger multires baseline.",
         f"- Long-horizon DA plots cover 0..{args.ar_steps * 6}h using the same fresh freeze6 forecasts.",
-        f"- Global coarse baseline is evaluated separately for 3 days (0..{args.global_ar_steps * 6}h).",
+        f"- Global 512x256 baseline is evaluated separately for 3 days (0..{args.global_ar_steps * 6}h).",
         "",
         "DA notes:",
         f"- Observations sampled on ROI only ({len(roi_indices)} ROI nodes, {len(station_indices)} stations)",
