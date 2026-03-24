@@ -112,11 +112,14 @@ def combine_spatial_masks(*masks):
 # -------------------------------------
 
 def spatial_corr(pred: torch.Tensor, true: torch.Tensor, exclude_channels: list = None) -> float:
-    """ (ТВОЯ ФУНКЦИЯ БЕЗ ИЗМЕНЕНИЙ) """  
-    if pred.dim() == 3:      # [B, N, F] -> усредним по батчу  
-        pred = pred.mean(dim=0)  
-        true = true.mean(dim=0)  
+    """Anomaly correlation coefficient, per-sample then averaged."""
+    if pred.dim() == 3:      # [B, N, F] -> per-sample ACC, then mean
+        accs = []
+        for b in range(pred.shape[0]):
+            accs.append(spatial_corr(pred[b], true[b], exclude_channels))
+        return sum(accs) / max(len(accs), 1)
 
+    # pred, true: [N, F]
     p = (pred - pred.mean(dim=0, keepdim=True)) / (pred.std(dim=0, keepdim=True) + 1e-8)  
     t = (true - true.mean(dim=0, keepdim=True)) / (true.std(dim=0, keepdim=True) + 1e-8)  
     acc_per_feat = (p * t).mean(dim=0)  
