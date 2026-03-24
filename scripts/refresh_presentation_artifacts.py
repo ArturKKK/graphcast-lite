@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -83,6 +84,22 @@ def run_logged(name: str, cmd: list[str], log_path: Path, cwd: Path | None = Non
         raise RuntimeError(f"Command failed: {name}. See {log_path}")
 
 
+def run_logged_if_needed(
+    name: str,
+    cmd: list[str],
+    log_path: Path,
+    outputs: list[Path] | None = None,
+    cwd: Path | None = None,
+    reuse_existing: bool = False,
+) -> None:
+    expected_outputs = outputs or [log_path]
+    if reuse_existing and log_path.exists() and all(path.exists() for path in expected_outputs):
+        print(f"\n=== {name} ===")
+        print(f"[skip] Reusing existing outputs: {', '.join(str(path) for path in expected_outputs)}")
+        return
+    run_logged(name=name, cmd=cmd, log_path=log_path, cwd=cwd)
+
+
 def require_path(path: Path, label: str) -> Path:
     if not path.exists():
         raise FileNotFoundError(f"Missing {label}: {path}")
@@ -92,6 +109,41 @@ def require_path(path: Path, label: str) -> Path:
 def resolve_path(raw_path: str) -> Path:
     path = Path(raw_path)
     return path if path.is_absolute() else REPO_ROOT / path
+
+
+def format_path(path: Path | None) -> str:
+    if path is None:
+        return "skipped"
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def default_artifact_store(out_dir: Path) -> Path:
+    data_root = Path("/data")
+    if data_root.exists():
+        return data_root / "graphcast-lite" / "presentation_cache" / out_dir.name / "artifacts"
+    return out_dir / "artifacts"
+
+
+def ensure_file_symlink(link_path: Path, target_path: Path) -> None:
+    link_path.parent.mkdir(parents=True, exist_ok=True)
+    if link_path.exists() or link_path.is_symlink():
+        if link_path.is_symlink() and link_path.resolve() == target_path.resolve():
+            return
+        link_path.unlink()
+    link_path.symlink_to(target_path)
+
+
+def materialize_artifact_path(link_dir: Path, store_dir: Path, file_name: str) -> Path:
+    link_dir.mkdir(parents=True, exist_ok=True)
+    store_dir.mkdir(parents=True, exist_ok=True)
+    link_path = link_dir / file_name
+    target_path = store_dir / file_name
+    if link_dir.resolve() != store_dir.resolve():
+        ensure_file_symlink(link_path, target_path)
+    return target_path
 
 
 def check_python_modules(module_names: list[str], failures: list[str], checks: list[str]) -> None:
@@ -246,6 +298,15 @@ def load_bundle(bundle_path: Path, data_dir: Path) -> BundleData:
     truth = truth.reshape(truth.shape[0], truth.shape[1], ar_steps, n_features)
     predictions = predictions * std[None, None, None, :] + mean[None, None, None, :]
     truth = truth * std[None, None, None, :] + mean[None, None, None, :]
+
+    city_mask_full = bbox_mask(latitudes, longitudes, CITY_BBOX)
+    roi_mask_full = bbox_mask(latitudes, longitudes, ROI_BBOX)
+    keep_mask = city_mask_full | roi_mask_full
+    if keep_mask.any():
+        predictions = predictions[:, keep_mask]
+        truth = truth[:, keep_mask]
+        latitudes = latitudes[keep_mask]
+        longitudes = longitudes[keep_mask]
 
     return BundleData(
         predictions=predictions.astype(np.float32),
@@ -440,9 +501,71 @@ def plot_region_rmse_summary(out_path: Path, bundle: BundleData, method_predicti
     plt.close(fig)
 
 
+def plot_horizon_rmse_curves(out_path: Path, bundle: BundleData, method_predictions: dict[str, np.ndarray], var_name: str, title: str) -> None:
+    city_idx = np.where(bundle.city_mask)[0]
+    channel_idx = bundle.var_names.index(var_name)
+    steps = bundle.truth.shape[2]
+    hours = np.array([(step + 1) * 6 for step in range(steps)], dtype=np.int64)
+
+    fig, ax = plt.subplots(figsize=(10, 5.5))
+    for name, pred in method_predictions.items():
+        errs = []
+        for step_idx in range(steps):
+            truth = display_values(bundle.truth[:, city_idx, step_idx, channel_idx], var_name)
+            pred_vals = display_values(pred[:, city_idx, step_idx, channel_idx], var_name)
+            errs.append(float(np.sqrt(np.mean((pred_vals - truth) ** 2))))
+        ax.plot(hours, errs, marker="o", linewidth=2.0, label=name)
+
+    ax.set_xlabel("Forecast horizon [hours]")
+    ax.set_ylabel(f"RMSE [{DISPLAY.get(var_name, DEFAULT_DISPLAY)['unit']}]")
+    ax.set_title(title)
+    ax.grid(alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
 def write_summary(path: Path, lines: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def stage_live_outputs(live_dir: Path, out_dir: Path, slides_dir: Path) -> Path | None:
+    if not live_dir.exists():
+        return None
+
+    live_stage_dir = out_dir / "live"
+    live_stage_dir.mkdir(parents=True, exist_ok=True)
+
+    copied_files: list[str] = []
+    for file_name in ["summary.txt", "openmeteo_comparison.md", "openmeteo_comparison.csv"]:
+        src = live_dir / file_name
+        if src.exists():
+            shutil.copy2(src, live_stage_dir / file_name)
+            copied_files.append(file_name)
+
+    live_plot = live_dir / "t2m_city_forecast.png"
+    if live_plot.exists():
+        shutil.copy2(live_plot, slides_dir / "live_gdas_t2m_3day.png")
+        copied_files.append("slides/live_gdas_t2m_3day.png")
+
+    write_summary(
+        live_stage_dir / "README.md",
+        [
+            "# Live GDAS 3-Day Outputs",
+            "",
+            f"Source directory: {live_dir}",
+            "Staged files:",
+            *[f"- {name}" for name in copied_files],
+            "",
+            "Notes:",
+            "- Input analyses are GDAS fields ingested into the trained GraphCast-lite multires model.",
+            "- Open-Meteo files are kept only as a reference forecast comparison for the same valid times.",
+        ],
+    )
+    return live_stage_dir
 
 
 def build_predict_cmd(
@@ -487,9 +610,19 @@ def main() -> None:
     parser.add_argument("--freeze-exp", default="experiments/multires_nores_freeze6")
     parser.add_argument("--nofreeze-exp", default="experiments/multires_nores_nofreeze")
     parser.add_argument("--main-data", default="data/datasets/multires_krsk_19f")
+    parser.add_argument("--global-exp", default="experiments/wb2_64x32_ar_15f_4obs_4pred")
+    parser.add_argument("--global-data", default="data/datasets/wb2_64x32_zq_15f_4obs_4pred")
+    parser.add_argument("--global-region", nargs=4, type=float, default=CITY_BBOX)
+    parser.add_argument("--global-ar-steps", type=int, default=12)
+    parser.add_argument("--global-max-samples", type=int, default=200)
+    parser.add_argument("--live-dir", default="results/live_gdas_run_3day")
+    parser.add_argument("--include-live", action="store_true",
+                        help="Stage already computed local live GDAS outputs into the presentation folder")
     parser.add_argument("--jan-data", default="data/datasets/multires_krsk_19f_jan2023_interp")
     parser.add_argument("--wrf-json", default="aaaa/wrf_krasnoyarsk/wrf_d03_jan2023.json")
     parser.add_argument("--out-dir", default="results/presentation_refresh")
+    parser.add_argument("--artifact-store-dir", default=None,
+                        help="Directory for heavy .pt bundles. If omitted and /data exists, uses /data/graphcast-lite/presentation_cache/<out-dir>/artifacts")
     parser.add_argument("--metric-samples", type=int, default=200)
     parser.add_argument("--artifact-samples", type=int, default=8)
     parser.add_argument("--ar-steps", type=int, default=4)
@@ -500,11 +633,16 @@ def main() -> None:
     parser.add_argument("--oi-corr-len", type=float, default=300000.0)
     parser.add_argument("--wrf-sample", type=int, default=7)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--reuse-existing", action="store_true",
+                        help="Reuse existing logs/artifacts if the expected outputs are already present")
     args = parser.parse_args()
 
     freeze_exp = resolve_path(args.freeze_exp)
     nofreeze_exp = resolve_path(args.nofreeze_exp)
     main_data = resolve_path(args.main_data)
+    global_exp = resolve_path(args.global_exp)
+    global_data = resolve_path(args.global_data)
+    live_dir = resolve_path(args.live_dir)
     jan_data = resolve_path(args.jan_data)
     wrf_json = resolve_path(args.wrf_json)
     out_dir = resolve_path(args.out_dir)
@@ -512,14 +650,26 @@ def main() -> None:
     slides_dir = out_dir / "slides"
     artifact_dir = out_dir / "artifacts"
     da_dir = out_dir / "da"
+    global_dir = out_dir / "global_3day"
+
+    artifact_store_dir = resolve_path(args.artifact_store_dir) if args.artifact_store_dir else default_artifact_store(out_dir)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     logs_dir.mkdir(parents=True, exist_ok=True)
     slides_dir.mkdir(parents=True, exist_ok=True)
     artifact_dir.mkdir(parents=True, exist_ok=True)
     da_dir.mkdir(parents=True, exist_ok=True)
+    global_dir.mkdir(parents=True, exist_ok=True)
 
     preflight = run_preflight(freeze_exp, nofreeze_exp, main_data, jan_data, wrf_json)
+    check_experiment_dir(global_exp, "global coarse experiment", preflight.failures, preflight.checks)
+    check_dataset_dir(global_data, "global coarse dataset", preflight.failures, preflight.checks)
+    if args.include_live:
+        if live_dir.exists():
+            preflight.checks.append(f"OK live 3-day directory: {live_dir}")
+        else:
+            preflight.warnings.append(f"Live 3-day directory missing, live staging will be skipped: {live_dir}")
+    preflight.checks.append(f"Heavy artifact storage: {artifact_store_dir}")
     write_preflight_report(logs_dir / "preflight.log", preflight)
     print_preflight_report(preflight)
     if not preflight.ok:
@@ -527,33 +677,58 @@ def main() -> None:
 
     freeze_metrics_log = logs_dir / "freeze6_metrics.log"
     nofreeze_metrics_log = logs_dir / "nofreeze_metrics.log"
-    freeze_bundle = artifact_dir / "freeze6_artifacts.pt"
-    nofreeze_bundle = artifact_dir / "nofreeze_artifacts.pt"
-    jan_bundle = artifact_dir / "freeze6_jan2023_wrf.pt"
+    global_metrics_log = global_dir / "global_metrics_3day.log"
+    freeze_bundle = materialize_artifact_path(artifact_dir, artifact_store_dir, "freeze6_artifacts.pt")
+    nofreeze_bundle = materialize_artifact_path(artifact_dir, artifact_store_dir, "nofreeze_artifacts.pt")
+    jan_bundle = materialize_artifact_path(artifact_dir, artifact_store_dir, "freeze6_jan2023_wrf.pt")
 
-    run_logged(
+    run_logged_if_needed(
         "freeze6 metrics",
         build_predict_cmd(freeze_exp, main_data, None, CITY_BBOX, args.ar_steps, args.metric_samples, no_save=True),
         freeze_metrics_log,
+        outputs=[freeze_metrics_log],
+        reuse_existing=args.reuse_existing,
     )
-    run_logged(
+    run_logged_if_needed(
         "nofreeze metrics",
         build_predict_cmd(nofreeze_exp, main_data, None, CITY_BBOX, args.ar_steps, args.metric_samples, no_save=True),
         nofreeze_metrics_log,
+        outputs=[nofreeze_metrics_log],
+        reuse_existing=args.reuse_existing,
     )
 
-    run_logged(
+    run_logged_if_needed(
+        "global coarse 3-day metrics",
+        build_predict_cmd(
+            global_exp,
+            global_data,
+            None,
+            tuple(args.global_region),
+            args.global_ar_steps,
+            args.global_max_samples,
+            no_save=True,
+        ),
+        global_metrics_log,
+        outputs=[global_metrics_log],
+        reuse_existing=args.reuse_existing,
+    )
+
+    run_logged_if_needed(
         "freeze6 artifact bundle",
         build_predict_cmd(freeze_exp, main_data, freeze_bundle, CITY_BBOX, args.ar_steps, args.artifact_samples),
         logs_dir / "freeze6_artifacts.log",
+        outputs=[freeze_bundle, logs_dir / "freeze6_artifacts.log"],
+        reuse_existing=args.reuse_existing,
     )
-    run_logged(
+    run_logged_if_needed(
         "nofreeze artifact bundle",
         build_predict_cmd(nofreeze_exp, main_data, nofreeze_bundle, CITY_BBOX, args.ar_steps, args.artifact_samples),
         logs_dir / "nofreeze_artifacts.log",
+        outputs=[nofreeze_bundle, logs_dir / "nofreeze_artifacts.log"],
+        reuse_existing=args.reuse_existing,
     )
 
-    run_logged(
+    run_logged_if_needed(
         "freeze6 plots",
         [
             sys.executable,
@@ -577,8 +752,10 @@ def main() -> None:
             "18",
         ],
         logs_dir / "freeze6_plots.log",
+        outputs=[logs_dir / "freeze6_plots.log", out_dir / "plots_freeze6"],
+        reuse_existing=args.reuse_existing,
     )
-    run_logged(
+    run_logged_if_needed(
         "nofreeze plots",
         [
             sys.executable,
@@ -602,16 +779,20 @@ def main() -> None:
             "18",
         ],
         logs_dir / "nofreeze_plots.log",
+        outputs=[logs_dir / "nofreeze_plots.log", out_dir / "plots_nofreeze"],
+        reuse_existing=args.reuse_existing,
     )
 
     wrf_summary = None
     if jan_data.exists() and wrf_json.exists():
-        run_logged(
+        run_logged_if_needed(
             "freeze6 Jan2023 WRF bundle",
             build_predict_cmd(freeze_exp, jan_data, jan_bundle, CITY_BBOX, args.ar_steps, max(args.artifact_samples, args.wrf_sample + 1), split="all"),
             logs_dir / "freeze6_jan2023.log",
+            outputs=[jan_bundle, logs_dir / "freeze6_jan2023.log"],
+            reuse_existing=args.reuse_existing,
         )
-        run_logged(
+        run_logged_if_needed(
             "WRF comparison",
             [
                 sys.executable,
@@ -630,6 +811,8 @@ def main() -> None:
                 str(args.wrf_sample),
             ],
             logs_dir / "wrf_compare.log",
+            outputs=[logs_dir / "wrf_compare.log"],
+            reuse_existing=args.reuse_existing,
         )
         wrf_summary = logs_dir / "wrf_compare.log"
     else:
@@ -715,19 +898,54 @@ def main() -> None:
         },
         "t2m",
     )
+    plot_horizon_rmse_curves(
+        slides_dir / f"t2m_rmse_curve_{args.ar_steps * 6:03d}h.png",
+        freeze_data,
+        {
+            "freeze6": da_outputs["freeze6"],
+            "nofreeze": da_outputs["nofreeze"],
+            "nudge_all": da_outputs["nudge_all"],
+            "oi_all": da_outputs["oi_all"],
+        },
+        "t2m",
+        title=f"City-region t2m RMSE vs horizon (0..{args.ar_steps * 6}h)",
+    )
+    plot_horizon_rmse_curves(
+        slides_dir / f"t2m_da_groups_curve_{args.ar_steps * 6:03d}h.png",
+        freeze_data,
+        {
+            "freeze6": da_outputs["freeze6"],
+            "oi_all": da_outputs["oi_all"],
+            "oi_surf": da_outputs["oi_surf"],
+            "oi_temp": da_outputs["oi_temp"],
+            "oi_dyn": da_outputs["oi_dyn"],
+        },
+        "t2m",
+        title=f"City-region t2m RMSE by DA variable group (0..{args.ar_steps * 6}h)",
+    )
+
+    staged_live_dir = stage_live_outputs(live_dir, out_dir, slides_dir) if args.include_live else None
 
     summary_lines = [
         "# Presentation Refresh Outputs",
         "",
-        f"Main metrics log (freeze6): {freeze_metrics_log.relative_to(REPO_ROOT)}",
-        f"Main metrics log (nofreeze): {nofreeze_metrics_log.relative_to(REPO_ROOT)}",
-        f"Freeze6 artifact bundle: {freeze_bundle.relative_to(REPO_ROOT)}",
-        f"Nofreeze artifact bundle: {nofreeze_bundle.relative_to(REPO_ROOT)}",
-        f"WRF summary: {wrf_summary.relative_to(REPO_ROOT)}",
-        f"Freeze6 plots: {(out_dir / 'plots_freeze6').relative_to(REPO_ROOT)}",
-        f"Nofreeze plots: {(out_dir / 'plots_nofreeze').relative_to(REPO_ROOT)}",
-        f"DA outputs: {da_dir.relative_to(REPO_ROOT)}",
-        f"Slide assets: {slides_dir.relative_to(REPO_ROOT)}",
+        f"Main metrics log (freeze6): {format_path(freeze_metrics_log)}",
+        f"Main metrics log (nofreeze): {format_path(nofreeze_metrics_log)}",
+        f"Global coarse 3-day metrics: {format_path(global_metrics_log)}",
+        f"Freeze6 artifact bundle: {format_path(freeze_bundle)}",
+        f"Nofreeze artifact bundle: {format_path(nofreeze_bundle)}",
+        f"Heavy artifact storage: {format_path(artifact_store_dir)}",
+        f"WRF summary: {format_path(wrf_summary)}",
+        f"Freeze6 plots: {format_path(out_dir / 'plots_freeze6')}",
+        f"Nofreeze plots: {format_path(out_dir / 'plots_nofreeze')}",
+        f"DA outputs: {format_path(da_dir)}",
+        f"Slide assets: {format_path(slides_dir)}",
+        f"Live 3-day staged outputs: {format_path(staged_live_dir)}",
+        "",
+        "Model notes:",
+        "- freeze6 and nofreeze are both evaluated for presentation tables; freeze6 remains the stronger multires baseline.",
+        f"- Long-horizon DA plots cover 0..{args.ar_steps * 6}h using the same fresh freeze6 forecasts.",
+        f"- Global coarse baseline is evaluated separately for 3 days (0..{args.global_ar_steps * 6}h).",
         "",
         "DA notes:",
         f"- Observations sampled on ROI only ({len(roi_indices)} ROI nodes, {len(station_indices)} stations)",
