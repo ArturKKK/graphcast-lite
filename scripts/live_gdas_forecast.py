@@ -23,7 +23,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from src.config import ExperimentConfig
 from src.constants import FileNames
-from src.data.dataloader_chunked import load_chunked_datasets
+from src.data.data_configs import DatasetMetadata
 from src.main import load_model_from_experiment_config
 from src.utils import load_from_json_file
 
@@ -51,6 +51,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Download recent GDAS analyses and run live GraphCast-lite inference")
     parser.add_argument("--experiment-dir", default="experiments/multires_nores_freeze6")
     parser.add_argument("--data-dir", required=True)
+    parser.add_argument("--runtime-bundle", default=None, help="Optional lightweight bundle dir exported from cluster for live inference")
     parser.add_argument("--ckpt", default=None)
     parser.add_argument("--cache-dir", default="results/live_gdas/cache")
     parser.add_argument("--out-dir", default="results/live_gdas/latest")
@@ -157,6 +158,14 @@ def get_var_order(data_dir: Path) -> list[str]:
     return DEFAULT_VAR_ORDER.copy()
 
 
+def get_var_order_from_bundle(bundle_dir: Path) -> list[str]:
+    variables_path = bundle_dir / "variables.json"
+    if variables_path.exists():
+        with variables_path.open("r", encoding="utf-8") as handle:
+            return json.load(handle)
+    return DEFAULT_VAR_ORDER.copy()
+
+
 def load_scalers(data_dir: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     scalers = np.load(data_dir / "scalers.npz")
     if "mean" in scalers:
@@ -174,6 +183,16 @@ def load_scalers(data_dir: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np
 def load_coords(data_dir: Path) -> tuple[np.ndarray, np.ndarray]:
     coords = np.load(data_dir / "coords.npz")
     return coords["latitude"].astype(np.float32), coords["longitude"].astype(np.float32)
+
+
+def load_coords_from_bundle(bundle_dir: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+    coords = np.load(bundle_dir / "coords.npz")
+    is_regional = coords["is_regional"] if "is_regional" in coords else None
+    return (
+        coords["latitude"].astype(np.float32),
+        coords["longitude"].astype(np.float32),
+        is_regional,
+    )
 
 
 def load_template_static(data_dir: Path, var_order: list[str]) -> dict[str, np.ndarray]:
@@ -201,6 +220,91 @@ def load_template_static(data_dir: Path, var_order: list[str]) -> dict[str, np.n
             values = mmap_arr[0, :, :, idx].astype(np.float32).reshape(-1)
         static_values[name] = values
     return static_values
+
+
+def load_template_static_from_bundle(bundle_dir: Path) -> dict[str, np.ndarray]:
+    static_values: dict[str, np.ndarray] = {}
+    static_path = bundle_dir / "static_fields.npz"
+    if not static_path.exists():
+        return static_values
+    payload = np.load(static_path)
+    for name in payload.files:
+        static_values[name] = payload[name].astype(np.float32)
+    return static_values
+
+
+def build_metadata_from_arrays(
+    latitudes: np.ndarray,
+    longitudes: np.ndarray,
+    n_features: int,
+    obs_window: int,
+    pred_window: int,
+    is_regional: np.ndarray | None = None,
+) -> DatasetMetadata:
+    metadata = DatasetMetadata(
+        flattened=True,
+        num_latitudes=0,
+        num_longitudes=0,
+        num_features=n_features,
+        obs_window=obs_window,
+        pred_window=pred_window,
+    )
+    metadata.flat_grid = True
+    metadata.num_grid_nodes = len(latitudes)
+    metadata.cordinates = (latitudes.astype(np.float32), longitudes.astype(np.float32))
+    metadata.is_regional = is_regional
+    return metadata
+
+
+def load_runtime_assets(
+    data_dir: Path,
+    runtime_bundle_dir: Path | None,
+    obs_window: int,
+    pred_window: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[str], np.ndarray, np.ndarray, dict[str, np.ndarray], DatasetMetadata]:
+    if runtime_bundle_dir is not None:
+        required = ["coords.npz", "scalers.npz", "variables.json"]
+        for required_name in required:
+            required_path = runtime_bundle_dir / required_name
+            if not required_path.exists():
+                raise FileNotFoundError(f"Missing runtime bundle file: {required_path}")
+
+        x_mean, x_std, y_mean, y_std = load_scalers(runtime_bundle_dir)
+        var_order = get_var_order_from_bundle(runtime_bundle_dir)
+        latitudes, longitudes, is_regional = load_coords_from_bundle(runtime_bundle_dir)
+        template_static = load_template_static_from_bundle(runtime_bundle_dir)
+        metadata = build_metadata_from_arrays(
+            latitudes=latitudes,
+            longitudes=longitudes,
+            n_features=len(var_order),
+            obs_window=obs_window,
+            pred_window=pred_window,
+            is_regional=is_regional,
+        )
+        return x_mean, x_std, y_mean, y_std, var_order, latitudes, longitudes, template_static, metadata
+
+    for required_name in ["coords.npz", "scalers.npz", "variables.json"]:
+        required_path = data_dir / required_name
+        if not required_path.exists():
+            raise FileNotFoundError(f"Missing dataset file: {required_path}")
+
+    x_mean, x_std, y_mean, y_std = load_scalers(data_dir)
+    var_order = get_var_order(data_dir)
+    latitudes, longitudes = load_coords(data_dir)
+    template_static = load_template_static(data_dir, var_order)
+    is_regional = None
+    coords = np.load(data_dir / "coords.npz")
+    if "is_regional" in coords:
+        is_regional = coords["is_regional"]
+    metadata = build_metadata_from_arrays(
+        latitudes=latitudes,
+        longitudes=longitudes,
+        n_features=len(var_order),
+        obs_window=obs_window,
+        pred_window=pred_window,
+        is_regional=is_regional,
+    )
+    return x_mean, x_std, y_mean, y_std, var_order, latitudes, longitudes, template_static, metadata
 
 
 def build_interpolator(data_array: xr.DataArray) -> RegularGridInterpolator:
@@ -389,6 +493,7 @@ def main() -> None:
     args = parse_args()
     experiment_dir = Path(args.experiment_dir)
     data_dir = Path(args.data_dir)
+    runtime_bundle_dir = Path(args.runtime_bundle) if args.runtime_bundle else None
     cache_dir = Path(args.cache_dir)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -399,10 +504,6 @@ def main() -> None:
         raise FileNotFoundError(f"Missing config: {cfg_path}")
     if not ckpt_path.exists():
         raise FileNotFoundError(f"Missing checkpoint: {ckpt_path}")
-    for required_name in ["coords.npz", "scalers.npz", "variables.json"]:
-        required_path = data_dir / required_name
-        if not required_path.exists():
-            raise FileNotFoundError(f"Missing dataset file: {required_path}")
 
     exp_cfg = ExperimentConfig(**load_from_json_file(str(cfg_path)))
     obs_window = int(exp_cfg.data.obs_window_used)
@@ -411,10 +512,12 @@ def main() -> None:
     obs_cycles = obs_window
     no_residual = not bool(getattr(exp_cfg, "use_residual", False))
 
-    x_mean, x_std, y_mean, y_std = load_scalers(data_dir)
-    var_order = get_var_order(data_dir)
-    latitudes, longitudes = load_coords(data_dir)
-    template_static = load_template_static(data_dir, var_order)
+    x_mean, x_std, y_mean, y_std, var_order, latitudes, longitudes, template_static, metadata = load_runtime_assets(
+        data_dir=data_dir,
+        runtime_bundle_dir=runtime_bundle_dir,
+        obs_window=obs_window,
+        pred_window=1,
+    )
 
     if args.cycle:
         anchor = datetime.fromisoformat(args.cycle)
@@ -447,19 +550,13 @@ def main() -> None:
     input_path = out_dir / "input_normalized.npy"
     np.save(input_path, input_tensor)
 
-    _, _, _, meta = load_chunked_datasets(
-        data_path=str(data_dir),
-        obs_window=obs_window,
-        pred_steps=1,
-        n_features=len(var_order),
-    )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = load_model_from_experiment_config(
         exp_cfg,
         device,
-        meta,
+        metadata,
         coordinates=(latitudes, longitudes),
-        flat_grid=getattr(meta, "flat_grid", False),
+        flat_grid=getattr(metadata, "flat_grid", False),
     )
     state = torch.load(str(ckpt_path), map_location=device)
     model.load_state_dict(state, strict=False)
@@ -498,6 +595,7 @@ def main() -> None:
         "experiment_dir": str(experiment_dir),
         "checkpoint": str(ckpt_path),
         "data_dir": str(data_dir),
+        "runtime_bundle": str(runtime_bundle_dir) if runtime_bundle_dir else None,
     }
     torch.save(payload, out_dir / "forecast.pt")
 
