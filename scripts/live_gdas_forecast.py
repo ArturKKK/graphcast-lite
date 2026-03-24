@@ -39,9 +39,9 @@ DEFAULT_VAR_ORDER = [
 ]
 
 GROUP_FILTERS = {
-    "t2m": [{"typeOfLevel": "heightAboveGround", "shortName": "t2m"}],
-    "10u": [{"typeOfLevel": "heightAboveGround", "shortName": "u10"}],
-    "10v": [{"typeOfLevel": "heightAboveGround", "shortName": "v10"}],
+    "t2m": [{"typeOfLevel": "heightAboveGround", "shortName": "2t"}],
+    "10u": [{"typeOfLevel": "heightAboveGround", "shortName": "10u"}],
+    "10v": [{"typeOfLevel": "heightAboveGround", "shortName": "10v"}],
     "msl": [
         {"typeOfLevel": "meanSea", "shortName": "prmsl"},
         {"typeOfLevel": "meanSea", "shortName": "mslma"},
@@ -425,9 +425,9 @@ def extract_live_channels(
     warnings: list[str] = []
 
     var_specs = {
-        "t2m": ("t2m", ["t2m", "t"], None),
-        "10u": ("10u", ["u10", "u"], None),
-        "10v": ("10v", ["v10", "v"], None),
+        "t2m": ("t2m", ["2t", "t2m", "t"], None),
+        "10u": ("10u", ["10u", "u10", "u"], None),
+        "10v": ("10v", ["10v", "v10", "v"], None),
         "msl": ("msl", ["prmsl", "mslma"], None),
         "sp": ("sp", ["sp", "pres"], None),
         "tcwv": ("tcwv", ["pwat", "tcwv"], None),
