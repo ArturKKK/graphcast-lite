@@ -8,6 +8,7 @@
   "random_seed": 42,
   "use_latitude_weighting": true,
   "max_ar_steps": 4,
+  "roi_only_loss": true,
   "data_dir": "data/datasets/multires_krsk_19f",
   "freeze_processor_epochs": 7,
   "finetune_processor_lr_factor": 0.1,

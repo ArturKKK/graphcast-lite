@@ -89,13 +89,26 @@ def weighted_mse_loss(pred, target, lat_weights=None, channel_mask=None, spatial
     spatial_mask: тензор shape (1, G, 1) с 0.0 для буферных точек на краях.
     """
     diff = (pred - target) ** 2
+    weights = torch.ones_like(diff)
     if channel_mask is not None:
-        diff = diff * channel_mask  # broadcast: [..., C] * [C]
+        weights = weights * channel_mask.view(1, 1, -1)
     if spatial_mask is not None:
-        diff = diff * spatial_mask  # broadcast: [N, G, C] * [1, G, 1]
+        weights = weights * spatial_mask
     if lat_weights is not None:
-        diff = diff * lat_weights
-    return diff.mean()
+        weights = weights * lat_weights
+
+    weighted_diff = diff * weights
+    normalizer = weights.sum().clamp_min(1e-12)
+    return weighted_diff.sum() / normalizer
+
+
+def combine_spatial_masks(*masks):
+    combined = None
+    for mask in masks:
+        if mask is None:
+            continue
+        combined = mask if combined is None else (combined * mask)
+    return combined
 # -------------------------------------
 
 def spatial_corr(pred: torch.Tensor, true: torch.Tensor, exclude_channels: list = None) -> float:
@@ -352,6 +365,19 @@ def train(
             total = n_lon * n_lat
             print(f"[Train] boundary_mask_width={bmw} → {inner}/{total} active grid points "
                   f"(inner {n_lon-2*bmw}×{n_lat-2*bmw})")
+
+    roi_spatial_mask = None
+    if getattr(config, 'roi_only_loss', False) and dataset_metadata is not None:
+        roi_mask_np = getattr(dataset_metadata, 'is_regional', None)
+        if roi_mask_np is not None:
+            roi_spatial_mask = torch.as_tensor(roi_mask_np, dtype=torch.float32, device=device).view(1, -1, 1)
+            active = int(roi_spatial_mask.sum().item())
+            total = roi_spatial_mask.shape[1]
+            print(f"[Train] roi_only_loss=True → {active}/{total} active ROI nodes")
+        else:
+            print("[Train] roi_only_loss=True, но metadata.is_regional отсутствует; использую полный grid loss")
+
+    spatial_mask = combine_spatial_masks(spatial_mask, roi_spatial_mask)
 
     loss_fn = nn.MSELoss()
     use_residual = getattr(config, 'use_residual', True)
