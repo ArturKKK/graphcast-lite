@@ -39,11 +39,34 @@ DEFAULT_VAR_ORDER = [
 ]
 
 GROUP_FILTERS = {
-    "heightAboveGround": {"typeOfLevel": "heightAboveGround"},
-    "meanSea": {"typeOfLevel": "meanSea"},
-    "surface": {"typeOfLevel": "surface"},
-    "atmosphereSingleLayer": {"typeOfLevel": "atmosphereSingleLayer"},
-    "isobaricInhPa": {"typeOfLevel": "isobaricInhPa"},
+    "t2m": [{"typeOfLevel": "heightAboveGround", "shortName": "t2m"}],
+    "10u": [{"typeOfLevel": "heightAboveGround", "shortName": "u10"}],
+    "10v": [{"typeOfLevel": "heightAboveGround", "shortName": "v10"}],
+    "msl": [
+        {"typeOfLevel": "meanSea", "shortName": "prmsl"},
+        {"typeOfLevel": "meanSea", "shortName": "mslma"},
+    ],
+    "sp": [
+        {"typeOfLevel": "surface", "shortName": "sp"},
+        {"typeOfLevel": "surface", "shortName": "pres"},
+    ],
+    "tcwv": [
+        {"typeOfLevel": "atmosphereSingleLayer", "shortName": "pwat"},
+        {"typeOfLevel": "atmosphereSingleLayer", "shortName": "tcwv"},
+    ],
+    "isobaric_t": [{"typeOfLevel": "isobaricInhPa", "shortName": "t"}],
+    "isobaric_u": [{"typeOfLevel": "isobaricInhPa", "shortName": "u"}],
+    "isobaric_v": [{"typeOfLevel": "isobaricInhPa", "shortName": "v"}],
+    "isobaric_z": [
+        {"typeOfLevel": "isobaricInhPa", "shortName": "gh"},
+        {"typeOfLevel": "isobaricInhPa", "shortName": "z"},
+    ],
+    "isobaric_q": [{"typeOfLevel": "isobaricInhPa", "shortName": "q"}],
+    "tp": [
+        {"typeOfLevel": "surface", "shortName": "tp"},
+        {"typeOfLevel": "surface", "shortName": "acpcp"},
+        {"typeOfLevel": "surface", "shortName": "prate"},
+    ],
 }
 
 
@@ -110,14 +133,27 @@ def find_recent_cycles(obs_cycles: int, lag_hours: int, max_lookback_cycles: int
 
 
 def download_file(url: str, dest: Path, timeout: int) -> Path:
+    expected_bytes = 0
+    try:
+        head_response = requests.head(url, allow_redirects=True, timeout=min(timeout, 60))
+        if head_response.ok:
+            expected_bytes = int(head_response.headers.get("Content-Length", 0))
+    except requests.RequestException:
+        expected_bytes = 0
+
     if dest.exists() and dest.stat().st_size > 0:
-        print(f"[cache] Using existing {dest}")
-        return dest
+        existing_size = dest.stat().st_size
+        if expected_bytes and existing_size == expected_bytes:
+            print(f"[cache] Using existing {dest}")
+            return dest
+        print(f"[cache] Removing incomplete cached file {dest} ({existing_size} bytes, expected {expected_bytes or 'unknown'})")
+        dest.unlink()
+
     dest.parent.mkdir(parents=True, exist_ok=True)
     print(f"[download] {url}")
     with requests.get(url, stream=True, timeout=timeout) as response:
         response.raise_for_status()
-        total_bytes = int(response.headers.get("Content-Length", 0))
+        total_bytes = int(response.headers.get("Content-Length", 0)) or expected_bytes
         written = 0
         with dest.open("wb") as handle:
             for chunk in response.iter_content(chunk_size=1024 * 1024):
@@ -130,26 +166,29 @@ def download_file(url: str, dest: Path, timeout: int) -> Path:
                     print(f"  {written / (1024**2):7.1f} MB / {total_bytes / (1024**2):7.1f} MB  ({pct:5.1f}%)", end="\r", flush=True)
         if total_bytes:
             print()
+        if total_bytes and written != total_bytes:
+            dest.unlink(missing_ok=True)
+            raise RuntimeError(f"Downloaded truncated file {dest}: wrote {written} bytes, expected {total_bytes}")
     return dest
 
 
-def open_cfgrib_group(grib_path: Path, group_name: str) -> xr.Dataset | None:
-    try:
-        ds = xr.open_dataset(
-            grib_path,
-            engine="cfgrib",
-            backend_kwargs={"filter_by_keys": GROUP_FILTERS[group_name], "indexpath": ""},
-        )
-        return ds
-    except Exception as exc:
-        print(f"[cfgrib] skip {group_name}: {exc}")
-        return None
+def open_cfgrib_dataset(grib_path: Path, payload_name: str) -> xr.Dataset | None:
+    for filter_by_keys in GROUP_FILTERS[payload_name]:
+        try:
+            return xr.open_dataset(
+                grib_path,
+                engine="cfgrib",
+                backend_kwargs={"filter_by_keys": filter_by_keys, "indexpath": ""},
+            )
+        except Exception:
+            continue
+    return None
 
 
 def open_gdas_payload(grib_path: Path) -> dict[str, xr.Dataset]:
     payload: dict[str, xr.Dataset] = {}
     for group_name in GROUP_FILTERS:
-        ds = open_cfgrib_group(grib_path, group_name)
+        ds = open_cfgrib_dataset(grib_path, group_name)
         if ds is not None:
             payload[group_name] = ds
     if not payload:
@@ -386,23 +425,23 @@ def extract_live_channels(
     warnings: list[str] = []
 
     var_specs = {
-        "t2m": ("heightAboveGround", ["t2m", "t"], None),
-        "10u": ("heightAboveGround", ["u10", "u"], None),
-        "10v": ("heightAboveGround", ["v10", "v"], None),
-        "msl": ("meanSea", ["prmsl", "mslma"], None),
-        "sp": ("surface", ["sp", "pres"], None),
-        "tcwv": ("atmosphereSingleLayer", ["pwat", "tcwv"], None),
-        "t@850": ("isobaricInhPa", ["t"], 850),
-        "u@850": ("isobaricInhPa", ["u"], 850),
-        "v@850": ("isobaricInhPa", ["v"], 850),
-        "z@850": ("isobaricInhPa", ["gh", "z"], 850),
-        "q@850": ("isobaricInhPa", ["q"], 850),
-        "t@500": ("isobaricInhPa", ["t"], 500),
-        "u@500": ("isobaricInhPa", ["u"], 500),
-        "v@500": ("isobaricInhPa", ["v"], 500),
-        "z@500": ("isobaricInhPa", ["gh", "z"], 500),
-        "q@500": ("isobaricInhPa", ["q"], 500),
-        "tp": ("surface", ["tp", "acpcp", "prate"], None),
+        "t2m": ("t2m", ["t2m", "t"], None),
+        "10u": ("10u", ["u10", "u"], None),
+        "10v": ("10v", ["v10", "v"], None),
+        "msl": ("msl", ["prmsl", "mslma"], None),
+        "sp": ("sp", ["sp", "pres"], None),
+        "tcwv": ("tcwv", ["pwat", "tcwv"], None),
+        "t@850": ("isobaric_t", ["t"], 850),
+        "u@850": ("isobaric_u", ["u"], 850),
+        "v@850": ("isobaric_v", ["v"], 850),
+        "z@850": ("isobaric_z", ["gh", "z"], 850),
+        "q@850": ("isobaric_q", ["q"], 850),
+        "t@500": ("isobaric_t", ["t"], 500),
+        "u@500": ("isobaric_u", ["u"], 500),
+        "v@500": ("isobaric_v", ["v"], 500),
+        "z@500": ("isobaric_z", ["gh", "z"], 500),
+        "q@500": ("isobaric_q", ["q"], 500),
+        "tp": ("tp", ["tp", "acpcp", "prate"], None),
     }
 
     for name in var_order:
