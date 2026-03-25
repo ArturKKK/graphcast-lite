@@ -248,13 +248,12 @@ def eval_dual(
     device: torch.device,
     lat_weights=None,
     use_residual: bool = False,
-    region_mask=None,
 ):
     """Оценка на val/test. Loss считается ТОЛЬКО по ROI."""
     model.eval()
     total_loss = 0
+    total_global_loss = 0
     n_batches = 0
-    acc_values = []
 
     roi_mask = model.roi_mask  # (G,) bool tensor on device
 
@@ -272,6 +271,7 @@ def eval_dual(
             else:
                 y_step0 = y
 
+            # --- Corrected prediction ---
             pred = model(X)
             if pred.dim() == 2:
                 pred = pred.unsqueeze(0)
@@ -283,24 +283,31 @@ def eval_dual(
             else:
                 out = pred
 
-            # Loss ТОЛЬКО по ROI (согласовано с train)
             out_roi = out[:, roi_mask, :]
             y_roi = y_step0[:, roi_mask, :]
             loss = weighted_mse_loss(out_roi, y_roi, None)
             total_loss += loss.item()
+
+            # --- Global-only prediction (no regional correction) ---
+            global_pred = model.global_model(X=X, attention_threshold=0.0)
+            if global_pred.dim() == 2:
+                global_pred = global_pred.unsqueeze(0)
+            if use_residual:
+                X_reshaped = X.view(N, G, model.obs_window, C)
+                global_out = X_reshaped[:, :, -1, :] + global_pred
+            else:
+                global_out = global_pred
+            global_roi = global_out[:, roi_mask, :]
+            global_loss = weighted_mse_loss(global_roi, y_roi, None)
+            total_global_loss += global_loss.item()
+
             n_batches += 1
 
-            # Regional ACC
-            if region_mask is not None:
-                acc_values.append(spatial_corr(
-                    out[:, region_mask, :], y_step0[:, region_mask, :]
-                ))
-            else:
-                acc_values.append(spatial_corr(out, y_step0))
-
     avg_loss = total_loss / max(n_batches, 1)
-    avg_acc = sum(acc_values) / max(len(acc_values), 1)
-    return avg_loss, avg_acc
+    avg_global_loss = total_global_loss / max(n_batches, 1)
+    # correction_skill: how much regional module improves over global-only (ROI MSE reduction)
+    correction_skill = 1.0 - avg_loss / avg_global_loss if avg_global_loss > 0 else 0.0
+    return avg_loss, correction_skill
 
 
 def main():
@@ -456,8 +463,8 @@ def main():
         print("\n[--overfit-only] Done. Exiting without full training.")
         return
 
-    _log(f"{'epoch':>5}  {'train_loss':>10}  {'val_loss':>10}  {'val_ACC':>8}  {'best':>10}")
-    _log("-" * 55)
+    _log(f"{'epoch':>5}  {'train_loss':>10}  {'val_loss':>10}  {'corr_skill':>10}  {'best':>10}")
+    _log("-" * 59)
 
     for epoch in range(num_epochs):
         train_loss = train_dual_epoch(
@@ -466,10 +473,9 @@ def main():
             check_grads=(epoch == 0),
         )
 
-        val_loss, val_acc = eval_dual(
+        val_loss, correction_skill = eval_dual(
             dual_model, val_loader, device,
             lat_weights=lat_weights, use_residual=use_residual,
-            region_mask=region_mask_np,
         )
 
         improved = ""
@@ -488,7 +494,7 @@ def main():
         else:
             patience += 1
 
-        _log(f"{epoch+1:5d}  {train_loss:10.6f}  {val_loss:10.6f}  {val_acc:8.4f}  {best_val_loss:10.6f}{improved}")
+        _log(f"{epoch+1:5d}  {train_loss:10.6f}  {val_loss:10.6f}  {correction_skill:>9.2%}  {best_val_loss:10.6f}{improved}")
 
         if patience >= max_patience:
             _log(f"Early stopping at epoch {epoch+1}")
@@ -500,12 +506,11 @@ def main():
     if os.path.exists(best_ckpt):
         dual_model.load_state_dict(torch.load(best_ckpt, map_location=device))
 
-    test_loss, test_acc = eval_dual(
+    test_loss, test_skill = eval_dual(
         dual_model, test_loader, device,
         lat_weights=lat_weights, use_residual=use_residual,
-        region_mask=region_mask_np,
     )
-    _log(f"\n[TEST] loss={test_loss:.6f}  regional_ACC={test_acc:.4f}")
+    _log(f"\n[TEST] loss={test_loss:.6f}  correction_skill={test_skill:.2%}")
 
     # Save results
     results = {
