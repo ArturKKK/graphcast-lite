@@ -516,7 +516,7 @@ def main():
     results = {
         "best_val_loss": best_val_loss,
         "test_loss": test_loss,
-        "test_regional_acc": test_acc,
+        "test_correction_skill": test_skill,
         "roi": list(roi),
         "reg_mesh_level": args.reg_mesh_level,
         "reg_steps": args.reg_steps,
