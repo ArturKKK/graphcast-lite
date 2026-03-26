@@ -234,31 +234,82 @@ def main():
     vars_path = ds_data_dir / "variables.json"
     var_names = json.load(open(vars_path)) if vars_path.exists() else [f"ch{i}" for i in range(C)]
 
-    # ── 5. Run inference ──
+    # ── 5. Run inference (per–AR-step) ──
     from torch.utils.data import DataLoader
     test_loader = DataLoader(test_ds, batch_size=1, shuffle=False)
 
     use_residual = not args.no_residual and getattr(gnn_cfg, 'use_residual', False)
+    AR = args.ar_steps
+    obs = gnn_cfg.data.obs_window_used
 
-    mse_gnn = np.zeros(C)
-    mse_cascade = np.zeros(C)
-    n_samples = 0
+    # Accumulators: per-step, per-channel
+    mse_gnn   = np.zeros((AR, C))   # GNN bilinear upsampled
+    mse_casc  = np.zeros((AR, C))   # GNN + UNet cascade
+    mse_pers  = np.zeros((AR, C))   # persistence (last real 0.25° obs)
+    n_per_step = np.zeros(AR, dtype=int)
 
-    print(f"\n[Inference] AR={args.ar_steps}, samples={min(args.max_samples, len(test_ds))}, "
+    # Physical units & formatting helpers
+    UNITS = {
+        "t2m": "°C", "10u": "m/s", "10v": "m/s", "msl": "Pa",
+        "tp": "m", "sp": "Pa", "tcwv": "kg/m²",
+        "z_surf": "m²/s²", "lsm": "-",
+        "t@850": "°C", "u@850": "m/s", "v@850": "m/s",
+        "z@850": "gpm", "q@850": "kg/kg",
+        "t@500": "°C", "u@500": "m/s", "v@500": "m/s",
+        "z@500": "gpm", "q@500": "kg/kg",
+    }
+
+    def _fmt_rmse(val, name):
+        if "z@" in name or name == "z_surf":
+            return f"{val / 9.81:7.1f}m"
+        elif name == "t2m" or name.startswith("t@"):
+            return f"{val:6.2f}°C"
+        elif name in ("10u", "10v") or name.startswith("u@") or name.startswith("v@"):
+            return f"{val:6.2f}ms"
+        elif name == "msl" or name == "sp":
+            return f"{val / 100:6.1f}hPa"
+        elif name == "tp":
+            return f"{val * 1000:6.3f}mm"
+        elif name == "tcwv":
+            return f"{val:6.2f}kg"
+        else:
+            return f"{val:8.4f}"
+
+    max_samples = min(args.max_samples, len(test_ds))
+    print(f"\n[Inference] AR={AR}, samples={max_samples}, "
           f"gnn_residual={use_residual}, unet_residual={ds_residual}")
 
+    # Pre-compute static tensor once
+    static_t = None
+    if static_fine is not None:
+        static_t = torch.from_numpy(static_fine.copy()).permute(2, 0, 1).unsqueeze(0).float().to(device)
+
     for i, (X, Y) in enumerate(test_loader):
-        if i >= args.max_samples:
+        if i >= max_samples:
             break
 
-        X, Y = X.to(device), Y.to(device)
+        # ── Time alignment: actual dataset time index ──
+        if hasattr(test_ds, '_sample_indices') and i < len(test_ds._sample_indices):
+            _chunk_idx, local_t = test_ds._sample_indices[i]
+        else:
+            local_t = i
+
+        X = X.to(device)
         N, G, feat_dim = X.shape
-        obs = gnn_cfg.data.obs_window_used
         C_feat = feat_dim // obs
         curr_state = X.view(N, G, obs, C_feat)
 
-        # AR rollout
-        for step in range(args.ar_steps):
+        # Persistence baseline: real 0.25° ERA5 at last obs time
+        t_persist = local_t + obs - 1
+        if t_persist >= ds_info["n_time"]:
+            continue
+        persist_raw = np.array(fine_data[t_persist], dtype=np.float32)  # (lon, lat, C)
+        persist_phys = persist_raw.transpose(1, 0, 2)  # (H, W, C)
+
+        # ── AR rollout with per-step evaluation ──
+        sample_ok = True
+        for step in range(AR):
+            # One GNN step
             inp = curr_state.view(N, G, -1)
             with torch.no_grad():
                 pred = gnn_model(X=inp, attention_threshold=0.0)
@@ -270,83 +321,173 @@ def main():
                 out = pred
             curr_state = torch.cat([curr_state[:, :, 1:, :], out.unsqueeze(2)], dim=2)
 
-        # GNN final prediction: (1, G, C)
-        gnn_pred = out[0].cpu().numpy()  # (G, C)
+            # Fine target for this step
+            t_fine = local_t + obs + step
+            if t_fine >= ds_info["n_time"]:
+                sample_ok = False
+                break
 
-        # Crop + upsample to fine grid (still in GNN-normalized space)
-        coarse_norm = crop_and_upsample_roi(
-            gnn_pred, grid_lats, grid_lons, roi,
-            target_lats, target_lons, flat_grid=flat_grid,
-        )  # (H, W, C) — normalized (same scalers as downscaler)
+            fine_target = np.array(fine_data[t_fine], dtype=np.float32)  # (lon, lat, C)
+            fine_target = fine_target.transpose(1, 0, 2)  # (H, W, C)
 
-        # ── UNet downscaling ──
-        # GNN output is already normalized (same scalers) — feed directly
-        frames = [coarse_norm] * obs_window
-        coarse_stack = np.concatenate(frames, axis=-1)  # (H, W, obs*C)
-        x_unet = torch.from_numpy(coarse_stack).permute(2, 0, 1).unsqueeze(0).float().to(device)
+            # Crop GNN output → fine grid (normalized space)
+            gnn_pred_np = out[0].cpu().numpy()  # (G, C)
+            coarse_norm = crop_and_upsample_roi(
+                gnn_pred_np, grid_lats, grid_lons, roi,
+                target_lats, target_lons, flat_grid=flat_grid,
+            )  # (H, W, C) normalized
 
-        if static_fine is not None:
-            static_t = torch.from_numpy(static_fine.copy()).permute(2, 0, 1).unsqueeze(0).float().to(device)
-            x_unet = torch.cat([x_unet, static_t], dim=1)
+            # UNet refinement
+            frames = [coarse_norm] * obs_window
+            coarse_stack = np.concatenate(frames, axis=-1)
+            x_unet = torch.from_numpy(coarse_stack).permute(2, 0, 1).unsqueeze(0).float().to(device)
+            if static_t is not None:
+                x_unet = torch.cat([x_unet, static_t], dim=1)
+            with torch.no_grad():
+                unet_out = unet(x_unet)
+            if ds_residual:
+                x_last = x_unet[:, (obs_window - 1) * C : obs_window * C, :, :]
+                unet_out = x_last + unet_out
+            cascade_norm = unet_out[0].cpu().numpy().transpose(1, 2, 0)  # (H, W, C)
 
-        with torch.no_grad():
-            unet_out = unet(x_unet)  # (1, C, H, W)
+            # Denormalize to physical
+            coarse_phys = coarse_norm * ds_std + ds_mean
+            cascade_phys = cascade_norm * ds_std + ds_mean
 
-        if ds_residual:
-            # UNet predicts delta — add last coarse frame (normalized)
-            x_last = x_unet[:, (obs_window - 1) * C : obs_window * C, :, :]
-            unet_out = x_last + unet_out
+            # Per-channel MSE (skip static)
+            for c in range(C):
+                if c in static_ch:
+                    continue
+                mse_gnn[step, c]  += np.mean((coarse_phys[:, :, c]  - fine_target[:, :, c]) ** 2)
+                mse_casc[step, c] += np.mean((cascade_phys[:, :, c] - fine_target[:, :, c]) ** 2)
+                mse_pers[step, c] += np.mean((persist_phys[:, :, c] - fine_target[:, :, c]) ** 2)
+            n_per_step[step] += 1
 
-        cascade_norm_out = unet_out[0].cpu().numpy()  # (C, H, W)
-        cascade_norm_out = cascade_norm_out.transpose(1, 2, 0)  # (H, W, C)
-
-        # Denormalize both to physical space for metrics
-        coarse_phys = coarse_norm * ds_std + ds_mean     # (H, W, C)
-        cascade_phys = cascade_norm_out * ds_std + ds_mean  # (H, W, C)
-
-        # ── Target: real fine ERA5 (physical) ──
-        t_idx = test_ds.indices[i] if hasattr(test_ds, 'indices') else i
-        t_target = t_idx + obs - 1 + args.ar_steps
-        if t_target >= ds_info["n_time"]:
-            continue
-
-        fine_target = np.array(fine_data[t_target], dtype=np.float32)  # (n_lon, n_lat, C)
-        fine_target = fine_target.transpose(1, 0, 2)  # (H, W, C)
-
-        # ── Metrics (all in physical units now) ──
-        for c in range(C):
-            if c in static_ch:
-                continue
-            mse_gnn[c] += np.mean((coarse_phys[:, :, c] - fine_target[:, :, c]) ** 2)
-            mse_cascade[c] += np.mean((cascade_phys[:, :, c] - fine_target[:, :, c]) ** 2)
-
-        n_samples += 1
         if (i + 1) % 10 == 0:
-            print(f"  {i+1}/{min(args.max_samples, len(test_ds))}")
+            print(f"  {i + 1}/{max_samples}")
 
-    if n_samples == 0:
-        print("No valid samples!")
-        return
+    # ═══════════════════════════════════════════════════════
+    # Results
+    # ═══════════════════════════════════════════════════════
+    dyn_ch = [c for c in range(C) if c not in static_ch]
 
-    # ── Results ──
-    mse_gnn /= n_samples
-    mse_cascade /= n_samples
-    rmse_gnn = np.sqrt(mse_gnn)
-    rmse_cascade = np.sqrt(mse_cascade)
-    improvement = 1.0 - rmse_cascade / (rmse_gnn + 1e-8)
+    # Per-step per-channel RMSE
+    rmse_gnn  = np.zeros_like(mse_gnn)
+    rmse_casc = np.zeros_like(mse_gnn)
+    rmse_pers = np.zeros_like(mse_gnn)
+    for s in range(AR):
+        if n_per_step[s] > 0:
+            rmse_gnn[s]  = np.sqrt(mse_gnn[s]  / n_per_step[s])
+            rmse_casc[s] = np.sqrt(mse_casc[s] / n_per_step[s])
+            rmse_pers[s] = np.sqrt(mse_pers[s] / n_per_step[s])
 
-    print(f"\n{'='*60}")
-    print(f"Results ({n_samples} samples, +{args.ar_steps*6}h)")
-    print(f"{'='*60}")
-    print(f"{'Variable':>12}  {'RMSE_GNN':>10}  {'RMSE_cascade':>12}  {'Improv':>8}")
-    print("-" * 48)
-    for c in range(C):
-        if c in static_ch:
-            continue
-        print(f"{var_names[c]:>12}  {rmse_gnn[c]:10.4f}  {rmse_cascade[c]:12.4f}  {improvement[c]:>7.1%}")
+    # ── Compact per-horizon summary ──
+    print(f"\n{'=' * 72}")
+    print(f"Cascade results  ({int(n_per_step[0])} samples)")
+    print(f"{'=' * 72}")
 
-    mean_imp = np.mean([improvement[c] for c in range(C) if c not in static_ch])
-    print(f"\n{'MEAN':>12}  {'':>10}  {'':>12}  {mean_imp:>7.1%}")
+    header = f"  {'':>10}"
+    for s in range(AR):
+        header += f"  +{(s+1)*6:02d}h       "
+    print(header)
+
+    header2 = f"  {'':>10}"
+    for s in range(AR):
+        header2 += f"  {'GNN':>6} {'Casc':>6} {'Δ':>5}"
+    print(header2)
+    print("  " + "-" * (10 + AR * 19))
+
+    for c in dyn_ch:
+        name = var_names[c]
+        row = f"  {name:>10}"
+        for s in range(AR):
+            g = _fmt_rmse(rmse_gnn[s, c], name).strip()
+            ca = _fmt_rmse(rmse_casc[s, c], name).strip()
+            imp = (1 - rmse_casc[s, c] / (rmse_gnn[s, c] + 1e-12)) * 100
+            sign = "+" if imp >= 0 else ""
+            row += f"  {g:>6} {ca:>6} {sign}{imp:4.1f}%"
+        print(row)
+
+    # Mean skill per horizon
+    print("  " + "-" * (10 + AR * 19))
+    row = f"  {'MEAN':>10}"
+    for s in range(AR):
+        skills = [(1 - rmse_casc[s, c] / (rmse_gnn[s, c] + 1e-12)) for c in dyn_ch]
+        ms = np.mean(skills) * 100
+        sign = "+" if ms >= 0 else ""
+        row += f"  {'':>6} {'':>6} {sign}{ms:4.1f}%"
+    print(row)
+
+    # ── Per-horizon summary: Skill vs Persistence ──
+    print(f"\n  Skill vs persistence (0.25° ERA5):")
+    header = f"  {'':>10}"
+    for s in range(AR):
+        header += f"  +{(s+1)*6:02d}h "
+    print(header)
+    print("  " + "-" * (10 + AR * 8))
+    for c in dyn_ch:
+        name = var_names[c]
+        row = f"  {name:>10}"
+        for s in range(AR):
+            sk = (1 - rmse_casc[s, c] / (rmse_pers[s, c] + 1e-12)) * 100
+            row += f"  {sk:+5.1f}% "
+        print(row)
+
+    row = f"  {'MEAN':>10}"
+    for s in range(AR):
+        skills = [(1 - rmse_casc[s, c] / (rmse_pers[s, c] + 1e-12)) for c in dyn_ch]
+        row += f"  {np.mean(skills)*100:+5.1f}% "
+    print(row)
+
+    # ── Detailed table: last horizon ──
+    s_last = AR - 1
+    print(f"\n  Detailed +{AR*6}h:")
+    print(f"  {'Variable':>10} {'Unit':>6}  {'Persist':>8}  {'GNN_bln':>8}  {'Cascade':>8}  {'Sk_pers':>7}  {'Sk_GNN':>7}")
+    print("  " + "-" * 62)
+    for c in dyn_ch:
+        name = var_names[c]
+        unit = UNITS.get(name, "?")
+        rp = rmse_pers[s_last, c]
+        rg = rmse_gnn[s_last, c]
+        rc = rmse_casc[s_last, c]
+        sk_p = (1 - rc / (rp + 1e-12)) * 100
+        sk_g = (1 - rc / (rg + 1e-12)) * 100
+
+        def _val(v, nm):
+            if "z@" in nm or nm == "z_surf":
+                return f"{v/9.81:7.1f}"
+            elif nm == "msl" or nm == "sp":
+                return f"{v/100:7.2f}"
+            elif nm == "tp":
+                return f"{v*1000:7.4f}"
+            else:
+                return f"{v:7.3f}"
+
+        print(f"  {name:>10} {unit:>6}  {_val(rp, name)}  {_val(rg, name)}  {_val(rc, name)}  {sk_p:+6.1f}%  {sk_g:+6.1f}%")
+
+    mean_sk_p = np.mean([(1 - rmse_casc[s_last, c] / (rmse_pers[s_last, c] + 1e-12)) for c in dyn_ch]) * 100
+    mean_sk_g = np.mean([(1 - rmse_casc[s_last, c] / (rmse_gnn[s_last, c] + 1e-12)) for c in dyn_ch]) * 100
+    print(f"  {'MEAN':>10} {'':>6}  {'':>8}  {'':>8}  {'':>8}  {mean_sk_p:+6.1f}%  {mean_sk_g:+6.1f}%")
+
+    # ── Save results.json ──
+    results = {}
+    for s in range(AR):
+        h = (s + 1) * 6
+        results[f"+{h}h"] = {
+            "n_samples": int(n_per_step[s]),
+            "per_channel": {
+                var_names[c]: {
+                    "rmse_persist": float(rmse_pers[s, c]),
+                    "rmse_gnn": float(rmse_gnn[s, c]),
+                    "rmse_cascade": float(rmse_casc[s, c]),
+                }
+                for c in dyn_ch
+            },
+        }
+    out_path = ds_dir / "cascade_results.json"
+    with open(out_path, "w") as f:
+        json.dump(results, f, indent=2)
+    print(f"\n  Results saved → {out_path}")
 
 
 if __name__ == "__main__":
