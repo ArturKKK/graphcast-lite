@@ -165,12 +165,10 @@ def train_epoch(model, loader, optimizer, device, channel_mask, residual):
         out = model(X)  # (B, C, H, W)
 
         if residual:
-            # Add to last coarse frame (last C channels before static)
+            # Add to last coarse frame: channels [(obs-1)*C : obs*C]
             C = Y.shape[1]
-            x_last = X[:, -C - (X.shape[1] % C) if X.shape[1] % C else -C:, :, :]
-            # Simpler: take channels [obs*C - C : obs*C]
-            obs_channels = (X.shape[1] // C) * C  # round down
-            x_last = X[:, obs_channels - C:obs_channels, :, :]
+            obs_end = (X.shape[1] // C) * C  # skip static channels at end
+            x_last = X[:, obs_end - C:obs_end, :, :]
             out = x_last + out
 
         loss = masked_mse_loss(out, Y, channel_mask)
