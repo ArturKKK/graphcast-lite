@@ -273,16 +273,14 @@ def main():
         # GNN final prediction: (1, G, C)
         gnn_pred = out[0].cpu().numpy()  # (G, C)
 
-        # Crop + upsample to fine grid
-        coarse_up = crop_and_upsample_roi(
+        # Crop + upsample to fine grid (still in GNN-normalized space)
+        coarse_norm = crop_and_upsample_roi(
             gnn_pred, grid_lats, grid_lons, roi,
             target_lats, target_lons, flat_grid=flat_grid,
-        )  # (H, W, C)
+        )  # (H, W, C) — normalized (same scalers as downscaler)
 
         # ── UNet downscaling ──
-        # Normalize
-        coarse_norm = (coarse_up - ds_mean) / (ds_std + 1e-8)
-        # For obs_window: repeat the same frame (we only have 1 prediction)
+        # GNN output is already normalized (same scalers) — feed directly
         frames = [coarse_norm] * obs_window
         coarse_stack = np.concatenate(frames, axis=-1)  # (H, W, obs*C)
         x_unet = torch.from_numpy(coarse_stack).permute(2, 0, 1).unsqueeze(0).float().to(device)
@@ -299,18 +297,15 @@ def main():
             x_last = x_unet[:, (obs_window - 1) * C : obs_window * C, :, :]
             unet_out = x_last + unet_out
 
-        cascade_norm = unet_out[0].cpu().numpy()  # (C, H, W)
-        cascade_norm = cascade_norm.transpose(1, 2, 0)  # (H, W, C)
+        cascade_norm_out = unet_out[0].cpu().numpy()  # (C, H, W)
+        cascade_norm_out = cascade_norm_out.transpose(1, 2, 0)  # (H, W, C)
 
-        # Denormalize
-        cascade_phys = cascade_norm * (ds_std + 1e-8) + ds_mean  # (H, W, C)
+        # Denormalize both to physical space for metrics
+        coarse_phys = coarse_norm * ds_std + ds_mean     # (H, W, C)
+        cascade_phys = cascade_norm_out * ds_std + ds_mean  # (H, W, C)
 
-        # ── Target: real fine ERA5 ──
-        # We need to find the matching timestep in fine_data
-        # Use the test dataset index to map back
-        # For simplicity, use the aligned time step
+        # ── Target: real fine ERA5 (physical) ──
         t_idx = test_ds.indices[i] if hasattr(test_ds, 'indices') else i
-        # The target is the last AR step
         t_target = t_idx + obs - 1 + args.ar_steps
         if t_target >= ds_info["n_time"]:
             continue
@@ -318,11 +313,11 @@ def main():
         fine_target = np.array(fine_data[t_target], dtype=np.float32)  # (n_lon, n_lat, C)
         fine_target = fine_target.transpose(1, 0, 2)  # (H, W, C)
 
-        # ── Metrics ──
+        # ── Metrics (all in physical units now) ──
         for c in range(C):
             if c in static_ch:
                 continue
-            mse_gnn[c] += np.mean((coarse_up[:, :, c] - fine_target[:, :, c]) ** 2)
+            mse_gnn[c] += np.mean((coarse_phys[:, :, c] - fine_target[:, :, c]) ** 2)
             mse_cascade[c] += np.mean((cascade_phys[:, :, c] - fine_target[:, :, c]) ** 2)
 
         n_samples += 1
