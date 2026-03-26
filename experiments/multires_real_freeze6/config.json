@@ -1,0 +1,71 @@
+{
+  "batch_size": 1,
+  "learning_rate": 1e-4,
+  "num_epochs": 64,
+  "early_stopping_patience": 15,
+  "early_stopping_delta": 1e-5,
+  "wandb_log": false,
+  "random_seed": 42,
+  "use_latitude_weighting": true,
+  "max_ar_steps": 4,
+  "use_residual": false,
+  "roi_only_loss": true,
+  "data_dir": "data/datasets/multires_krsk_19f_real",
+  "freeze_processor_epochs": 6,
+  "finetune_processor_lr_factor": 0.1,
+
+  "graph": {
+    "grid2mesh_edge_creation": "radius",
+    "mesh2grid_edge_creation": "contained",
+    "grid2mesh_radius_query": 0.6,
+    "mesh_levels": [4, 6]
+  },
+
+  "pipeline": {
+    "encoder": {
+      "mlp": {
+        "mlp_hidden_dims": [256, 256],
+        "output_dim": 256,
+        "use_layer_norm": true,
+        "layer_norm_mode": "node"
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [256, 256],
+        "output_dim": 256,
+        "activation": "swish"
+      }
+    },
+    "processor": {
+      "gcn": {
+        "layer_type": "interaction_net",
+        "output_dim": 256,
+        "activation": "swish",
+        "use_layer_norm": true,
+        "num_message_passing_steps": 12,
+        "edge_feature_dim": 4
+      }
+    },
+    "decoder": {
+      "mlp": {
+        "mlp_hidden_dims": [256, 128],
+        "output_dim": 128,
+        "use_layer_norm": false
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [128, 128],
+        "output_dim": 19,
+        "activation": "swish"
+      }
+    }
+  },
+
+  "data": {
+    "dataset_name": "multires",
+    "num_features_used": 19,
+    "obs_window_used": 2,
+    "pred_window_used": 1,
+    "want_feats_flattened": true
+  }
+}
