@@ -48,6 +48,18 @@ from copy import deepcopy
 from src.train import get_lat_weights, weighted_mse_loss, spatial_corr
 
 
+def apply_special_channels(out, prev_state, target_step, static_channels=None, forcing_channels=None):
+    """Carry forward static channels and inject known forcing channels."""
+    if static_channels:
+        prev_last = prev_state[:, :, -1, :]
+        for ch in static_channels:
+            out[:, :, ch] = prev_last[:, :, ch]
+    if forcing_channels and target_step is not None:
+        for ch in forcing_channels:
+            out[:, :, ch] = target_step[:, :, ch]
+    return out
+
+
 def overfit_test(model, dataloader, device, use_residual=False, n_steps=200, lr=0.01):
     """Overfit на 1 сэмпл — если loss падает, модель МОЖЕТ учиться."""
     print("\n" + "="*60)
@@ -130,6 +142,9 @@ def train_dual_epoch(
     device: torch.device,
     lat_weights=None,
     use_residual: bool = False,
+    current_ar_steps: int = 1,
+    static_channels=None,
+    forcing_channels=None,
     check_grads: bool = False,
 ):
     """Один проход обучения DualMeshModel.
@@ -153,32 +168,46 @@ def train_dual_epoch(
 
         N, G, feat_dim = X.shape
         C = feat_dim // model.obs_window
-
-        # Одношаговый: берём первый шаг из y
         total_target_steps = y.shape[-1] // C
-        if total_target_steps > 1:
-            y_step0 = y.view(N, G, total_target_steps, C)[:, :, 0, :]
-        else:
-            y_step0 = y
+        y_steps = y.view(N, G, total_target_steps, C)
+        obs = model.obs_window
+        curr_state = X.view(N, G, obs, C)
+        steps_to_run = min(current_ar_steps, total_target_steps)
 
         optimizer.zero_grad()
 
-        pred = model(X)
-        if pred.dim() == 2:
-            pred = pred.unsqueeze(0)
+        loss = 0.0
+        out_roi = None
+        y_roi = None
 
-        # Residual: model output — delta or full field
-        if use_residual:
-            X_reshaped = X.view(N, G, model.obs_window, C)
-            X_last = X_reshaped[:, :, -1, :]
-            out = X_last + pred
-        else:
-            out = pred
+        for step in range(steps_to_run):
+            inp = curr_state.view(N, G, -1)
+            pred = model(inp)
+            if pred.dim() == 2:
+                pred = pred.unsqueeze(0)
 
-        # Loss ТОЛЬКО по ROI — региональный модуль влияет только на эти точки
-        out_roi = out[:, roi_mask, :]
-        y_roi = y_step0[:, roi_mask, :]
-        loss = weighted_mse_loss(out_roi, y_roi, None)  # lat_weights не нужны для ROI
+            if use_residual:
+                x_last = curr_state[:, :, -1, :]
+                out = x_last + pred
+            else:
+                out = pred
+
+            target = y_steps[:, :, step, :]
+            out = apply_special_channels(
+                out,
+                curr_state,
+                target,
+                static_channels=static_channels,
+                forcing_channels=forcing_channels,
+            )
+
+            out_roi = out[:, roi_mask, :]
+            y_roi = target[:, roi_mask, :]
+            loss = loss + weighted_mse_loss(out_roi, y_roi, None)
+
+            curr_state = torch.cat([curr_state[:, :, 1:, :], out.unsqueeze(2)], dim=2)
+
+        loss = loss / max(steps_to_run, 1)
 
         loss.backward()
 
@@ -214,7 +243,7 @@ def train_dual_epoch(
         # Последний батч — замеряем correction magnitude
         last_out_roi = out_roi.detach()
         last_y_roi = y_roi.detach()
-        last_X = X
+        last_X = curr_state[:, :, -model.obs_window:, :].reshape(N, G, -1)
 
     # Замер коррекции в конце эпохи (по последнему батчу)
     if n_batches > 0:
@@ -248,6 +277,9 @@ def eval_dual(
     device: torch.device,
     lat_weights=None,
     use_residual: bool = False,
+    current_ar_steps: int = 1,
+    static_channels=None,
+    forcing_channels=None,
 ):
     """Оценка на val/test. Loss считается ТОЛЬКО по ROI."""
     model.eval()
@@ -266,40 +298,61 @@ def eval_dual(
             C = feat_dim // model.obs_window
 
             total_target_steps = y.shape[-1] // C
-            if total_target_steps > 1:
-                y_step0 = y.view(N, G, total_target_steps, C)[:, :, 0, :]
-            else:
-                y_step0 = y
+            y_steps = y.view(N, G, total_target_steps, C)
+            obs = model.obs_window
+            corr_state = X.view(N, G, obs, C)
+            glob_state = X.view(N, G, obs, C).clone()
+            steps_to_run = min(current_ar_steps, total_target_steps)
 
-            # --- Corrected prediction ---
-            pred = model(X)
-            if pred.dim() == 2:
-                pred = pred.unsqueeze(0)
+            loss = 0.0
+            global_loss = 0.0
 
-            if use_residual:
-                X_reshaped = X.view(N, G, model.obs_window, C)
-                X_last = X_reshaped[:, :, -1, :]
-                out = X_last + pred
-            else:
-                out = pred
+            for step in range(steps_to_run):
+                target = y_steps[:, :, step, :]
 
-            out_roi = out[:, roi_mask, :]
-            y_roi = y_step0[:, roi_mask, :]
-            loss = weighted_mse_loss(out_roi, y_roi, None)
-            total_loss += loss.item()
+                corr_inp = corr_state.view(N, G, -1)
+                pred = model(corr_inp)
+                if pred.dim() == 2:
+                    pred = pred.unsqueeze(0)
+                if use_residual:
+                    corr_out = corr_state[:, :, -1, :] + pred
+                else:
+                    corr_out = pred
+                corr_out = apply_special_channels(
+                    corr_out,
+                    corr_state,
+                    target,
+                    static_channels=static_channels,
+                    forcing_channels=forcing_channels,
+                )
 
-            # --- Global-only prediction (no regional correction) ---
-            global_pred = model.global_model(X=X, attention_threshold=0.0)
-            if global_pred.dim() == 2:
-                global_pred = global_pred.unsqueeze(0)
-            if use_residual:
-                X_reshaped = X.view(N, G, model.obs_window, C)
-                global_out = X_reshaped[:, :, -1, :] + global_pred
-            else:
-                global_out = global_pred
-            global_roi = global_out[:, roi_mask, :]
-            global_loss = weighted_mse_loss(global_roi, y_roi, None)
-            total_global_loss += global_loss.item()
+                global_inp = glob_state.view(N, G, -1)
+                global_pred = model.global_model(X=global_inp, attention_threshold=0.0)
+                if global_pred.dim() == 2:
+                    global_pred = global_pred.unsqueeze(0)
+                if use_residual:
+                    global_out = glob_state[:, :, -1, :] + global_pred
+                else:
+                    global_out = global_pred
+                global_out = apply_special_channels(
+                    global_out,
+                    glob_state,
+                    target,
+                    static_channels=static_channels,
+                    forcing_channels=forcing_channels,
+                )
+
+                corr_roi = corr_out[:, roi_mask, :]
+                global_roi = global_out[:, roi_mask, :]
+                y_roi = target[:, roi_mask, :]
+                loss = loss + weighted_mse_loss(corr_roi, y_roi, None)
+                global_loss = global_loss + weighted_mse_loss(global_roi, y_roi, None)
+
+                corr_state = torch.cat([corr_state[:, :, 1:, :], corr_out.unsqueeze(2)], dim=2)
+                glob_state = torch.cat([glob_state[:, :, 1:, :], global_out.unsqueeze(2)], dim=2)
+
+            total_loss += (loss / max(steps_to_run, 1)).item()
+            total_global_loss += (global_loss / max(steps_to_run, 1)).item()
 
             n_batches += 1
 
@@ -328,6 +381,8 @@ def main():
                     help="Region of Interest: lat_min lat_max lon_min lon_max")
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--batch-size", type=int, default=None)
+    ap.add_argument("--ar-steps", type=int, default=None,
+                    help="AR rollout horizon for train/val/test. Defaults to config max_ar_steps.")
     ap.add_argument("--overfit-only", action="store_true",
                     help="Run only overfit test (1 sample, 200 steps) and exit")
     args = ap.parse_args()
@@ -351,10 +406,12 @@ def main():
     if data_dir is None:
         data_dir = f"data/datasets/{exp_cfg.data.dataset_name.value}"
 
+    ar_steps = args.ar_steps or max(getattr(exp_cfg, 'max_ar_steps', 1), getattr(exp_cfg.data, 'pred_window_used', 1))
+
     train_ds, val_ds, test_ds, meta = load_chunked_datasets(
         data_path=data_dir,
         obs_window=exp_cfg.data.obs_window_used,
-        pred_steps=1,
+        pred_steps=ar_steps,
         n_features=exp_cfg.data.num_features_used,
     )
 
@@ -433,15 +490,14 @@ def main():
 
     # --- Latitude weights ---
     use_residual = getattr(exp_cfg, 'use_residual', False)
+    static_channels = getattr(exp_cfg, 'static_channels', [])
+    forcing_channels = getattr(exp_cfg, 'forcing_channels', [])
     lat_weights = None
     if getattr(exp_cfg, 'use_latitude_weighting', False) and meta:
         if flat_grid and real_coords is not None:
             lat_weights = get_lat_weights(0, 0, device, flat_lats=real_coords[0])
         else:
             lat_weights = get_lat_weights(meta.num_latitudes, meta.num_longitudes, device)
-
-    # --- Region mask for metrics ---
-    region_mask_np = dual_model.roi_mask.cpu().numpy()
 
     # --- Training loop ---
     num_epochs = args.epochs or exp_cfg.num_epochs
@@ -463,6 +519,7 @@ def main():
         print("\n[--overfit-only] Done. Exiting without full training.")
         return
 
+    _log(f"[AR] training/eval horizon = {ar_steps} step(s) (+{ar_steps*6}h)")
     _log(f"{'epoch':>5}  {'train_loss':>10}  {'val_loss':>10}  {'corr_skill':>10}  {'best':>10}")
     _log("-" * 59)
 
@@ -470,12 +527,18 @@ def main():
         train_loss = train_dual_epoch(
             dual_model, train_loader, optimizer, device,
             lat_weights=lat_weights, use_residual=use_residual,
+            current_ar_steps=ar_steps,
+            static_channels=static_channels,
+            forcing_channels=forcing_channels,
             check_grads=(epoch == 0),
         )
 
         val_loss, correction_skill = eval_dual(
             dual_model, val_loader, device,
             lat_weights=lat_weights, use_residual=use_residual,
+            current_ar_steps=ar_steps,
+            static_channels=static_channels,
+            forcing_channels=forcing_channels,
         )
 
         improved = ""
@@ -509,6 +572,9 @@ def main():
     test_loss, test_skill = eval_dual(
         dual_model, test_loader, device,
         lat_weights=lat_weights, use_residual=use_residual,
+        current_ar_steps=ar_steps,
+        static_channels=static_channels,
+        forcing_channels=forcing_channels,
     )
     _log(f"\n[TEST] loss={test_loss:.6f}  correction_skill={test_skill:.2%}")
 
@@ -522,6 +588,7 @@ def main():
         "reg_steps": args.reg_steps,
         "cross_k": args.cross_k,
         "hidden_dim": args.hidden_dim,
+        "ar_steps": ar_steps,
     }
     save_to_json_file(results, os.path.join(results_dir, "results.json"))
     _log(f"Results saved to {results_dir}")

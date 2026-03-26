@@ -7,7 +7,7 @@
   "wandb_log": false,
   "random_seed": 42,
   "use_latitude_weighting": true,
-  "max_ar_steps": 1,
+  "max_ar_steps": 4,
   "use_residual": false,
   "data_dir": "data/datasets/multires_krsk_19f",
 
@@ -62,7 +62,7 @@
     "dataset_name": "multires",
     "num_features_used": 19,
     "obs_window_used": 2,
-    "pred_window_used": 1,
+    "pred_window_used": 4,
     "want_feats_flattened": true
   }
 }
