@@ -168,6 +168,7 @@ def main():
         gnn_ckpt = gnn_dir / "checkpoint.pth"
     state = torch.load(gnn_ckpt, map_location=device)
     gnn_model.load_state_dict(state, strict=False)
+    gnn_model = gnn_model.to(device)  # move registered buffers (edge features) to GPU
     gnn_model.eval()
     print(f"[GNN] Loaded from {gnn_ckpt}")
 
@@ -215,6 +216,7 @@ def main():
     ds_cfg = json.load(open(ds_cfg_path)) if ds_cfg_path.exists() else {}
     obs_window = ds_cfg.get("obs_window", 2)
     base_filters = ds_cfg.get("base_filters", 64)
+    ds_residual = ds_cfg.get("residual", False)
 
     in_channels = obs_window * C + n_static
     unet = WeatherUNet(in_channels=in_channels, out_channels=C,
@@ -243,7 +245,7 @@ def main():
     n_samples = 0
 
     print(f"\n[Inference] AR={args.ar_steps}, samples={min(args.max_samples, len(test_ds))}, "
-          f"residual={use_residual}")
+          f"gnn_residual={use_residual}, unet_residual={ds_residual}")
 
     for i, (X, Y) in enumerate(test_loader):
         if i >= args.max_samples:
@@ -291,6 +293,12 @@ def main():
 
         with torch.no_grad():
             unet_out = unet(x_unet)  # (1, C, H, W)
+
+        if ds_residual:
+            # UNet predicts delta — add last coarse frame (normalized)
+            x_last = x_unet[:, (obs_window - 1) * C : obs_window * C, :, :]
+            unet_out = x_last + unet_out
+
         cascade_norm = unet_out[0].cpu().numpy()  # (C, H, W)
         cascade_norm = cascade_norm.transpose(1, 2, 0)  # (H, W, C)
 
