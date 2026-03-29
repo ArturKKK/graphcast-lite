@@ -725,3 +725,81 @@ class DualMeshModel(nn.Module):
         output = global_pred + correction_full
 
         return output
+
+    # ── Cached training support (AR=1) ──────────────────────────────────
+
+    @torch.no_grad()
+    def precompute_global(self, X: torch.Tensor) -> dict:
+        """Run global model once, extract only what regional module needs.
+
+        Returns a dict of **CPU** tensors (to free GPU memory for training).
+        Used for AR=1 cached training: precompute once, train regional fast.
+
+        Cache per sample: ~4 MB (vs ~200 MB for full latents).
+        """
+        assert X.shape[0] == 1
+        global_pred, grid_latent, mesh_latent = (
+            self.global_model.forward_with_latents(X=X, attention_threshold=0.0)
+        )
+
+        half_E = self.cross_edge_index.shape[1] // 2
+        g2r_senders = self.cross_edge_index[0, :half_E]
+
+        return {
+            'global_pred_roi': global_pred[self.roi_mask].cpu(),     # (n_roi, C)
+            'roi_grid_latent': grid_latent[self.roi_mask].cpu(),     # (n_roi, D)
+            'cross_sender_feat': mesh_latent[g2r_senders].cpu(),     # (half_E, D)
+        }
+
+    def forward_cached(
+        self,
+        roi_raw: torch.Tensor,
+        global_pred_roi: torch.Tensor,
+        roi_grid_latent: torch.Tensor,
+        cross_sender_feat: torch.Tensor,
+    ) -> torch.Tensor:
+        """Forward using precomputed global outputs. Skips global model entirely.
+
+        Returns: (n_roi, C) — prediction for ROI grid points only.
+        """
+        roi_input = torch.cat([roi_raw, roi_grid_latent], dim=-1)
+
+        # Regional encoding
+        reg_mesh_features = self.reg_encoder(
+            grid_features=roi_input,
+            edge_index=self.reg_encoding_edges,
+            n_mesh_nodes=self.n_reg_mesh,
+        )
+
+        # Cross-message with pre-indexed global mesh features
+        half_E = self.cross_edge_index.shape[1] // 2
+        g2r_receivers = self.cross_edge_index[1, :half_E]
+        cross_edge_attr = self.cross_edge_encoder(self.cross_edge_features)[:half_E]
+
+        g2r_input = torch.cat([
+            cross_sender_feat,
+            reg_mesh_features[g2r_receivers],
+            cross_edge_attr,
+        ], dim=-1)
+        g2r_msg = self.cross_message.g2r_edge_mlp(g2r_input)
+        n_reg = reg_mesh_features.shape[0]
+        g2r_agg = scatter(g2r_msg, g2r_receivers, dim=0, dim_size=n_reg, reduce="mean")
+        reg_mesh_features = self.cross_message.norm_reg(reg_mesh_features + g2r_agg)
+
+        # Regional processing
+        reg_mesh_features = self.reg_processor(
+            x=reg_mesh_features,
+            edge_index=self.reg_processing_edges,
+            edge_attr_raw=self.reg_processing_edge_features,
+        )
+
+        # Regional decoding
+        roi_correction = self.reg_decoder(
+            mesh_features=reg_mesh_features,
+            edge_index=self.reg_decoding_edges,
+            n_grid_nodes=self.n_roi_grid,
+            idw_weights=self.dec_idw_weights,
+            grid_features=roi_input,
+        )
+
+        return global_pred_roi + roi_correction

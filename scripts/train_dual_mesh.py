@@ -146,23 +146,24 @@ def train_dual_epoch(
     static_channels=None,
     forcing_channels=None,
     check_grads: bool = False,
+    cache: list = None,
 ):
     """Один проход обучения DualMeshModel.
 
-    КЛЮЧЕВОЕ ОТЛИЧИЕ от старой версии: loss считается ТОЛЬКО по ROI точкам.
-    Это устраняет gradient dilution (раньше 97.9% loss приходилось на
-    замороженные глобальные точки, размывая градиент в ~48 раз).
+    loss считается ТОЛЬКО по ROI точкам.
+
+    If cache is not None: uses precomputed global outputs (forward_cached),
+    skipping the global model entirely. Each epoch is ~30s instead of hours.
     """
     model.train()
-    # Глобальная модель всегда в eval (BatchNorm/Dropout если есть)
     model.global_model.eval()
 
-    roi_mask = model.roi_mask  # (G,) bool tensor on device
+    roi_mask = model.roi_mask
 
     total_loss = 0
     n_batches = 0
 
-    for X, y in dataloader:
+    for batch_idx, (X, y) in enumerate(dataloader):
         X, y = X.to(device), y.to(device)
         y = y.squeeze(0) if y.dim() == 4 else y
 
@@ -170,68 +171,79 @@ def train_dual_epoch(
         C = feat_dim // model.obs_window
         total_target_steps = y.shape[-1] // C
         y_steps = y.view(N, G, total_target_steps, C)
-        obs = model.obs_window
-        curr_state = X.view(N, G, obs, C)
-        steps_to_run = min(current_ar_steps, total_target_steps)
 
         optimizer.zero_grad()
 
-        loss = 0.0
-        out_roi = None
-        y_roi = None
-
-        for step in range(steps_to_run):
-            inp = curr_state.view(N, G, -1)
-            pred = model(inp)
-            if pred.dim() == 2:
-                pred = pred.unsqueeze(0)
-
-            if use_residual:
-                x_last = curr_state[:, :, -1, :]
-                out = x_last + pred
-            else:
-                out = pred
-
-            target = y_steps[:, :, step, :]
-            out = apply_special_channels(
-                out,
-                curr_state,
-                target,
-                static_channels=static_channels,
-                forcing_channels=forcing_channels,
+        if cache is not None:
+            # ── Cached mode: skip global model, AR=1 only ──
+            roi_raw = X[0][roi_mask]  # (n_roi, T*F)
+            c = cache[batch_idx]
+            out_roi = model.forward_cached(
+                roi_raw=roi_raw,
+                global_pred_roi=c['global_pred_roi'].to(device),
+                roi_grid_latent=c['roi_grid_latent'].to(device),
+                cross_sender_feat=c['cross_sender_feat'].to(device),
             )
-
-            out_roi = out[:, roi_mask, :]
+            if use_residual:
+                x_last_roi = X[0, roi_mask, -C:]
+                out_roi = x_last_roi + out_roi
+            target = y_steps[:, :, 0, :]
             y_roi = target[:, roi_mask, :]
-            loss = loss + weighted_mse_loss(out_roi, y_roi, None)
+            loss = weighted_mse_loss(out_roi.unsqueeze(0), y_roi, None)
+        else:
+            # ── Standard mode: full forward with global model ──
+            obs = model.obs_window
+            curr_state = X.view(N, G, obs, C)
+            steps_to_run = min(current_ar_steps, total_target_steps)
+            loss = 0.0
+            out_roi = None
+            y_roi = None
 
-            curr_state = torch.cat([curr_state[:, :, 1:, :], out.unsqueeze(2)], dim=2)
+            for step in range(steps_to_run):
+                inp = curr_state.view(N, G, -1)
+                pred = model(inp)
+                if pred.dim() == 2:
+                    pred = pred.unsqueeze(0)
 
-        loss = loss / max(steps_to_run, 1)
+                if use_residual:
+                    x_last = curr_state[:, :, -1, :]
+                    out = x_last + pred
+                else:
+                    out = pred
+
+                target = y_steps[:, :, step, :]
+                out = apply_special_channels(
+                    out, curr_state, target,
+                    static_channels=static_channels,
+                    forcing_channels=forcing_channels,
+                )
+
+                out_roi = out[:, roi_mask, :]
+                y_roi = target[:, roi_mask, :]
+                loss = loss + weighted_mse_loss(out_roi, y_roi, None)
+
+                curr_state = torch.cat([curr_state[:, :, 1:, :], out.unsqueeze(2)], dim=2)
+
+            loss = loss / max(steps_to_run, 1)
 
         loss.backward()
 
-        # Gradient sanity check (первый батч первой эпохи)
         if check_grads and n_batches == 0:
-            print("[GradCheck] out.requires_grad:", out.requires_grad)
-            # Grad norms для КАЖДОГО модуля — увидим, идут ли градиенты upstream
+            print("[GradCheck] out_roi.requires_grad:", out_roi.requires_grad)
             module_grads = {}
             for name, p in model.named_parameters():
                 if p.requires_grad and p.grad is not None:
                     gn = p.grad.norm().item()
-                    # Группируем по модулю
                     module = name.split('.')[0]
                     if module not in module_grads:
                         module_grads[module] = []
                     module_grads[module].append((name, gn))
-
             for module, grads in sorted(module_grads.items()):
                 max_gn = max(g for _, g in grads)
                 mean_gn = sum(g for _, g in grads) / len(grads)
                 top_param = max(grads, key=lambda x: x[1])
                 print(f"  [{module}] {len(grads)} params, max_grad={max_gn:.6f}, mean_grad={mean_gn:.6f}")
                 print(f"    top: {top_param[0]} = {top_param[1]:.6f}")
-
             if not module_grads:
                 print("  WARNING: все градиенты нулевые!")
 
@@ -240,33 +252,7 @@ def train_dual_epoch(
         total_loss += loss.item()
         n_batches += 1
 
-        # Последний батч — замеряем correction magnitude
-        last_out_roi = out_roi.detach()
-        last_y_roi = y_roi.detach()
-        last_X = curr_state[:, :, -model.obs_window:, :].reshape(N, G, -1)
-
-    # Замер коррекции в конце эпохи (по последнему батчу)
-    if n_batches > 0:
-        with torch.no_grad():
-            model.eval()
-            global_pred = model.global_model(X=last_X, attention_threshold=0.0)
-            if global_pred.dim() == 2:
-                global_pred = global_pred.unsqueeze(0)
-            if use_residual:
-                N_x, G_x, fd = last_X.shape
-                C_x = fd // model.obs_window
-                X_reshaped = last_X.view(N_x, G_x, model.obs_window, C_x)
-                global_out = X_reshaped[:, :, -1, :] + global_pred
-            else:
-                global_out = global_pred
-            global_roi = global_out[:, model.roi_mask, :]
-            correction = last_out_roi - global_roi
-            baseline_loss = weighted_mse_loss(global_roi, last_y_roi, None).item()
-            model.train()
-            model.global_model.eval()
-        print(f"  [Correction] mean_abs={correction.abs().mean().item():.6f}, "
-              f"max_abs={correction.abs().max().item():.4f}, "
-              f"baseline_mse={baseline_loss:.6f}")
+    return total_loss / max(n_batches, 1)
 
     return total_loss / max(n_batches, 1)
 
@@ -280,6 +266,7 @@ def eval_dual(
     current_ar_steps: int = 1,
     static_channels=None,
     forcing_channels=None,
+    cache: list = None,
 ):
     """Оценка на val/test. Loss считается ТОЛЬКО по ROI."""
     model.eval()
@@ -287,78 +274,96 @@ def eval_dual(
     total_global_loss = 0
     n_batches = 0
 
-    roi_mask = model.roi_mask  # (G,) bool tensor on device
+    roi_mask = model.roi_mask
 
     with torch.no_grad():
-        for X, y in dataloader:
+        for batch_idx, (X, y) in enumerate(dataloader):
             X, y = X.to(device), y.to(device)
             y = y.squeeze(0) if y.dim() == 4 else y
 
             N, G, feat_dim = X.shape
             C = feat_dim // model.obs_window
-
             total_target_steps = y.shape[-1] // C
             y_steps = y.view(N, G, total_target_steps, C)
-            obs = model.obs_window
-            corr_state = X.view(N, G, obs, C)
-            glob_state = X.view(N, G, obs, C).clone()
-            steps_to_run = min(current_ar_steps, total_target_steps)
 
-            loss = 0.0
-            global_loss = 0.0
-
-            for step in range(steps_to_run):
-                target = y_steps[:, :, step, :]
-
-                corr_inp = corr_state.view(N, G, -1)
-                pred = model(corr_inp)
-                if pred.dim() == 2:
-                    pred = pred.unsqueeze(0)
-                if use_residual:
-                    corr_out = corr_state[:, :, -1, :] + pred
-                else:
-                    corr_out = pred
-                corr_out = apply_special_channels(
-                    corr_out,
-                    corr_state,
-                    target,
-                    static_channels=static_channels,
-                    forcing_channels=forcing_channels,
+            if cache is not None:
+                # ── Cached mode: AR=1, skip global model ──
+                roi_raw = X[0][roi_mask]
+                c = cache[batch_idx]
+                out_roi = model.forward_cached(
+                    roi_raw=roi_raw,
+                    global_pred_roi=c['global_pred_roi'].to(device),
+                    roi_grid_latent=c['roi_grid_latent'].to(device),
+                    cross_sender_feat=c['cross_sender_feat'].to(device),
                 )
-
-                global_inp = glob_state.view(N, G, -1)
-                global_pred = model.global_model(X=global_inp, attention_threshold=0.0)
-                if global_pred.dim() == 2:
-                    global_pred = global_pred.unsqueeze(0)
                 if use_residual:
-                    global_out = glob_state[:, :, -1, :] + global_pred
-                else:
-                    global_out = global_pred
-                global_out = apply_special_channels(
-                    global_out,
-                    glob_state,
-                    target,
-                    static_channels=static_channels,
-                    forcing_channels=forcing_channels,
-                )
-
-                corr_roi = corr_out[:, roi_mask, :]
-                global_roi = global_out[:, roi_mask, :]
+                    x_last_roi = X[0, roi_mask, -C:]
+                    out_roi = x_last_roi + out_roi
+                target = y_steps[:, :, 0, :]
                 y_roi = target[:, roi_mask, :]
-                loss = loss + weighted_mse_loss(corr_roi, y_roi, None)
-                global_loss = global_loss + weighted_mse_loss(global_roi, y_roi, None)
+                global_pred_roi = c['global_pred_roi'].to(device)
+                if use_residual:
+                    global_pred_roi = X[0, roi_mask, -C:] + global_pred_roi
+                loss = weighted_mse_loss(out_roi.unsqueeze(0), y_roi, None)
+                global_loss = weighted_mse_loss(global_pred_roi.unsqueeze(0), y_roi, None)
+            else:
+                # ── Standard mode ──
+                obs = model.obs_window
+                corr_state = X.view(N, G, obs, C)
+                glob_state = X.view(N, G, obs, C).clone()
+                steps_to_run = min(current_ar_steps, total_target_steps)
+                loss = 0.0
+                global_loss = 0.0
 
-                corr_state = torch.cat([corr_state[:, :, 1:, :], corr_out.unsqueeze(2)], dim=2)
-                glob_state = torch.cat([glob_state[:, :, 1:, :], global_out.unsqueeze(2)], dim=2)
+                for step in range(steps_to_run):
+                    target = y_steps[:, :, step, :]
 
-            total_loss += (loss / max(steps_to_run, 1)).item()
-            total_global_loss += (global_loss / max(steps_to_run, 1)).item()
+                    corr_inp = corr_state.view(N, G, -1)
+                    pred = model(corr_inp)
+                    if pred.dim() == 2:
+                        pred = pred.unsqueeze(0)
+                    if use_residual:
+                        corr_out = corr_state[:, :, -1, :] + pred
+                    else:
+                        corr_out = pred
+                    corr_out = apply_special_channels(
+                        corr_out, corr_state, target,
+                        static_channels=static_channels,
+                        forcing_channels=forcing_channels,
+                    )
 
+                    global_inp = glob_state.view(N, G, -1)
+                    global_pred = model.global_model(X=global_inp, attention_threshold=0.0)
+                    if global_pred.dim() == 2:
+                        global_pred = global_pred.unsqueeze(0)
+                    if use_residual:
+                        global_out = glob_state[:, :, -1, :] + global_pred
+                    else:
+                        global_out = global_pred
+                    global_out = apply_special_channels(
+                        global_out, glob_state, target,
+                        static_channels=static_channels,
+                        forcing_channels=forcing_channels,
+                    )
+
+                    corr_roi = corr_out[:, roi_mask, :]
+                    global_roi = global_out[:, roi_mask, :]
+                    y_roi = target[:, roi_mask, :]
+                    loss = loss + weighted_mse_loss(corr_roi, y_roi, None)
+                    global_loss = global_loss + weighted_mse_loss(global_roi, y_roi, None)
+
+                    corr_state = torch.cat([corr_state[:, :, 1:, :], corr_out.unsqueeze(2)], dim=2)
+                    glob_state = torch.cat([glob_state[:, :, 1:, :], global_out.unsqueeze(2)], dim=2)
+
+                loss = loss / max(steps_to_run, 1)
+                global_loss = global_loss / max(steps_to_run, 1)
+
+            total_loss += loss.item()
+            total_global_loss += global_loss.item()
             n_batches += 1
 
     avg_loss = total_loss / max(n_batches, 1)
     avg_global_loss = total_global_loss / max(n_batches, 1)
-    # correction_skill: how much regional module improves over global-only (ROI MSE reduction)
     correction_skill = 1.0 - avg_loss / avg_global_loss if avg_global_loss > 0 else 0.0
     return avg_loss, correction_skill
 
@@ -385,6 +390,11 @@ def main():
                     help="AR rollout horizon for train/val/test. Defaults to config max_ar_steps.")
     ap.add_argument("--overfit-only", action="store_true",
                     help="Run only overfit test (1 sample, 200 steps) and exit")
+    ap.add_argument("--precompute", action="store_true",
+                    help="Precompute global outputs and cache in RAM. Requires --ar-steps 1. "
+                         "~4 MB/sample. Eliminates global model from training loop.")
+    ap.add_argument("--subsample", type=int, default=1,
+                    help="Use every Nth sample (default: 1 = all). E.g. --subsample 4 → 25%% of data.")
     args = ap.parse_args()
 
     exp_dir = args.experiment_dir
@@ -415,6 +425,20 @@ def main():
         n_features=exp_cfg.data.num_features_used,
     )
 
+    # --- Subsample datasets if requested ---
+    if args.subsample > 1:
+        from torch.utils.data import Subset
+        train_ds = Subset(train_ds, list(range(0, len(train_ds), args.subsample)))
+        val_ds = Subset(val_ds, list(range(0, len(val_ds), args.subsample)))
+        print(f"[Subsample] every {args.subsample}th sample: train={len(train_ds)}, val={len(val_ds)}")
+
+    # --- Validate precompute mode ---
+    if args.precompute:
+        effective_ar = ar_steps
+        if effective_ar != 1:
+            print(f"WARNING: --precompute requires --ar-steps 1, got {effective_ar}. Forcing ar_steps=1.")
+            ar_steps = 1
+
     batch_size = args.batch_size or exp_cfg.batch_size
     use_cuda = device.type == "cuda"
     loader_kwargs = dict(
@@ -422,7 +446,9 @@ def main():
         pin_memory=use_cuda,
         persistent_workers=use_cuda,
     )
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, **loader_kwargs)
+    # With --precompute, cache is indexed sequentially → must disable shuffle
+    train_shuffle = not args.precompute
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=train_shuffle, **loader_kwargs)
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, **loader_kwargs)
     test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False, **loader_kwargs)
 
@@ -519,6 +545,40 @@ def main():
         print("\n[--overfit-only] Done. Exiting without full training.")
         return
 
+    # --- Precompute global outputs (if requested) ---
+    train_cache = None
+    val_cache = None
+    if args.precompute:
+        import time as _time
+        print("\n" + "="*60)
+        print("[Precompute] Caching global model outputs...")
+        print("="*60)
+        dual_model.eval()
+
+        def _build_cache(loader, name):
+            cache = []
+            t0 = _time.time()
+            for i, (X, y) in enumerate(loader):
+                X = X.to(device)
+                c = dual_model.precompute_global(X)
+                cache.append(c)
+                if (i + 1) % 500 == 0:
+                    elapsed = _time.time() - t0
+                    print(f"  {name}: {i+1}/{len(loader)} ({elapsed:.0f}s)")
+            elapsed = _time.time() - t0
+            mem_mb = sum(
+                sum(v.numel() * v.element_size() for v in c.values())
+                for c in cache
+            ) / 1e6
+            print(f"  {name}: {len(cache)} samples cached in {elapsed:.0f}s ({mem_mb:.0f} MB)")
+            return cache
+
+        train_cache = _build_cache(train_loader, "train")
+        val_cache = _build_cache(val_loader, "val")
+        print("[Precompute] Done. Training will skip global model from now on.\n")
+        dual_model.train()
+        dual_model.global_model.eval()
+
     _log(f"[AR] training/eval horizon = {ar_steps} step(s) (+{ar_steps*6}h)")
     _log(f"{'epoch':>5}  {'train_loss':>10}  {'val_loss':>10}  {'corr_skill':>10}  {'best':>10}")
     _log("-" * 59)
@@ -531,6 +591,7 @@ def main():
             static_channels=static_channels,
             forcing_channels=forcing_channels,
             check_grads=(epoch == 0),
+            cache=train_cache,
         )
 
         val_loss, correction_skill = eval_dual(
@@ -539,6 +600,7 @@ def main():
             current_ar_steps=ar_steps,
             static_channels=static_channels,
             forcing_channels=forcing_channels,
+            cache=val_cache,
         )
 
         improved = ""
