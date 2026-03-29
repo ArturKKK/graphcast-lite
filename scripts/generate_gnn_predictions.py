@@ -183,6 +183,12 @@ def main():
 
     print(f"[Target] T={T}, grid={n_lon_fine}×{n_lat_fine}, C={C_ds}")
 
+    # Load GNN scalers for denormalization (GNN output → physical units)
+    gnn_sc = np.load(os.path.join(gnn_data_dir, "scalers.npz"))
+    gnn_mean = gnn_sc["mean"].astype(np.float32)  # (C,)
+    gnn_std  = gnn_sc["std"].astype(np.float32)   # (C,)
+    print(f"[Scalers] GNN mean[:3]={gnn_mean[:3]}, std[:3]={gnn_std[:3]}")
+
     # ── 3. Create output memmap ──
     out_path = ds_dir / "gnn_pred.npy"
     gnn_pred = np.memmap(out_path, dtype=np.float16, mode="w+",
@@ -240,8 +246,11 @@ def main():
                 t_pred = obs + i
 
             if t_pred < T:
+                # Denormalize: GNN-normalized → physical units
+                # (so train_downscaler.py can re-normalize with its own scalers)
+                roi_phys = roi_fine * gnn_std + gnn_mean
                 # Store as (n_lon, n_lat, C) — lon-first to match downscaler format
-                gnn_pred[t_pred] = roi_fine.transpose(1, 0, 2).astype(np.float16)
+                gnn_pred[t_pred] = roi_phys.transpose(1, 0, 2).astype(np.float16)
                 total_generated += 1
 
             if (i + 1) % 200 == 0:

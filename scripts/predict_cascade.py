@@ -201,6 +201,11 @@ def main():
     ds_mean = sc["mean"].astype(np.float32)
     ds_std = sc["std"].astype(np.float32)
 
+    # Load GNN scalers (GNN output is in GNN-normalized space)
+    gnn_sc = np.load(os.path.join(gnn_data_dir, "scalers.npz"))
+    gnn_mean = gnn_sc["mean"].astype(np.float32)
+    gnn_std  = gnn_sc["std"].astype(np.float32)
+
     # Static fields
     static_fine = None
     static_path = ds_data_dir / "static_fine.npy"
@@ -330,12 +335,16 @@ def main():
             fine_target = np.array(fine_data[t_fine], dtype=np.float32)  # (lon, lat, C)
             fine_target = fine_target.transpose(1, 0, 2)  # (H, W, C)
 
-            # Crop GNN output → fine grid (normalized space)
+            # Crop GNN output → fine grid (GNN-normalized space)
             gnn_pred_np = out[0].cpu().numpy()  # (G, C)
-            coarse_norm = crop_and_upsample_roi(
+            coarse_gnn = crop_and_upsample_roi(
                 gnn_pred_np, grid_lats, grid_lons, roi,
                 target_lats, target_lons, flat_grid=flat_grid,
-            )  # (H, W, C) normalized
+            )  # (H, W, C) in GNN-normalized space
+
+            # Convert: GNN-normalized → physical → DS-normalized
+            coarse_phys = coarse_gnn * gnn_std + gnn_mean
+            coarse_norm = (coarse_phys - ds_mean) / ds_std
 
             # UNet refinement
             frames = [coarse_norm] * obs_window
@@ -350,8 +359,7 @@ def main():
                 unet_out = x_last + unet_out
             cascade_norm = unet_out[0].cpu().numpy().transpose(1, 2, 0)  # (H, W, C)
 
-            # Denormalize to physical
-            coarse_phys = coarse_norm * ds_std + ds_mean
+            # Denormalize cascade to physical
             cascade_phys = cascade_norm * ds_std + ds_mean
 
             # Per-channel MSE (skip static)
