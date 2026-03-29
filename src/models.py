@@ -872,3 +872,56 @@ class WeatherPrediction(nn.Module):
         ]
 
         return decoded_grid_node_features
+
+    def forward_with_latents(self, X: torch.Tensor, attention_threshold=0.0, **kwargs):
+        """Forward pass that also returns intermediate latents.
+
+        Identical to forward() but additionally returns grid encoder latents
+        and processed mesh latents — used by DualMeshModel to avoid running
+        encoder+processor twice.
+
+        Returns
+        -------
+        prediction : (N_grid, C)
+        grid_latent : (N_grid, D) — encoder-level grid latents
+        processed_mesh_latent : (N_mesh, D) — mesh latents after processor
+        """
+        X = X.squeeze()
+        if self.use_product_graph:
+            X = X.view(self._num_grid_nodes * self.obs_window, self.num_features)
+            X = self.product_graph_model(X=X, edge_index=self.product_graph)
+            X = X[-self._num_grid_nodes:, :]
+
+        X = self._preprocess_input(grid_node_features=X)
+        encoded_features = self.encoder.forward(X=X, edge_index=self.encoding_graph)
+
+        grid_node_features = encoded_features[:self._num_grid_nodes, :]
+        mesh_node_features = encoded_features[self._num_grid_nodes:, :]
+
+        if self.using_sparse_gat:
+            processed_mesh_node_features, new_edge_index = self.processor.forward(
+                X=mesh_node_features, edge_index=self.processing_graph,
+                attention_threshold=attention_threshold, **kwargs
+            )
+            self.processing_graph = new_edge_index
+        elif self.using_interaction_net:
+            processed_mesh_node_features = self.processor.forward(
+                X=mesh_node_features, edge_index=self.processing_graph,
+                attention_threshold=attention_threshold,
+                edge_attr=self._processing_edge_features,
+            )
+        else:
+            processed_mesh_node_features = self.processor.forward(
+                X=mesh_node_features, edge_index=self.processing_graph,
+                attention_threshold=attention_threshold,
+            )
+
+        processed_features = torch.cat(
+            (grid_node_features, processed_mesh_node_features), dim=0
+        )
+        decoded_grid_node_features = self.decoder.forward(
+            X=processed_features, edge_index=self.decoding_graph,
+        )
+        decoded_grid_node_features = decoded_grid_node_features[:self._num_grid_nodes, :]
+
+        return decoded_grid_node_features, grid_node_features, processed_mesh_node_features

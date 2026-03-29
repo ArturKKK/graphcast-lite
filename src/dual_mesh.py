@@ -668,18 +668,19 @@ class DualMeshModel(nn.Module):
         """
         assert X.shape[0] == 1, f"DualMeshModel supports batch_size=1 only, got {X.shape[0]}"
 
-        # ── 1. Глобальный прогноз (без графа вычислений) ──
+        # ── 1. Глобальный прогноз + латенты ЗА ОДИН ПРОХОД ──
         with torch.no_grad():
-            global_pred = self.global_model(X=X, attention_threshold=attention_threshold, **kwargs)
-
-            # ── 2. Извлекаем PROCESSED глобальные mesh латенты ──
-            X_sq = X[0]  # (G, T*F)
-            global_grid_latent, global_mesh_latent = self._get_global_latents(X_sq)
+            global_pred, global_grid_latent, global_mesh_latent = (
+                self.global_model.forward_with_latents(
+                    X=X, attention_threshold=attention_threshold, **kwargs
+                )
+            )
 
         global_pred = global_pred.detach()
 
         # ── 3. Regional encoding ──
         # ROI grid: raw features + глобальные grid латенты (encoder-level)
+        X_sq = X[0]  # (G, T*F)
         roi_raw = X_sq[self.roi_mask]  # (n_roi, T*F)
         roi_global_latent = global_grid_latent[self.roi_mask]  # (n_roi, D)
         roi_input = torch.cat([roi_raw, roi_global_latent], dim=-1)
