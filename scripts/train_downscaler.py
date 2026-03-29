@@ -9,13 +9,18 @@ scripts/train_downscaler.py
   2. Кропаем ROI и ресайзим до 41×61
   3. UNet восстанавливает мелкомасштабные детали
 
-UNet обучается на парах (coarse ERA5, real ERA5) — не нужно генерировать
-предсказания GNN для всех сэмплов. При инференсе вместо coarse ERA5
-подставляется прогноз GNN.
+Улучшения v2:
+  --gnn-input       Обучать на GNN-предсказаниях (закрывает domain gap)
+  --spectral-weight  FFT L1 loss (против размытия)
+  --gradient-weight  Sobel gradient loss (сохраняет фронты)
+  --input-noise      Gaussian noise σ на вход (робастность)
+  --augment-flip     Горизонтальный flip с p=0.5
 
 Usage:
   python scripts/train_downscaler.py experiments/downscaler_krsk \
-    --data-dir /data/datasets/downscaler_krsk_19f
+    --data-dir /data/datasets/downscaler_krsk_19f \
+    --gnn-input --spectral-weight 0.1 --gradient-weight 0.05 \
+    --input-noise 0.05 --augment-flip
 """
 
 import argparse
@@ -28,6 +33,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
 PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
@@ -42,17 +48,19 @@ from src.unet.model import WeatherUNet
 # ──────────────────────────────────────────────────────────
 class DownscalerDataset(Dataset):
     """
-    Загружает пары (coarse, fine) из memmap файлов.
+    Загружает пары (input, fine) из memmap файлов.
 
-    Для temporal context: вход = obs_window последовательных coarse кадров.
-    Target = fine кадр для последнего (или obs_window-го) timestep.
+    Input source: coarse.npy (ERA5 upsampled) или gnn_pred.npy (GNN output).
+    Target: fine.npy (real 0.25° ERA5).
 
-    X: (obs_window * C, H, W) — coarse
+    X: (obs_window * C, H, W) — input
     Y: (C, H, W) — real fine
     """
 
     def __init__(self, data_dir: str, obs_window: int = 2, split: str = "train",
-                 static_context: bool = True):
+                 static_context: bool = True, use_gnn_input: bool = False,
+                 augment_flip: bool = False, input_noise: float = 0.0,
+                 wind_u_channels: tuple = ()):
         data_dir = Path(data_dir)
 
         with open(data_dir / "dataset_info.json") as f:
@@ -64,10 +72,28 @@ class DownscalerDataset(Dataset):
         self.C = info["n_feat"]     # 19
         self.obs_window = obs_window
         self.static_channels = info.get("static_channels", [])
+        self.augment_flip = augment_flip and (split == "train")
+        self.input_noise = input_noise if (split == "train") else 0.0
+        self.wind_u_channels = wind_u_channels  # channels to negate on flip
 
         shape = (self.T, self.n_lon, self.n_lat, self.C)
-        self.coarse = np.memmap(data_dir / "coarse.npy", dtype=np.float16,
-                                mode="r", shape=shape)
+
+        # Choose input source: GNN predictions or ERA5 coarse
+        if use_gnn_input:
+            gnn_path = data_dir / "gnn_pred.npy"
+            if not gnn_path.exists():
+                raise FileNotFoundError(
+                    f"gnn_pred.npy not found in {data_dir}. "
+                    f"Run generate_gnn_predictions.py first."
+                )
+            self.coarse = np.memmap(gnn_path, dtype=np.float16,
+                                    mode="r", shape=shape)
+            print(f"  [input] Using GNN predictions (gnn_pred.npy)")
+        else:
+            self.coarse = np.memmap(data_dir / "coarse.npy", dtype=np.float16,
+                                    mode="r", shape=shape)
+            print(f"  [input] Using ERA5 coarse (coarse.npy)")
+
         self.fine = np.memmap(data_dir / "fine.npy", dtype=np.float16,
                               mode="r", shape=shape)
 
@@ -135,15 +161,30 @@ class DownscalerDataset(Dataset):
         if self.static_fine is not None:
             static = self.static_fine.transpose(1, 0, 2)  # (H, W, N_static)
             static_t = torch.from_numpy(static.copy()).permute(2, 0, 1).float()  # (N_static, H, W)
-            # Normalize static: z_surf is in meters (÷1000), lsm is 0-1
-            # Simple: just append raw — UNet will figure it out
             X = torch.cat([X, static_t], dim=0)  # (obs*C + N_static, H, W)
+
+        # ── Augmentation: horizontal flip ──
+        if self.augment_flip and torch.rand(1).item() < 0.5:
+            X = X.flip(-1)  # flip W dimension
+            Y = Y.flip(-1)
+            # Negate u-wind channels (eastward becomes westward)
+            for ch in self.wind_u_channels:
+                # Negate in each obs frame
+                for obs_i in range(self.obs_window):
+                    X[obs_i * self.C + ch] = -X[obs_i * self.C + ch]
+                Y[ch] = -Y[ch]
+
+        # ── Augmentation: input noise ──
+        if self.input_noise > 0:
+            n_dynamic = self.obs_window * self.C
+            noise = torch.randn_like(X[:n_dynamic]) * self.input_noise
+            X[:n_dynamic] = X[:n_dynamic] + noise
 
         return X, Y
 
 
 # ──────────────────────────────────────────────────────────
-# Loss
+# Losses
 # ──────────────────────────────────────────────────────────
 def masked_mse_loss(pred, target, channel_mask=None):
     diff = (pred - target) ** 2
@@ -152,10 +193,38 @@ def masked_mse_loss(pred, target, channel_mask=None):
     return diff.mean()
 
 
+def spectral_loss(pred, target, channel_mask=None):
+    """FFT-based L1 loss — penalizes frequency domain differences, prevents blurring."""
+    if channel_mask is not None:
+        mask = channel_mask.view(1, -1, 1, 1)
+        pred = pred * mask
+        target = target * mask
+    pred_fft = torch.fft.rfft2(pred, norm="ortho")
+    tgt_fft = torch.fft.rfft2(target, norm="ortho")
+    return F.l1_loss(torch.abs(pred_fft), torch.abs(tgt_fft))
+
+
+def gradient_loss(pred, target, channel_mask=None):
+    """Sobel-like spatial gradient loss — preserves sharp weather fronts."""
+    pred_dy = pred[:, :, 1:, :] - pred[:, :, :-1, :]
+    pred_dx = pred[:, :, :, 1:] - pred[:, :, :, :-1]
+    tgt_dy = target[:, :, 1:, :] - target[:, :, :-1, :]
+    tgt_dx = target[:, :, :, 1:] - target[:, :, :, :-1]
+    if channel_mask is not None:
+        mask = channel_mask.view(1, -1, 1, 1)
+        loss_dy = ((pred_dy - tgt_dy) ** 2 * mask).mean()
+        loss_dx = ((pred_dx - tgt_dx) ** 2 * mask).mean()
+    else:
+        loss_dy = ((pred_dy - tgt_dy) ** 2).mean()
+        loss_dx = ((pred_dx - tgt_dx) ** 2).mean()
+    return loss_dy + loss_dx
+
+
 # ──────────────────────────────────────────────────────────
 # Training / validation
 # ──────────────────────────────────────────────────────────
-def train_epoch(model, loader, optimizer, device, channel_mask, residual):
+def train_epoch(model, loader, optimizer, device, channel_mask, residual,
+                spectral_weight=0.0, gradient_weight=0.0):
     model.train()
     total_loss = 0
     for X, Y in loader:
@@ -165,13 +234,17 @@ def train_epoch(model, loader, optimizer, device, channel_mask, residual):
         out = model(X)  # (B, C, H, W)
 
         if residual:
-            # Add to last coarse frame: channels [(obs-1)*C : obs*C]
             C = Y.shape[1]
-            obs_end = (X.shape[1] // C) * C  # skip static channels at end
+            obs_end = (X.shape[1] // C) * C
             x_last = X[:, obs_end - C:obs_end, :, :]
             out = x_last + out
 
         loss = masked_mse_loss(out, Y, channel_mask)
+        if spectral_weight > 0:
+            loss = loss + spectral_weight * spectral_loss(out, Y, channel_mask)
+        if gradient_weight > 0:
+            loss = loss + gradient_weight * gradient_loss(out, Y, channel_mask)
+
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
@@ -244,6 +317,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("experiment_dir", help="e.g. experiments/downscaler_krsk")
     ap.add_argument("--data-dir", required=True, help="Path to downscaler dataset")
+    # v2 improvements
+    ap.add_argument("--gnn-input", action="store_true",
+                    help="Use GNN predictions (gnn_pred.npy) instead of ERA5 coarse")
+    ap.add_argument("--spectral-weight", type=float, default=0.0,
+                    help="Weight for FFT spectral loss (e.g. 0.1)")
+    ap.add_argument("--gradient-weight", type=float, default=0.0,
+                    help="Weight for spatial gradient loss (e.g. 0.05)")
+    ap.add_argument("--input-noise", type=float, default=0.0,
+                    help="Gaussian noise σ added to input (e.g. 0.05)")
+    ap.add_argument("--augment-flip", action="store_true",
+                    help="Random horizontal flip augmentation")
     args = ap.parse_args()
 
     exp_dir = Path(args.experiment_dir)
@@ -275,10 +359,32 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
+    # Wind u-component channel indices (negate on horizontal flip)
+    # Detect from variable names
+    vars_path = Path(args.data_dir) / "variables.json"
+    var_names_list = json.load(open(vars_path)) if vars_path.exists() else []
+    wind_u_channels = tuple(
+        i for i, v in enumerate(var_names_list)
+        if v in ("10u", "u@850", "u@500")
+    )
+    if args.augment_flip and wind_u_channels:
+        print(f"Wind-u channels to negate on flip: {wind_u_channels}")
+
     # ── Datasets ──
-    train_ds = DownscalerDataset(args.data_dir, obs_window, "train", static_context)
-    val_ds = DownscalerDataset(args.data_dir, obs_window, "val", static_context)
-    test_ds = DownscalerDataset(args.data_dir, obs_window, "test", static_context)
+    ds_kwargs = dict(
+        obs_window=obs_window,
+        static_context=static_context,
+        use_gnn_input=args.gnn_input,
+    )
+    train_ds = DownscalerDataset(
+        args.data_dir, split="train",
+        augment_flip=args.augment_flip,
+        input_noise=args.input_noise,
+        wind_u_channels=wind_u_channels,
+        **ds_kwargs,
+    )
+    val_ds = DownscalerDataset(args.data_dir, split="val", **ds_kwargs)
+    test_ds = DownscalerDataset(args.data_dir, split="test", **ds_kwargs)
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True,
                               num_workers=4, pin_memory=True, drop_last=True)
@@ -324,8 +430,13 @@ def main():
         with open(log_path, "a") as f:
             f.write(msg + "\n")
 
+    sw = args.spectral_weight
+    gw = args.gradient_weight
+
     _log(f"=== Downscaler training started: {datetime.now().isoformat()} ===")
     _log(f"data_dir={args.data_dir}  epochs={num_epochs}  batch={batch_size}  lr={lr}")
+    _log(f"gnn_input={args.gnn_input}  spectral_w={sw}  gradient_w={gw}  "
+         f"noise={args.input_noise}  flip={args.augment_flip}")
     _log(f"{'epoch':>5}  {'train_loss':>10}  {'val_loss':>10}  {'best':>10}  {'lr':>8}")
     _log("-" * 55)
 
@@ -333,7 +444,8 @@ def main():
         t0 = datetime.now()
 
         train_loss = train_epoch(model, train_loader, optimizer, device,
-                                 channel_mask, residual)
+                                 channel_mask, residual,
+                                 spectral_weight=sw, gradient_weight=gw)
         val_loss = validate(model, val_loader, device, channel_mask, residual, C)
         scheduler.step()
 

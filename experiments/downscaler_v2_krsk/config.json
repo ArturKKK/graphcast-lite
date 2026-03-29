@@ -1,0 +1,19 @@
+{
+  "num_features": 19,
+  "obs_window": 2,
+  "batch_size": 32,
+  "learning_rate": 1e-3,
+  "num_epochs": 150,
+  "patience": 30,
+  "base_filters": 64,
+  "static_context": true,
+  "residual": true,
+  "static_channels": [7, 8],
+  "random_seed": 42,
+  "gnn_input": true,
+  "spectral_weight": 0.1,
+  "gradient_weight": 0.05,
+  "input_noise": 0.05,
+  "augment_flip": true,
+  "notes": "v2: GNN input (closes domain gap) + spectral/gradient losses + augmentation"
+}
