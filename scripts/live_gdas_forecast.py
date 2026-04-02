@@ -25,6 +25,10 @@ from src.config import ExperimentConfig
 from src.constants import FileNames
 from src.data.data_configs import DatasetMetadata
 from src.main import load_model_from_experiment_config
+from src.postprocessing.mos_correction import (
+    apply_mos_t2m, load_mos_table,
+    apply_learned_mos_t2m, load_learned_mos,
+)
 from src.utils import load_from_json_file
 
 CITY_BBOX = (55.5, 56.5, 92.0, 94.0)
@@ -88,6 +92,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-lookback-cycles", type=int, default=12)
     parser.add_argument("--timeout", type=int, default=600)
     parser.add_argument("--keep-grib", action="store_true")
+    parser.add_argument("--mos-table", default=None,
+                        help="Path to MOS bias correction JSON (from build_mos_table.py). "
+                             "If provided, t2m predictions are corrected for station bias.")
+    parser.add_argument("--learned-mos", default=None,
+                        help="Path to learned MOS model (.joblib from build_learned_mos.py). "
+                             "ML-based t2m correction (overrides --mos-table if both given).")
     parser.add_argument("--cycle", default=None, help="Optional cycle anchor in ISO form, e.g. 2026-03-23T12:00:00+00:00")
     args = parser.parse_args()
     if args.data_dir is None and args.runtime_bundle is None:
@@ -644,6 +654,43 @@ def main() -> None:
     prediction_norm = torch.cat(ar_outs, dim=2).squeeze(0).numpy().reshape(G, args.ar_steps, C)
     prediction_phys = denormalize_prediction(prediction_norm, y_mean[:C], y_std[:C])
 
+    # --- MOS bias correction ---
+    mos_table = None
+    learned_mos_bundle = None
+    last_cycle = cycles[-1]
+    forecast_valid_times = [
+        last_cycle + timedelta(hours=6 * (step + 1))
+        for step in range(args.ar_steps)
+    ]
+
+    # Learned MOS takes priority over static MOS
+    if args.learned_mos:
+        lmos_path = Path(args.learned_mos)
+        if lmos_path.exists():
+            learned_mos_bundle = load_learned_mos(lmos_path)
+            prediction_phys = apply_learned_mos_t2m(
+                prediction_phys, var_order, learned_mos_bundle,
+                latitudes, longitudes, forecast_valid_times,
+            )
+            print(f"[Learned MOS] Applied ML t2m correction from {lmos_path.name}")
+            print(f"  Test MAE: {learned_mos_bundle.get('test_mae', '?')}°C")
+        else:
+            print(f"[Learned MOS] WARNING: model not found at {lmos_path}, skipping")
+    elif args.mos_table:
+        mos_path = Path(args.mos_table)
+        if mos_path.exists():
+            mos_table = load_mos_table(mos_path)
+            prediction_phys = apply_mos_t2m(
+                prediction_phys, var_order, mos_table, forecast_valid_times,
+            )
+            print(f"[MOS] Applied t2m bias correction from {mos_path.name}")
+            for vt in forecast_valid_times:
+                from src.postprocessing.mos_correction import get_t2m_bias
+                bias = get_t2m_bias(mos_table, vt)
+                print(f"  +{(forecast_valid_times.index(vt)+1)*6:02d}h ({vt.strftime('%H:%MZ')}): bias={bias:+.2f}°C")
+        else:
+            print(f"[MOS] WARNING: table not found at {mos_path}, skipping correction")
+
     payload = {
         "cycles": [cycle.isoformat() for cycle in cycles],
         "var_names": var_order,
@@ -657,6 +704,8 @@ def main() -> None:
         "checkpoint": str(ckpt_path),
         "data_dir": str(data_dir),
         "runtime_bundle": str(runtime_bundle_dir) if runtime_bundle_dir else None,
+        "mos_applied": mos_table is not None,
+        "learned_mos_applied": learned_mos_bundle is not None,
     }
     torch.save(payload, out_dir / "forecast.pt")
 
