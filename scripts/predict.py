@@ -303,9 +303,7 @@ def main():
             print("[DA] Используем y_test как наблюдения.")
 
     oi_solver = None
-    if args.assim_method == "oi":
-        lats, lons = read_coords(meta, data_dir)
-        oi_solver = OptimalInterpolation(lats, lons, args.oi_sigma_b, args.oi_sigma_o, args.oi_corr_len, device)
+    _oi_pending = (args.assim_method == "oi")  # будет создан после region_idxs
 
     # --- boundary setup ---
     boundary_mask, background_data = None, None
@@ -363,6 +361,20 @@ def main():
         lats, lons = read_coords(meta, data_dir)
         region_idxs = region_node_indices(*args.region, lats, lons)
         print(f"[Region] {len(region_idxs)} nodes")
+
+    # --- OI init (после region_idxs, чтобы знать ROI) ---
+    if _oi_pending:
+        lats, lons = read_coords(meta, data_dir)
+        is_flat = getattr(meta, 'flat_grid', False)
+        oi_roi_idx = None
+        if is_flat and region_idxs is not None:
+            oi_roi_idx = region_idxs
+        elif is_flat and getattr(meta, 'is_regional', None) is not None:
+            oi_roi_idx = np.where(meta.is_regional)[0]
+        oi_solver = OptimalInterpolation(
+            lats, lons, args.oi_sigma_b, args.oi_sigma_o, args.oi_corr_len, device,
+            flat_grid=is_flat, roi_idx=oi_roi_idx
+        )
 
     # --- streaming metrics (без хранения всех тензоров) ---
     no_loss_ch = sorted(set(static_ch) | set(forcing_ch))

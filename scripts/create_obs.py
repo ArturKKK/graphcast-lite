@@ -14,6 +14,11 @@ def main():
     parser.add_argument("--sparsity", type=float, default=0.1, help="Доля точек (0.1 = 10%)")
     parser.add_argument("--vars", type=str, default="all", help="Переменные через запятую (напр. 't2m,10u') или 'all'")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--roi", nargs=4, type=float, default=None,
+                        metavar=("LAT_MIN", "LAT_MAX", "LON_MIN", "LON_MAX"),
+                        help="Ограничить станции регионом (для multires). Нужен --coords-path.")
+    parser.add_argument("--coords-path", type=str, default=None,
+                        help="Путь к coords.npz (для --roi на flat grid)")
     
     args = parser.parse_args()
     
@@ -76,11 +81,35 @@ def main():
     
     # 3. Выбираем случайные точки (Sparsity)
     np.random.seed(args.seed)
-    num_stations = int(G * args.sparsity)
+
+    # Если задан ROI — станции только внутри региона
+    candidate_indices = np.arange(G)
+    if args.roi is not None:
+        lat_min, lat_max, lon_min, lon_max = args.roi
+        if args.coords_path is None:
+            print("ОШИБКА: --roi требует --coords-path (coords.npz)")
+            return
+        coords = np.load(args.coords_path)
+        c_lats = coords["latitude"].astype(np.float32)
+        c_lons = coords["longitude"].astype(np.float32)
+        if c_lats.ndim == 1 and len(c_lats) == G:
+            # Flat grid (multires): координаты per-node
+            roi_mask = ((c_lats >= lat_min) & (c_lats <= lat_max) &
+                        (c_lons >= lon_min) & (c_lons <= lon_max))
+        else:
+            # Regular grid: meshgrid
+            lon_grid, lat_grid = np.meshgrid(c_lons, c_lats)
+            roi_mask = ((lat_grid.ravel() >= lat_min) & (lat_grid.ravel() <= lat_max) &
+                        (lon_grid.ravel() >= lon_min) & (lon_grid.ravel() <= lon_max))
+        candidate_indices = np.where(roi_mask)[0]
+        print(f"[ROI] {len(candidate_indices)} узлов в регионе "
+              f"[{lat_min:.0f}-{lat_max:.0f}°N, {lon_min:.0f}-{lon_max:.0f}°E]")
+
+    num_stations = int(len(candidate_indices) * args.sparsity)
     if num_stations == 0: num_stations = 1 
     
-    station_indices = np.random.choice(G, num_stations, replace=False)
-    print(f"Выбрано {num_stations} 'станций' из {G} узлов ({args.sparsity*100}%)")
+    station_indices = np.random.choice(candidate_indices, num_stations, replace=False)
+    print(f"Выбрано {num_stations} 'станций' из {len(candidate_indices)} узлов ({args.sparsity*100}%)")
     
     # 4. Определяем индексы переменных
     if args.vars == "all":
