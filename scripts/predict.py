@@ -407,7 +407,6 @@ def main():
     _obs_channel_indices = None
     if args.obs_channels is not None:
         vars_path = data_dir / "variables.json"
-        import json
         all_vars = json.loads(vars_path.read_text())
         requested = [v.strip() for v in args.obs_channels.split(",")]
         _obs_channel_indices = []
