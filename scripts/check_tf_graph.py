@@ -1,8 +1,11 @@
 """Diagnostic: compare checkpoint graph edges with rebuilt graph for timeforce model."""
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 import torch
 from src.main import load_model_from_experiment_config
-from src.data.data_configs import ExperimentConfig, DatasetMetadata
+from src.config import ExperimentConfig
+from src.data.data_configs import DatasetMetadata
 from src.utils import load_from_json_file
 
 cfg = ExperimentConfig(**load_from_json_file("experiments/region_krsk_23f_timeforce/config.json"))
