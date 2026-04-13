@@ -116,7 +116,7 @@ class OptimalInterpolation:
                 K = BH_T @ inv_term
 
                 innovation = y_obs_val - (H @ x_b_roi)
-                x_a[self.roi_idx, c] = x_b_roi + (K @ innovation)
+                x_a[self.roi_idx, c] = (x_b_roi + (K @ innovation)).to(x_a.device)
             else:
                 # Full-grid mode (original)
                 obs_mask = ~torch.isnan(y_o[:, c])
@@ -139,6 +139,6 @@ class OptimalInterpolation:
                 K = BH_T @ inv_term
 
                 innovation = y_obs_val - (H @ x_b_vec)
-                x_a[:, c] = x_b_vec + (K @ innovation)
+                x_a[:, c] = (x_b_vec + (K @ innovation)).to(x_a.device)
 
         return x_a.view(input_shape)
