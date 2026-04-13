@@ -164,6 +164,15 @@ def main():
     ap.add_argument("--background-path", type=str, default=None)
     ap.add_argument("--taper-width", type=int, default=5)
 
+    # --- Inline sparse obs (альтернатива --obs-path) ---
+    ap.add_argument("--obs-sparsity", type=float, default=None,
+                    help="Доля станций для inline DA (напр. 0.01=1%%, 0.1=10%%). "
+                         "Создаёт sparse obs из ground truth в цикле — без y_test.pt.")
+    ap.add_argument("--obs-seed", type=int, default=42,
+                    help="Seed для выбора позиций станций при --obs-sparsity")
+    ap.add_argument("--obs-roi-only", action="store_true",
+                    help="Станции только в ROI (требует region_idxs)")
+
     args = ap.parse_args()
 
     exp_dir = args.experiment_dir
@@ -376,6 +385,21 @@ def main():
             flat_grid=is_flat, roi_idx=oi_roi_idx
         )
 
+    # --- Inline sparse observations (--obs-sparsity) ---
+    _station_indices = None
+    if args.obs_sparsity is not None and args.assim_method != "none":
+        rng = np.random.RandomState(args.obs_seed)
+        if args.obs_roi_only and region_idxs is not None:
+            candidate_pool = region_idxs
+        elif getattr(meta, 'is_regional', None) is not None:
+            candidate_pool = np.where(meta.is_regional)[0]
+        else:
+            candidate_pool = np.arange(G)
+        n_stations = max(1, int(len(candidate_pool) * args.obs_sparsity))
+        _station_indices = rng.choice(candidate_pool, n_stations, replace=False)
+        _station_indices.sort()
+        print(f"[Inline-obs] {n_stations} станций ({args.obs_sparsity*100:.1f}% от {len(candidate_pool)} узлов, seed={args.obs_seed})")
+
     # --- streaming metrics (без хранения всех тензоров) ---
     no_loss_ch = sorted(set(static_ch) | set(forcing_ch))
     sm_pred = StreamingMetrics(C, exclude_channels=no_loss_ch)
@@ -425,6 +449,11 @@ def main():
             X_last = X.squeeze(0)[:, -C:].repeat(1, effective_P)  # persistence baseline
 
             obs_i = y if observations is None else observations[i]
+
+            # Inline sparse obs: маскируем ground truth → NaN кроме станций
+            if _station_indices is not None:
+                obs_i = torch.full_like(y, float('nan'))
+                obs_i[_station_indices] = y[_station_indices]
 
             X = X.to(device)
 
