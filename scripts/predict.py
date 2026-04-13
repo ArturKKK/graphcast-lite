@@ -172,6 +172,9 @@ def main():
                     help="Seed для выбора позиций станций при --obs-sparsity")
     ap.add_argument("--obs-roi-only", action="store_true",
                     help="Станции только в ROI (требует region_idxs)")
+    ap.add_argument("--obs-channels", type=str, default=None,
+                    help="Имена переменных для наблюдений через запятую (напр. 't2m,10u,10v'). "
+                         "Остальные каналы будут NaN на станциях. По умолчанию — все каналы.")
 
     args = ap.parse_args()
 
@@ -400,6 +403,21 @@ def main():
         _station_indices.sort()
         print(f"[Inline-obs] {n_stations} станций ({args.obs_sparsity*100:.1f}% от {len(candidate_pool)} узлов, seed={args.obs_seed})")
 
+    # --- Маска каналов для наблюдений (--obs-channels) ---
+    _obs_channel_indices = None
+    if args.obs_channels is not None:
+        vars_path = data_dir / "variables.json"
+        import json
+        all_vars = json.loads(vars_path.read_text())
+        requested = [v.strip() for v in args.obs_channels.split(",")]
+        _obs_channel_indices = []
+        for v in requested:
+            if v in all_vars:
+                _obs_channel_indices.append(all_vars.index(v))
+            else:
+                print(f"[WARN] переменная '{v}' не найдена в {all_vars}")
+        print(f"[Obs-channels] наблюдаем {len(_obs_channel_indices)}/{C} каналов: {requested}")
+
     # --- streaming metrics (без хранения всех тензоров) ---
     no_loss_ch = sorted(set(static_ch) | set(forcing_ch))
     sm_pred = StreamingMetrics(C, exclude_channels=no_loss_ch)
@@ -454,6 +472,13 @@ def main():
             if _station_indices is not None:
                 obs_i = torch.full_like(y, float('nan'))
                 obs_i[_station_indices] = y[_station_indices]
+                # Маскируем ненаблюдаемые каналы (--obs-channels)
+                if _obs_channel_indices is not None:
+                    obs_flat = obs_i.view(obs_i.shape[0], -1, C)  # [G, steps, C]
+                    mask = torch.ones(C, dtype=torch.bool)
+                    mask[_obs_channel_indices] = False
+                    obs_flat[:, :, mask] = float('nan')
+                    obs_i = obs_flat.view(obs_i.shape)
 
             X = X.to(device)
 
