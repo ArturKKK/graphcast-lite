@@ -162,6 +162,9 @@ def main():
         region_bounds=ROI, mesh_buffer=15.0, flat_grid=True,
     )
     state = torch.load(ckpt_path, map_location=device, weights_only=True)
+    # Pruned mesh changes edge features — remove from state_dict (recomputed at init)
+    state = {k: v for k, v in state.items()
+             if not k.startswith("_processing_edge_features")}
     gnn_model.load_state_dict(state, strict=False)
     gnn_model.eval()
     print(f"  GNN loaded on {device}")
