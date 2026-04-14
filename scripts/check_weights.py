@@ -3,10 +3,11 @@
 import sys, os, torch, numpy as np
 sys.path.insert(0, ".")
 from src.config import ExperimentConfig
+from src.utils import load_from_json_file
 from src.main import load_model_from_experiment_config
 from src.data.dataloader_chunked import load_chunked_datasets
 
-cfg = ExperimentConfig.from_json("experiments/multires_real_freeze6/config.json")
+cfg = ExperimentConfig(**load_from_json_file("experiments/multires_real_freeze6/config.json"))
 _, _, _, meta = load_chunked_datasets(
     "data/datasets/multires_krsk_19f_real", obs_window=2, pred_steps=1, n_features=19
 )
