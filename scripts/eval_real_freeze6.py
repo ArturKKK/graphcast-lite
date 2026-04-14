@@ -117,8 +117,10 @@ def main():
         current_input = x_tensor
         for ar in range(AR):
             with torch.no_grad():
-                pred = gnn_model(current_input, attention_threshold=0.0)  # (1, N, C)
-            pred_np = pred.cpu().numpy().squeeze(0)  # (N, C)
+                pred = gnn_model(current_input, attention_threshold=0.0)
+            pred_np = pred.cpu().numpy()
+            while pred_np.ndim > 2:
+                pred_np = pred_np[0]  # squeeze batch dims to get (N, C)
 
             if ar == 0:
                 # GT for step 0 is y_true_all[0]
@@ -151,14 +153,19 @@ def main():
             mse_persist[ar] += ((persist_reg - gt_reg) ** 2).mean(axis=0)
 
             # Prepare next step input
+            # pred shape may be (N,C) or (1,N,C)
+            pred_2d = pred.squeeze()  # → (N, C)
+            if pred_2d.ndim == 1:
+                pred_2d = pred_2d.unsqueeze(-1)
             if use_residual:
-                full_pred = current_input[0, -1] + pred.squeeze(0)
+                full_pred = current_input[0, -1] + pred_2d
             else:
-                full_pred = pred.squeeze(0)
+                full_pred = pred_2d
 
+            # current_input: (1, OBS, N, C)
             current_input = torch.cat([
                 current_input[:, 1:, :, :],
-                full_pred.unsqueeze(0).unsqueeze(1)
+                full_pred.unsqueeze(0).unsqueeze(0)
             ], dim=1)
 
         count += 1
