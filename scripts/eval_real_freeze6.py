@@ -104,45 +104,39 @@ def main():
     count = 0
     t0 = time.time()
 
+    # ChunkDataset format: x=(N, OBS*C), y=(N, C)
+    # Model input: (1, N, OBS*C), output: (N, C)
+
     for si, idx in enumerate(sample_indices):
-        sample = test_ds[idx]
-        x_tensor = sample[0].unsqueeze(0).to(device)  # (1, OBS, N, C)
-        y_true_all = sample[1].cpu().numpy()           # (1, N, C) flat
+        x_flat, y_true = test_ds[idx]
+        # x_flat: (N, OBS*C=38), y_true: (N, C=19)
 
-        # Reshape y_true_all if needed
-        if y_true_all.ndim == 2:
-            y_true_all = y_true_all[np.newaxis, :]  # (1, N, C)
+        # Persistence = last obs frame (channels C..2C in flattened input)
+        persist_norm = x_flat[:, C:].numpy()  # (N, C) — last frame
+        persist_phys = persist_norm * y_std + y_mean
 
-        # AR rollout
-        current_input = x_tensor
+        gt = y_true.numpy()  # (N, C) normalized
+
+        current_input = x_flat.unsqueeze(0).to(device)  # (1, N, 38)
+
         for ar in range(AR):
             with torch.no_grad():
                 pred = gnn_model(current_input, attention_threshold=0.0)
             pred_np = pred.cpu().numpy()
             while pred_np.ndim > 2:
-                pred_np = pred_np[0]  # squeeze batch dims to get (N, C)
+                pred_np = pred_np[0]  # → (N, C)
 
-            if ar == 0:
-                # GT for step 0 is y_true_all[0]
-                gt = y_true_all[0] if y_true_all.shape[0] > 0 else y_true_all.squeeze(0)
-            else:
-                # For AR > 0, we need next timestep GT
+            if ar > 0:
+                # GT for step ar: need idx + ar
                 next_idx = idx + ar
                 if next_idx >= len(test_ds):
                     break
-                next_sample = test_ds[next_idx]
-                gt = next_sample[1].cpu().numpy()
-                if gt.ndim == 3:
-                    gt = gt[0]
+                _, y_next = test_ds[next_idx]
+                gt = y_next.numpy()
 
             # Physical units
             pred_phys = pred_np * y_std + y_mean
             gt_phys = gt * y_std + y_mean
-
-            # Persistence baseline (last obs frame)
-            if ar == 0:
-                persist_norm = x_tensor[0, -1].cpu().numpy()  # (N, C)
-            persist_phys = persist_norm * y_std + y_mean
 
             # Regional MSE
             pred_reg = pred_phys[region_idx]
@@ -152,21 +146,19 @@ def main():
             mse_region[ar] += ((pred_reg - gt_reg) ** 2).mean(axis=0)
             mse_persist[ar] += ((persist_reg - gt_reg) ** 2).mean(axis=0)
 
-            # Prepare next step input
-            # pred shape may be (N,C) or (1,N,C)
-            pred_2d = pred.squeeze()  # → (N, C)
-            if pred_2d.ndim == 1:
-                pred_2d = pred_2d.unsqueeze(-1)
+            # Prepare next AR step input: shift window
             if use_residual:
-                full_pred = current_input[0, -1] + pred_2d
+                new_frame = current_input[0, :, C:] + pred  # add residual to last frame
             else:
-                full_pred = pred_2d
-
-            # current_input: (1, OBS, N, C)
+                new_frame = pred  # (N, C) or (1, N, C)
+            new_frame_2d = new_frame.squeeze()
+            if new_frame_2d.ndim == 1:
+                new_frame_2d = new_frame_2d.unsqueeze(-1)
+            # Shift: drop first C cols, append new_frame
             current_input = torch.cat([
-                current_input[:, 1:, :, :],
-                full_pred.unsqueeze(0).unsqueeze(0)
-            ], dim=1)
+                current_input[:, :, C:],  # (1, N, C) — was last frame, now first
+                new_frame_2d.unsqueeze(0)  # (1, N, C)
+            ], dim=-1)  # → (1, N, 2*C=38)
 
         count += 1
         if (si + 1) % 20 == 0:
