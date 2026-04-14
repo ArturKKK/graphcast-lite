@@ -117,7 +117,7 @@ def main():
         current_input = x_tensor
         for ar in range(AR):
             with torch.no_grad():
-                pred = gnn_model(current_input)  # (1, N, C)
+                pred = gnn_model(current_input, attention_threshold=0.0)  # (1, N, C)
             pred_np = pred.cpu().numpy().squeeze(0)  # (N, C)
 
             if ar == 0:
