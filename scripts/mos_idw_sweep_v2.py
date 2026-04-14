@@ -145,23 +145,12 @@ def main():
 
     # ── Load ChunkDataset ──
     print("[2] Loading ChunkDataset...")
-    from src.data.data_configs import DatasetMetadata
-    metadata = DatasetMetadata(
-        flattened=True, num_latitudes=0, num_longitudes=0,
-        num_features=C, obs_window=OBS, pred_window=1,
-    )
-    metadata.flat_grid = True
-    metadata.num_grid_nodes = N_total
-    metadata.cordinates = (flat_lats, flat_lons)
-    metadata.is_regional = is_regional
-
-    train_ds, test_ds = load_chunked_datasets(
-        data_dir=str(data_dir),
-        metadata=metadata,
+    train_ds, val_ds, test_ds, metadata = load_chunked_datasets(
+        data_path=str(data_dir),
         obs_window=OBS,
-        pred_window=1,
-        split_ratios=(0.8, 0.1, 0.1),
-        split="test_only",
+        pred_steps=1,
+        n_features=C,
+        test_split="test_only",
     )
 
     # ── Load GNN ──
@@ -234,103 +223,81 @@ def main():
     t0 = time.time()
 
     for si, ds_idx in enumerate(sample_indices):
-        sample = test_ds[ds_idx]
-        X_obs = sample["X"]  # (N, OBS, C) — already normalized
-        Y_true = sample["Y"]  # (N, P, C) — normalized
-        # For AR we only use the first target as immediate next step
+        X_flat, Y_flat = test_ds[ds_idx]
+        # X_flat: (N, OBS*C) normalized, Y_flat: (N, 1*C) normalized
+        X_np = X_flat.numpy()  # (N, OBS*C)
+        Y_np = Y_flat.numpy()  # (N, C)
 
-        curr_state = torch.from_numpy(X_obs).unsqueeze(0).float().to(device)  # (1, N, OBS, C)
+        curr_state = X_flat.unsqueeze(0).float().to(device)  # (1, N, OBS*C)
 
-        # Persistence: last obs step, physical units, regional nodes
-        persist_norm = X_obs[region_idx, -1, :]  # (n_regional, C)
+        # Persistence: last obs step (last C features of X), regional nodes
+        persist_norm = X_np[region_idx, -C:]  # (n_regional, C)
         persist_phys_t2m = persist_norm[:, t2m_idx] * y_std[t2m_idx] + y_mean[t2m_idx]
 
-        for ar_step in range(AR):
-            # Ground truth for this AR step
-            if ar_step == 0:
-                gt_norm = Y_true[region_idx, 0, :]  # (n_regional, C)
-            else:
-                # For AR steps > 0, rebuild ground truth from dataset
-                # We need sample at ds_idx with shifted target
-                try:
-                    future_sample = test_ds[ds_idx]
-                    # ChunkDataset returns the same sample; for multi-step we rely on
-                    # autoregressive rollout tracking internal ground truth
-                    # Actually, let's just compute metrics on the first step if AR>1
-                    # For proper multi-step, we'd need to access raw data
-                    pass
-                except:
-                    pass
+        # Ground truth: Y is (N, C) normalized — only +6h available
+        gt_norm = Y_np[region_idx, :]  # (n_regional, C)
+        gt_phys_t2m = gt_norm[:, t2m_idx] * y_std[t2m_idx] + y_mean[t2m_idx]
 
-            valid_times = [base_time + timedelta(hours=6 * (ar_step + 1))]
+        valid_times = [base_time + timedelta(hours=6)]
 
-            # GNN forward
-            inp = curr_state.view(1, N_total, OBS * C)
-            with torch.no_grad():
-                pred = gnn_model(X=inp, attention_threshold=0.0)
-            if pred.dim() == 2:
-                pred = pred.unsqueeze(0)
-            gnn_out = (curr_state[:, :, -1, :] + pred) if use_residual else pred
-            gnn_out_np = gnn_out[0].cpu().numpy()  # (N, C) normalized
+        # GNN forward
+        inp = curr_state  # already (1, N, OBS*C)
+        with torch.no_grad():
+            pred = gnn_model(X=inp, attention_threshold=0.0)
+        if pred.dim() == 2:
+            pred = pred.unsqueeze(0)
+        if use_residual:
+            last_state = curr_state[:, :, -C:]
+            gnn_out = last_state + pred
+        else:
+            gnn_out = pred
+        gnn_out_np = gnn_out[0].cpu().numpy()  # (N, C) normalized
 
-            # Physical units for regional nodes
-            reg_pred_norm = gnn_out_np[region_idx]  # (n_regional, C)
-            reg_pred_phys = reg_pred_norm * y_std + y_mean  # (n_regional, C)
+        # Physical units for regional nodes
+        reg_pred_norm = gnn_out_np[region_idx]  # (n_regional, C)
+        reg_pred_phys = reg_pred_norm * y_std + y_mean  # (n_regional, C)
 
-            # Ground truth physical
-            if ar_step == 0:
-                gt_phys_t2m = gt_norm[:, t2m_idx] * y_std[t2m_idx] + y_mean[t2m_idx]
-            else:
-                # For AR>0, we'd need next sample's ground truth.
-                # Skip MOS evaluation for ar_step > 0 if we can't get GT.
-                break
+        # GNN raw t2m
+        se_t2m["GNN_raw"][0] += float(np.sum((reg_pred_phys[:, t2m_idx] - gt_phys_t2m) ** 2))
 
-            # GNN raw t2m
-            se_t2m["GNN_raw"][ar_step] += float(np.sum((reg_pred_phys[:, t2m_idx] - gt_phys_t2m) ** 2))
+        # Lapse correction
+        pred_3d = reg_pred_phys[:, np.newaxis, :]  # (n_regional, 1, C)
+        if z_surf_idx is not None:
+            z_surf_field = reg_pred_phys[:, z_surf_idx]
+            lapse_3d = apply_lapse_correction(pred_3d, VAR_ORDER, args.lapse_elev, z_surf_field)
+        else:
+            lapse_3d = pred_3d.copy()
+        se_t2m["GNN+lapse"][0] += float(np.sum((lapse_3d[:, 0, t2m_idx] - gt_phys_t2m) ** 2))
 
-            # Lapse correction
-            pred_3d = reg_pred_phys[:, np.newaxis, :]  # (n_regional, 1, C)
-            if z_surf_idx is not None:
-                z_surf_field = reg_pred_phys[:, z_surf_idx]
-                lapse_3d = apply_lapse_correction(pred_3d, VAR_ORDER, args.lapse_elev, z_surf_field)
-            else:
-                lapse_3d = pred_3d.copy()
-            se_t2m["GNN+lapse"][ar_step] += float(np.sum((lapse_3d[:, 0, t2m_idx] - gt_phys_t2m) ** 2))
+        # MOS station-only (no IDW)
+        mos_3d = lapse_3d.copy()
+        result = apply_learned_mos_t2m(
+            mos_3d, VAR_ORDER, mos_bundle,
+            reg_lats, reg_lons, valid_times,
+            stations=MOS_STATIONS, spatial_idw=False,
+        )
+        if isinstance(result, tuple):
+            mos_3d = result[0]
+        se_t2m["GNN+lapse+MOS_station"][0] += float(np.sum((mos_3d[:, 0, t2m_idx] - gt_phys_t2m) ** 2))
 
-            # MOS station-only (no IDW)
-            mos_3d = lapse_3d.copy()
+        # IDW sweep
+        for power, max_r, label in idw_configs:
+            idw_3d = lapse_3d.copy()
             result = apply_learned_mos_t2m(
-                mos_3d, VAR_ORDER, mos_bundle,
+                idw_3d, VAR_ORDER, mos_bundle,
                 reg_lats, reg_lons, valid_times,
-                stations=MOS_STATIONS, spatial_idw=False,
+                stations=MOS_STATIONS, spatial_idw=True,
+                idw_power=power, idw_max_radius_km=max_r,
             )
             if isinstance(result, tuple):
-                mos_3d = result[0]
-            se_t2m["GNN+lapse+MOS_station"][ar_step] += float(np.sum((mos_3d[:, 0, t2m_idx] - gt_phys_t2m) ** 2))
+                idw_3d = result[0]
+            cfg_name = f"GNN+lapse+MOS+IDW_{label}"
+            se_t2m[cfg_name][0] += float(np.sum((idw_3d[:, 0, t2m_idx] - gt_phys_t2m) ** 2))
 
-            # IDW sweep
-            for power, max_r, label in idw_configs:
-                idw_3d = lapse_3d.copy()
-                result = apply_learned_mos_t2m(
-                    idw_3d, VAR_ORDER, mos_bundle,
-                    reg_lats, reg_lons, valid_times,
-                    stations=MOS_STATIONS, spatial_idw=True,
-                    idw_power=power, idw_max_radius_km=max_r,
-                )
-                if isinstance(result, tuple):
-                    idw_3d = result[0]
-                cfg_name = f"GNN+lapse+MOS+IDW_{label}"
-                se_t2m[cfg_name][ar_step] += float(np.sum((idw_3d[:, 0, t2m_idx] - gt_phys_t2m) ** 2))
+        # Persistence
+        se_t2m["Persistence"][0] += float(np.sum((persist_phys_t2m - gt_phys_t2m) ** 2))
 
-            # Persistence
-            se_t2m["Persistence"][ar_step] += float(np.sum((persist_phys_t2m - gt_phys_t2m) ** 2))
-
-            count[ar_step] += n_regional
-
-            # Update state for next AR step
-            curr_state = torch.cat(
-                [curr_state[:, :, 1:, :], gnn_out.unsqueeze(2)], dim=2,
-            )
+        count[0] += n_regional
 
         if (si + 1) % 10 == 0 or si == 0:
             elapsed = time.time() - t0
