@@ -166,6 +166,7 @@ def main():
     state = {k: v for k, v in state.items()
              if not k.startswith("_processing_edge_features")}
     gnn_model.load_state_dict(state, strict=False)
+    gnn_model = gnn_model.to(device)  # ensure all buffers (edge features) on GPU
     gnn_model.eval()
     print(f"  GNN loaded on {device}")
 
