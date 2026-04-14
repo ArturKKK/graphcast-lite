@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Check weight loading for real_freeze6 — debug missing/unexpected keys."""
-import sys, torch
+import sys, os, torch, numpy as np
 sys.path.insert(0, ".")
 from src.config import ExperimentConfig
 from src.main import load_model_from_experiment_config
-from data.data_loading import load_chunked_datasets
+from src.data.dataloader_chunked import load_chunked_datasets
 
 cfg = ExperimentConfig.from_json("experiments/multires_real_freeze6/config.json")
 _, _, _, meta = load_chunked_datasets(
