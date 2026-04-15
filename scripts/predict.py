@@ -379,7 +379,10 @@ def main():
         lats, lons = read_coords(meta, data_dir)
         is_flat = getattr(meta, 'flat_grid', False)
         oi_roi_idx = None
-        if is_flat and region_idxs is not None:
+        if region_idxs is not None:
+            # ROI задан явно (--region) или из boundary_mask — используем для OI
+            # независимо от типа сетки (flat or regular grid).
+            # Без этого для global 512×256 строилась B-матрица 131K×131K (68 GB) → OOM.
             oi_roi_idx = region_idxs
         elif is_flat and getattr(meta, 'is_regional', None) is not None:
             oi_roi_idx = np.where(meta.is_regional)[0]
