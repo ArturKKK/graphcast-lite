@@ -27,9 +27,11 @@ from src.data.data_configs import DatasetMetadata
 from src.main import load_model_from_experiment_config
 from src.postprocessing.mos_correction import (
     apply_mos_t2m, load_mos_table,
-    apply_learned_mos_t2m, load_learned_mos,
+    apply_learned_mos_t2m, apply_learned_mos_wind, load_learned_mos,
+    load_wind_scaling, apply_wind_scaling,
 )
 from src.utils import load_from_json_file
+from src.unet.model import WeatherUNet
 
 CITY_BBOX = (55.5, 56.5, 92.0, 94.0)
 GDAS_BASE = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod"
@@ -98,11 +100,64 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--learned-mos", default=None,
                         help="Path to learned MOS model (.joblib from build_learned_mos.py). "
                              "ML-based t2m correction (overrides --mos-table if both given).")
+    parser.add_argument("--spatial-idw", action="store_true",
+                        help="Interpolate MOS bias correction to ALL grid nodes via IDW "
+                             "(instead of correcting only station grid points).")
     parser.add_argument("--cycle", default=None, help="Optional cycle anchor in ISO form, e.g. 2026-03-23T12:00:00+00:00")
+    parser.add_argument("--lapse-target-elevation", type=float, default=None,
+                        help="Target station elevation in metres for lapse-rate t2m correction. "
+                             "E.g. 277 for Opytnoe Pole (Krasnoyarsk). Corrects for grid cell "
+                             "topography averaging at coarse resolution.")
+    parser.add_argument("--input-bias-t2m", type=float, default=None,
+                        help="Additive bias correction (°C) to apply to GDAS t2m input "
+                             "*before* normalization. Positive value warms the input. "
+                             "Use to compensate systematic GDAS cold/warm bias for the region.")
+    parser.add_argument("--wind-scale", default=None,
+                        help="Path to wind monthly scaling JSON (from build_wind_scale.py). "
+                             "Applies seasonal multiplicative wind speed correction.")
+    parser.add_argument("--cascade-experiment", default=None,
+                        help="UNet downscaler experiment dir for cascade inference (e.g. experiments/downscaler_krsk)")
+    parser.add_argument("--cascade-data", default=None,
+                        help="Downscaler dataset dir with scalers/coords/static_fine.npy. "
+                             "Falls back to live_runtime_bundle if not set.")
     args = parser.parse_args()
     if args.data_dir is None and args.runtime_bundle is None:
         parser.error("either --data-dir or --runtime-bundle must be provided")
     return args
+
+
+# ── MOS station registry ────────────────────────────────────────────
+# Mirrors STATIONS from build_learned_mos.py; used at inference time
+# to apply corrections at all trained station grid points.
+_MOS_STATIONS = [
+    {"lat": 56.173, "lon": 92.493, "elev": 287, "name": "Yemelyanovo"},
+    {"lat": 56.283, "lon": 90.517, "elev": 257, "name": "Achinsk"},
+    {"lat": 56.200, "lon": 95.633, "elev": 207, "name": "Kansk"},
+    {"lat": 53.740, "lon": 91.385, "elev": 253, "name": "Abakan"},
+    {"lat": 57.683, "lon": 93.267, "elev": 93,  "name": "Kazachinskoe"},
+    {"lat": 56.900, "lon": 93.133, "elev": 180, "name": "Bolshaya Murta"},
+    {"lat": 56.967, "lon": 90.683, "elev": 181, "name": "Novobirilyussy"},
+    {"lat": 56.500, "lon": 93.283, "elev": 164, "name": "Sukhobuzimskoe"},
+    {"lat": 56.217, "lon": 89.550, "elev": 290, "name": "Bogotol"},
+    {"lat": 56.067, "lon": 92.733, "elev": 235, "name": "Minino"},
+    {"lat": 56.117, "lon": 92.200, "elev": 479, "name": "Kaca"},
+    {"lat": 55.933, "lon": 92.283, "elev": 275, "name": "Shumiha"},
+    {"lat": 57.633, "lon": 92.267, "elev": 179, "name": "Pirovskoe"},
+    {"lat": 57.200, "lon": 94.550, "elev": 168, "name": "Taseevo"},
+    {"lat": 56.650, "lon": 90.550, "elev": 231, "name": "Bolshoj Uluj"},
+    {"lat": 56.850, "lon": 95.217, "elev": 188, "name": "Dzerzhinskoe"},
+    {"lat": 56.033, "lon": 90.317, "elev": 256, "name": "Nazarovo"},
+    {"lat": 56.100, "lon": 91.667, "elev": 332, "name": "Kemchug"},
+    {"lat": 56.167, "lon": 95.267, "elev": 357, "name": "Solyanka"},
+]
+
+
+def _get_mos_stations(mos_bundle: dict) -> list[dict]:
+    """Return station list for MOS correction.
+
+    Uses the hardcoded registry (kept in sync with build_learned_mos.py).
+    """
+    return _MOS_STATIONS
 
 
 def cycle_floor_6h(dt_utc: datetime) -> datetime:
@@ -615,6 +670,14 @@ def main() -> None:
         extracted, cycle_warnings = extract_live_channels(payload, latitudes, longitudes, var_order, template_static)
         warnings.extend([f"{cycle_dt.isoformat()}: {line}" for line in cycle_warnings])
         frame = np.stack([extracted[name] for name in var_order], axis=-1).astype(np.float32)
+
+        # --- GDAS input bias correction for t2m ---
+        if args.input_bias_t2m is not None and "t2m" in var_order:
+            t_idx = var_order.index("t2m")
+            frame[:, t_idx] += args.input_bias_t2m  # t2m is in K here, bias in °C = K
+            if cycle_dt == cycle_payloads[0][0]:  # print once
+                print(f"[Input bias] t2m += {args.input_bias_t2m:+.2f}°C applied to GDAS input")
+
         obs_frames.append(normalize_frame(frame, x_mean[:len(var_order)], x_std[:len(var_order)]))
 
     input_tensor = np.stack(obs_frames, axis=1).reshape(len(latitudes), obs_window * len(var_order)).astype(np.float32)
@@ -654,6 +717,102 @@ def main() -> None:
     prediction_norm = torch.cat(ar_outs, dim=2).squeeze(0).numpy().reshape(G, args.ar_steps, C)
     prediction_phys = denormalize_prediction(prediction_norm, y_mean[:C], y_std[:C])
 
+    # --- Cascade: UNet downscaler refinement for ROI ---
+    cascade_phys = None  # (H, W, AR, C) in physical units, or None
+    cascade_lats = None
+    cascade_lons = None
+    if args.cascade_experiment:
+        from scripts.predict_cascade import crop_and_upsample_roi
+
+        cas_dir = Path(args.cascade_experiment)
+        cas_cfg = json.loads((cas_dir / "config.json").read_text()) if (cas_dir / "config.json").exists() else {}
+        cas_obs = cas_cfg.get("obs_window", 2)
+        cas_bf = cas_cfg.get("base_filters", 64)
+        cas_residual = cas_cfg.get("residual", False)
+        cas_static_ch = cas_cfg.get("static_channels", [7, 8])
+
+        # Load cascade scalers & coords
+        cas_data_dir = Path(args.cascade_data) if args.cascade_data else runtime_bundle_dir
+        if cas_data_dir and (cas_data_dir / "coords.npz").exists():
+            cas_coords = np.load(cas_data_dir / "coords.npz")
+            cascade_lats = cas_coords["latitude"].astype(np.float64)
+            cascade_lons = cas_coords["longitude"].astype(np.float64)
+        else:
+            # Default Krasnoyarsk ROI 0.25°
+            cascade_lats = np.linspace(50, 60, 41)
+            cascade_lons = np.linspace(83, 98, 61)
+
+        # Load UNet scalers (may differ from GNN scalers)
+        cas_sc_path = cas_data_dir / "scalers.npz" if cas_data_dir else None
+        if cas_sc_path and cas_sc_path.exists():
+            cas_sc = np.load(cas_sc_path)
+            cas_mean = cas_sc["mean"].astype(np.float32)
+            cas_std = cas_sc["std"].astype(np.float32)
+        else:
+            cas_mean, cas_std = y_mean[:C], y_std[:C]
+
+        # Static fields for UNet
+        n_static = 0
+        static_t = None
+        if cas_data_dir and (cas_data_dir / "static_fine.npy").exists():
+            sf = np.load(cas_data_dir / "static_fine.npy")  # (lon, lat, N_static)
+            sf = sf.transpose(1, 0, 2)  # (H, W, N_static)
+            n_static = sf.shape[2]
+            static_t = torch.from_numpy(sf).permute(2, 0, 1).unsqueeze(0).float().to(device)
+
+        in_ch = cas_obs * C + n_static
+        unet = WeatherUNet(in_channels=in_ch, out_channels=C, base_filters=cas_bf).to(device)
+        unet_ckpt = cas_dir / "best_model.pth"
+        unet.load_state_dict(torch.load(unet_ckpt, map_location=device))
+        unet.eval()
+        print(f"[Cascade] UNet loaded from {unet_ckpt}, params={unet.num_params:,}")
+
+        roi = (50.0, 60.0, 83.0, 98.0)
+        H_fine, W_fine = len(cascade_lats), len(cascade_lons)
+        cascade_phys = np.zeros((H_fine, W_fine, args.ar_steps, C), dtype=np.float32)
+
+        flat_grid = getattr(metadata, "flat_grid", False)
+        for step in range(args.ar_steps):
+            gnn_step_norm = prediction_norm[:, step, :]  # (G, C)
+            coarse_gnn = crop_and_upsample_roi(
+                gnn_step_norm, latitudes, longitudes, roi,
+                cascade_lats, cascade_lons, flat_grid=flat_grid,
+            )  # (H, W, C) in GNN-normalized space
+            coarse_phys_hw = coarse_gnn * y_std[:C] + y_mean[:C]
+            coarse_ds_norm = (coarse_phys_hw - cas_mean) / cas_std
+
+            frames = [coarse_ds_norm] * cas_obs
+            x_unet = torch.from_numpy(np.concatenate(frames, axis=-1)).permute(2, 0, 1).unsqueeze(0).float().to(device)
+            if static_t is not None:
+                x_unet = torch.cat([x_unet, static_t], dim=1)
+            with torch.no_grad():
+                unet_out = unet(x_unet)
+            if cas_residual:
+                x_last = x_unet[:, (cas_obs - 1) * C : cas_obs * C, :, :]
+                unet_out = x_last + unet_out
+            cas_norm = unet_out[0].cpu().numpy().transpose(1, 2, 0)  # (H, W, C)
+            cascade_phys[:, :, step, :] = cas_norm * cas_std + cas_mean
+
+        print(f"[Cascade] Refined {args.ar_steps} steps to {H_fine}×{W_fine} grid")
+
+    # --- Lapse-rate elevation correction for t2m ---
+    # Grid cells average topography at 0.25° resolution, which may differ from
+    # actual station elevation. Apply a standard lapse rate of 6.5 °C/km.
+    if args.lapse_target_elevation is not None and "t2m" in var_order and "z_surf" in var_order:
+        z_idx = var_order.index("z_surf")
+        t_idx = var_order.index("t2m")
+        z_grid = prediction_phys[:, 0, z_idx]  # gpm (static, same all steps)
+        z_target = float(args.lapse_target_elevation)
+        LAPSE_RATE = 6.5e-3  # K per metre
+        delta_z = z_grid - z_target  # positive means grid is higher → grid is colder
+        delta_t = delta_z * LAPSE_RATE  # positive correction = warm up
+        for step in range(prediction_phys.shape[1]):
+            prediction_phys[:, step, t_idx] += delta_t
+        city_mask = build_city_mask(latitudes, longitudes)
+        mean_correction = delta_t[city_mask].mean() if city_mask.any() else delta_t.mean()
+        print(f"[Lapse] Elevation correction: grid→{z_target:.0f}m, "
+              f"city-average ΔT={mean_correction:+.2f}°C")
+
     # --- MOS bias correction ---
     mos_table = None
     learned_mos_bundle = None
@@ -668,14 +827,50 @@ def main() -> None:
         lmos_path = Path(args.learned_mos)
         if lmos_path.exists():
             learned_mos_bundle = load_learned_mos(lmos_path)
-            prediction_phys = apply_learned_mos_t2m(
+            # Build station list from trained stations metadata
+            mos_stations = _get_mos_stations(learned_mos_bundle)
+            result = apply_learned_mos_t2m(
                 prediction_phys, var_order, learned_mos_bundle,
                 latitudes, longitudes, forecast_valid_times,
+                stations=mos_stations,
+                spatial_idw=args.spatial_idw,
             )
+            if isinstance(result, tuple):
+                prediction_phys, n_pts = result
+            else:
+                prediction_phys = result
+                n_pts = 1
             print(f"[Learned MOS] Applied ML t2m correction from {lmos_path.name}")
+            print(f"  Stations: {len(mos_stations)}, corrected grid points: {n_pts}")
             print(f"  Test MAE: {learned_mos_bundle.get('test_mae', '?')}°C")
+            # Wind MOS (if wind_model present in bundle)
+            if learned_mos_bundle.get("wind_model") is not None:
+                prediction_phys, n_wind_pts = apply_learned_mos_wind(
+                    prediction_phys, var_order, learned_mos_bundle,
+                    latitudes, longitudes, forecast_valid_times,
+                    stations=mos_stations,
+                    spatial_idw=args.spatial_idw,
+                )
+                print(f"[Learned MOS] Applied ML wind correction, grid points: {n_wind_pts}")
+                print(f"  Wind test MAE: {learned_mos_bundle.get('wind_test_mae', '?')} m/s")
         else:
             print(f"[Learned MOS] WARNING: model not found at {lmos_path}, skipping")
+
+    # ── Seasonal wind scaling ────────────────────────────────────────
+    if args.wind_scale:
+        ws_path = Path(args.wind_scale)
+        if ws_path.exists():
+            wind_scale_table = load_wind_scaling(ws_path)
+            prediction_phys, n_ws_pts = apply_wind_scaling(
+                prediction_phys, var_order, wind_scale_table,
+                latitudes, longitudes, forecast_valid_times,
+                spatial_idw=args.spatial_idw,
+            )
+            meta = wind_scale_table.get('_meta', {})
+            print(f"[Wind Scale] Applied seasonal wind correction from {ws_path.name}")
+            print(f"  Period: {meta.get('period', '?')}, corrected grid points: {n_ws_pts}")
+        else:
+            print(f"[Wind Scale] WARNING: table not found at {ws_path}, skipping")
     elif args.mos_table:
         mos_path = Path(args.mos_table)
         if mos_path.exists():
@@ -706,7 +901,13 @@ def main() -> None:
         "runtime_bundle": str(runtime_bundle_dir) if runtime_bundle_dir else None,
         "mos_applied": mos_table is not None,
         "learned_mos_applied": learned_mos_bundle is not None,
+        "input_bias_t2m": args.input_bias_t2m,
+        "cascade_experiment": args.cascade_experiment,
     }
+    if cascade_phys is not None:
+        payload["cascade_physical"] = cascade_phys  # (H, W, AR, C)
+        payload["cascade_lats"] = cascade_lats
+        payload["cascade_lons"] = cascade_lons
     torch.save(payload, out_dir / "forecast.pt")
 
     render_t2m_plot(out_dir / "t2m_city_forecast.png", latitudes, longitudes, prediction_phys, var_order)
