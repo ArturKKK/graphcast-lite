@@ -26,6 +26,7 @@ $VENV scripts/live_gdas_forecast.py \
   --experiment-dir experiments/multires_nores_freeze6 \
   --runtime-bundle live_runtime_bundle \
   --learned-mos live_runtime_bundle/learned_mos_t2m_wind_19st.joblib \
+  --wind-scale live_runtime_bundle/wind_monthly_scale.json \
   --spatial-idw \
   --lapse-target-elevation 287 \
   --ar-steps 12 \
