@@ -28,6 +28,7 @@ $VENV scripts/live_gdas_forecast.py \
   --learned-mos live_runtime_bundle/learned_mos_t2m_wind_19st.joblib \
   --wind-scale live_runtime_bundle/wind_monthly_scale.json \
   --spatial-idw \
+  --selective \
   --lapse-target-elevation 287 \
   --ar-steps 12 \
   --out-dir "$OUT" \
