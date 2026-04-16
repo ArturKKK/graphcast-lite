@@ -43,19 +43,19 @@
   var mapMarkers = [];
   var currentStep = 0;
   var tempChart = null;
-  var currentScope = "city"; // "city" or "region"
+  var currentScope = "core"; // "core", "city", or "region"
 
   // ── Scope helper ──
   function getActiveSummary(data) {
-    return currentScope === "city"
-      ? (data.summary_city || data.summary || [])
-      : (data.summary_region || data.summary || []);
+    if (currentScope === "core") return data.summary_core || data.summary_city || data.summary || [];
+    if (currentScope === "city") return data.summary_city || data.summary || [];
+    return data.summary_region || data.summary || [];
   }
 
   function getActivePointCount(data) {
-    return currentScope === "city"
-      ? (data.n_city_points || 0)
-      : (data.n_region_points || data.n_city_points || 0);
+    if (currentScope === "core") return data.n_core_points || 0;
+    if (currentScope === "city") return data.n_city_points || 0;
+    return data.n_region_points || data.n_city_points || 0;
   }
 
   // ── Utilities ──
@@ -197,9 +197,9 @@
     if (!s) return;
 
     card.style.display = "";
-    var scopeLabel = currentScope === "city"
-      ? "\u0441\u0440\u0435\u0434\u043D\u0435\u0435 \u043F\u043E \u0433\u043E\u0440\u043E\u0434\u0443 (" + data.n_city_points + " \u0442\u043E\u0447\u0435\u043A)"
-      : "\u0441\u0440\u0435\u0434\u043D\u0435\u0435 \u043F\u043E \u0440\u0435\u0433\u0438\u043E\u043D\u0443 (" + data.n_region_points + " \u0442\u043E\u0447\u0435\u043A)";
+    var nPts = getActivePointCount(data);
+    var scopeNames = {core: "\u0433\u043E\u0440\u043E\u0434\u0443", city: "\u0433\u043E\u0440\u043E\u0434\u0443 + \u043E\u043A\u0440.", region: "\u0440\u0435\u0433\u0438\u043E\u043D\u0443"};
+    var scopeLabel = "\u0441\u0440\u0435\u0434\u043D\u0435\u0435 \u043F\u043E " + scopeNames[currentScope] + " (" + nPts + " \u0442\u043E\u0447\u0435\u043A)";
     document.getElementById("city-avg-badge").textContent = scopeLabel;
 
     document.getElementById("current-time").textContent = formatKrskTime(s.valid_time_utc) + " (\u043A\u0440\u0430\u0441\u043D\u043E\u044F\u0440\u0441\u043A\u043E\u0435 \u0432\u0440\u0435\u043C\u044F)";
@@ -240,7 +240,10 @@
     var ptsEl = document.getElementById("table-city-pts");
     if (ptsEl) ptsEl.textContent = pts;
     var scopeEl = document.getElementById("table-scope-label");
-    if (scopeEl) scopeEl.textContent = currentScope === "city" ? "\u0433\u043E\u0440\u043E\u0434" : "\u0440\u0435\u0433\u0438\u043E\u043D";
+    if (scopeEl) {
+      var names = {core: "\u0433\u043E\u0440\u043E\u0434", city: "\u0433\u043E\u0440\u043E\u0434 + \u043E\u043A\u0440.", region: "\u0440\u0435\u0433\u0438\u043E\u043D"};
+      scopeEl.textContent = names[currentScope];
+    }
 
     for (var i = 0; i < summary.length; i++) {
       var s = summary[i];

@@ -2,6 +2,7 @@
 """Parse forecast.pt -> forecast.json for the web frontend.
 
 Extracts:
+  - Core-city forecast (CORE_CITY_BBOX, 3 pts at lat=56.0) for city center
   - City-average forecast (TIGHT_CITY_BBOX, ~9 pts) for city summary
   - Region-average forecast (REGION_BBOX, ~45 pts) for region summary
   - Per-grid-point data (MAP_BBOX) for the interactive Leaflet map
@@ -20,6 +21,9 @@ from pathlib import Path
 
 import numpy as np
 import torch
+
+# Core city strip: lat=56.0, 3 points (Ветлужанка — центр — Берёзовка)
+CORE_CITY_BBOX = (55.875, 56.125, 92.625, 93.375)
 
 # Tight Krasnoyarsk city bbox (~9 points at 0.25 deg)
 TIGHT_CITY_BBOX = (55.75, 56.25, 92.75, 93.25)
@@ -222,6 +226,11 @@ def parse_forecast(input_path: Path) -> dict:
     if last_cycle.tzinfo is None:
         last_cycle = last_cycle.replace(tzinfo=timezone.utc)
 
+    # --- Core city (3 pts at lat≈56.0, city center strip) ---
+    core_mask = build_mask(latitudes, longitudes, CORE_CITY_BBOX)
+    core_pred = prediction[core_mask]  # (N_core, n_steps, n_vars)
+    summary_core = compute_summary(core_pred, n_steps, last_cycle, vi)
+
     # --- City summary (tight bbox, ~9 pts) ---
     city_mask = build_mask(latitudes, longitudes, TIGHT_CITY_BBOX)
     city_pred = prediction[city_mask]  # (N_city, n_steps, n_vars)
@@ -289,9 +298,11 @@ def parse_forecast(input_path: Path) -> dict:
         "mos_applied": bool(data.get("learned_mos_applied", False)
                             or data.get("mos_applied", False)),
         "warnings": data.get("warnings", []),
+        "n_core_points": int(core_mask.sum()),
         "n_city_points": int(city_mask.sum()),
         "n_region_points": int(region_mask.sum()),
         "n_map_points": len(grid_points),
+        "summary_core": summary_core,
         "summary_city": summary_city,
         "summary_region": summary_region,
         "grid_points": grid_points,
@@ -317,6 +328,7 @@ def main():
 
     size_kb = args.output.stat().st_size / 1024
     print(f"Saved {args.output} ({size_kb:.0f} KB)")
+    print(f"  Core: {len(result['summary_core'])} steps, {result['n_core_points']} pts")
     print(f"  City: {len(result['summary_city'])} steps, {result['n_city_points']} pts")
     print(f"  Region: {result['n_region_points']} pts")
     print(f"  Map grid: {result['n_map_points']} pts")
