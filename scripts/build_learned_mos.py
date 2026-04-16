@@ -19,7 +19,7 @@ Key features vs v1:
 Usage:
     python scripts/build_learned_mos.py
     python scripts/build_learned_mos.py --start-year 2016 --end-year 2024
-    python scripts/build_learned_mos.py --stations 029570 029574
+    python scripts/build_learned_mos.py --stations 284935 294670 295810 287854
 """
 
 import argparse
@@ -39,26 +39,86 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 # ── Station registry ────────────────────────────────────────────────
+# USAF codes from NOAA ISD-history.txt (https://www.ncei.noaa.gov/pub/data/noaa/isd-history.txt)
+# NOTE: WMO block 029 = Finland, Russian Siberia uses 284xxx-298xxx USAF codes.
 STATIONS = {
-    "029570": {
-        "name": "Krasnoyarsk (Opytnoe Pole)",
-        "lat": 56.017, "lon": 92.750, "elev": 277,
+    "284935": {
+        "name": "Yemelyanovo / Krasnoyarsk (UNKL)",
+        "lat": 56.173, "lon": 92.493, "elev": 287,
     },
-    "029574": {
-        "name": "Emelyanovo (airport)",
-        "lat": 56.167, "lon": 92.617, "elev": 262,
-    },
-    "029612": {
+    "294670": {
         "name": "Achinsk",
-        "lat": 56.267, "lon": 90.500, "elev": 284,
+        "lat": 56.283, "lon": 90.517, "elev": 257,
     },
-    "029698": {
+    "295810": {
         "name": "Kansk",
-        "lat": 56.200, "lon": 95.717, "elev": 232,
+        "lat": 56.200, "lon": 95.633, "elev": 207,
     },
-    "029866": {
-        "name": "Abakan",
-        "lat": 53.750, "lon": 91.400, "elev": 247,
+    "287854": {
+        "name": "Abakan (UNAA)",
+        "lat": 53.740, "lon": 91.385, "elev": 253,
+    },
+    "293740": {
+        "name": "Kazachinskoe",
+        "lat": 57.683, "lon": 93.267, "elev": 93,
+    },
+    "294710": {
+        "name": "Bolshaya Murta",
+        "lat": 56.900, "lon": 93.133, "elev": 180,
+    },
+    "293670": {
+        "name": "Novobirilyussy",
+        "lat": 56.967, "lon": 90.683, "elev": 181,
+    },
+    "294770": {
+        "name": "Sukhobuzimskoe",
+        "lat": 56.500, "lon": 93.283, "elev": 164,
+    },
+    "295530": {
+        "name": "Bogotol",
+        "lat": 56.217, "lon": 89.550, "elev": 290,
+    },
+    # ── City / near-city stations (within ~30 km of Krasnoyarsk) ────
+    "295710": {
+        "name": "Minino (Opytnoe Pole)",
+        "lat": 56.067, "lon": 92.733, "elev": 235,
+    },
+    "295630": {
+        "name": "Kaca",
+        "lat": 56.117, "lon": 92.200, "elev": 479,
+    },
+    "295660": {
+        "name": "Shumiha",
+        "lat": 55.933, "lon": 92.283, "elev": 275,
+    },
+    # ── Regional stations within 100 km ─────────────────────────────
+    "293630": {
+        "name": "Pirovskoe",
+        "lat": 57.633, "lon": 92.267, "elev": 179,
+    },
+    "293790": {
+        "name": "Taseevo",
+        "lat": 57.200, "lon": 94.550, "elev": 168,
+    },
+    "294640": {
+        "name": "Bolshoj Uluj",
+        "lat": 56.650, "lon": 90.550, "elev": 231,
+    },
+    "294810": {
+        "name": "Dzerzhinskoe",
+        "lat": 56.850, "lon": 95.217, "elev": 188,
+    },
+    "295610": {
+        "name": "Nazarovo",
+        "lat": 56.033, "lon": 90.317, "elev": 256,
+    },
+    "295620": {
+        "name": "Kemchug",
+        "lat": 56.100, "lon": 91.667, "elev": 332,
+    },
+    "295800": {
+        "name": "Solyanka",
+        "lat": 56.167, "lon": 95.267, "elev": 357,
     },
 }
 
@@ -187,10 +247,19 @@ def fetch_station_isd_lite(usaf: str,
             temp_raw = int(parts[4])
             if temp_raw == -9999:
                 continue
-            rows.append({
+            rec: dict = {
                 "time": pd.Timestamp(year=y, month=m, day=d, hour=h),
                 "station_t2m_C": temp_raw / 10.0,
-            })
+            }
+            # Wind direction (field 8) and speed (field 9, m/s * 10)
+            if len(parts) >= 9:
+                wd_raw = int(parts[7])
+                ws_raw = int(parts[8])
+                if ws_raw != -9999:
+                    rec["station_wind_speed_ms"] = ws_raw / 10.0
+                if wd_raw != -9999:
+                    rec["station_wind_dir"] = float(wd_raw)
+            rows.append(rec)
             count += 1
         print(f"    ISD-Lite {year}: {count} records")
 
@@ -272,7 +341,7 @@ def main() -> None:
     parser.add_argument("--output", default="live_runtime_bundle/learned_mos_t2m.joblib")
     parser.add_argument("--start-year", type=int, default=2016)
     parser.add_argument("--end-year", type=int, default=2024)
-    parser.add_argument("--stations", nargs="*", default=["029570"],
+    parser.add_argument("--stations", nargs="*", default=["284935"],
                         help="USAF station IDs")
     parser.add_argument("--cache-dir", default="data/temp_train/mos_cache",
                         help="Cache directory for downloaded data")
@@ -313,6 +382,10 @@ def main() -> None:
             merged = merged.dropna(subset=["era5_temperature_2m", "station_t2m_C"])
             merged["bias"] = merged["station_t2m_C"] - merged["era5_temperature_2m"]
             merged = merged[merged["bias"].abs() < 20.0]
+            # Wind speed bias (station - ERA5), where available
+            # NOTE: Open-Meteo returns windspeed_10m in km/h, ISD-Lite is in m/s
+            if "station_wind_speed_ms" in merged.columns:
+                merged["wind_bias"] = merged["station_wind_speed_ms"] - merged["era5_windspeed_10m"] / 3.6
             print(f"  Matched: {len(merged)}")
 
             merged.to_csv(cache_file, index=False)
@@ -320,6 +393,8 @@ def main() -> None:
 
         if "bias" not in merged.columns:
             merged["bias"] = merged["station_t2m_C"] - merged["era5_temperature_2m"]
+        if "wind_bias" not in merged.columns and "station_wind_speed_ms" in merged.columns:
+            merged["wind_bias"] = merged["station_wind_speed_ms"] - merged["era5_windspeed_10m"] / 3.6
         merged = build_features(merged, info["lat"], info["lon"], info["elev"])
         all_merged.append(merged)
 
@@ -446,7 +521,54 @@ def main() -> None:
         for rank, i in enumerate(np.argsort(imp)[::-1][:10]):
             print(f"  {rank+1:2d}. {FEATURE_COLUMNS[i]:<28s} {imp[i]:.4f}")
 
-    # ── Step 5: Save ────────────────────────────────────────────────
+    # ── Step 5: Train wind MOS (if wind obs available) ────────────
+    wind_model = None
+    wind_test_mae = None
+    if "wind_bias" in df.columns:
+        df_wind = df.dropna(subset=FEATURE_COLUMNS + ["wind_bias"]).copy()
+        # Filter outliers
+        df_wind = df_wind[df_wind["wind_bias"].abs() < 15.0]
+        print(f"\n{'='*60}")
+        print(f"Wind MOS: {len(df_wind)} samples with wind observations")
+        print(f"Mean wind bias: {df_wind['wind_bias'].mean():.2f} m/s  Std: {df_wind['wind_bias'].std():.2f}")
+
+        w_train = df_wind[df_wind["time"].dt.year <= 2022]
+        w_val = df_wind[df_wind["time"].dt.year == 2023]
+        w_test = df_wind[df_wind["time"].dt.year == 2024]
+        print(f"Split: train={len(w_train)} | val={len(w_val)} | test={len(w_test)}")
+
+        if len(w_train) > 100 and len(w_test) > 0:
+            Xw_train = w_train[FEATURE_COLUMNS].values
+            yw_train = w_train["wind_bias"].values
+            Xw_test = w_test[FEATURE_COLUMNS].values
+            yw_test = w_test["wind_bias"].values
+
+            print("\n[Training] Wind HistGradientBoostingRegressor...")
+            wind_model = HistGradientBoostingRegressor(
+                max_iter=500,
+                max_depth=8,
+                learning_rate=0.05,
+                min_samples_leaf=20,
+                l2_regularization=0.1,
+                early_stopping=True,
+                validation_fraction=0.1,
+                n_iter_no_change=15,
+                random_state=42,
+            )
+            t0 = time.time()
+            wind_model.fit(Xw_train, yw_train)
+            dt_w = time.time() - t0
+            print(f"  Done in {dt_w:.1f}s | iterations: {wind_model.n_iter_}")
+
+            yw_pred = wind_model.predict(Xw_test)
+            wind_test_mae = float(mean_absolute_error(yw_test, yw_pred))
+            wind_era5_mae = float(mean_absolute_error(yw_test, np.zeros_like(yw_test)))
+            print(f"  Wind test MAE: {wind_test_mae:.3f} m/s  (raw ERA5: {wind_era5_mae:.3f})")
+            print(f"  Improvement: {(1 - wind_test_mae/wind_era5_mae)*100:+.1f}%")
+        else:
+            print("  Not enough wind data, skipping wind MOS")
+
+    # ── Step 6: Save ────────────────────────────────────────────────
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -462,8 +584,13 @@ def main() -> None:
         "n_train": len(X_train),
         "n_test": len(X_test),
     }
+    if wind_model is not None:
+        bundle["wind_model"] = wind_model
+        bundle["wind_test_mae"] = round(wind_test_mae, 4)
     joblib.dump(bundle, out_path)
     print(f"\n[Saved] {out_path} ({out_path.stat().st_size / 1024:.0f} KB)")
+    if wind_model is not None:
+        print(f"  Includes wind MOS (test MAE: {wind_test_mae:.3f} m/s)")
     print("Done!")
 
 

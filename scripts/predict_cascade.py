@@ -35,6 +35,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn.functional as F
+from datetime import datetime, timedelta, timezone
 from scipy.interpolate import RegularGridInterpolator
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -47,6 +48,11 @@ from src.utils import load_from_json_file
 from src.data.dataloader_chunked import load_chunked_datasets
 from src.main import load_model_from_experiment_config, set_random_seeds
 from src.unet.model import WeatherUNet
+from src.postprocessing.mos_correction import (
+    apply_learned_mos_t2m,
+    load_learned_mos,
+)
+from src.assimilation.optimal_interpolation import OptimalInterpolation
 
 
 def crop_and_upsample_roi(
@@ -124,6 +130,30 @@ def crop_and_upsample_roi(
     return result
 
 
+MOS_STATIONS = [
+    {"lat": 56.173, "lon": 92.493, "elev": 287, "name": "Yemelyanovo", "wmo": 295540},
+    {"lat": 56.267, "lon": 90.500, "elev": 279, "name": "Achinsk", "wmo": 295740},
+    {"lat": 56.200, "lon": 95.717, "elev": 137, "name": "Kansk", "wmo": 295660},
+    {"lat": 53.750, "lon": 91.400, "elev": 253, "name": "Abakan", "wmo": 298660},
+    {"lat": 57.683, "lon": 93.267, "elev": 93, "name": "Kazachinskoe", "wmo": 293740},
+    {"lat": 56.100, "lon": 92.567, "elev": 197, "name": "Bolshaya Murta", "wmo": None},
+    {"lat": 56.967, "lon": 90.683, "elev": 181, "name": "Novobirilyussy", "wmo": None},
+    {"lat": 56.533, "lon": 93.300, "elev": 210, "name": "Sukhobuzimskoe", "wmo": None},
+    {"lat": 56.217, "lon": 89.550, "elev": 290, "name": "Bogotol", "wmo": 295530},
+    {"lat": 56.083, "lon": 92.533, "elev": 282, "name": "Minino", "wmo": None},
+    {"lat": 56.017, "lon": 92.567, "elev": 215, "name": "Kaca", "wmo": None},
+    {"lat": 56.050, "lon": 93.017, "elev": 277, "name": "Shumiha", "wmo": None},
+    {"lat": 57.633, "lon": 92.267, "elev": 179, "name": "Pirovskoe", "wmo": 293630},
+    {"lat": 57.200, "lon": 94.550, "elev": 168, "name": "Taseevo", "wmo": 293790},
+    {"lat": 56.650, "lon": 90.550, "elev": 231, "name": "Bolshoj Uluj", "wmo": 294640},
+    {"lat": 56.850, "lon": 95.217, "elev": 188, "name": "Dzerzhinskoe", "wmo": 294810},
+    {"lat": 56.033, "lon": 90.317, "elev": 256, "name": "Nazarovo", "wmo": 295610},
+    {"lat": 56.617, "lon": 91.700, "elev": 211, "name": "Kemchug", "wmo": None},
+    {"lat": 55.340, "lon": 91.385, "elev": 253, "name": "Solyanka", "wmo": 295800},
+]
+LAPSE_RATE = 6.5e-3  # K/m
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("gnn_experiment", help="GNN experiment dir (e.g. experiments/multires_nores_freeze6)")
@@ -134,6 +164,12 @@ def main():
     ap.add_argument("--ar-steps", type=int, default=4)
     ap.add_argument("--max-samples", type=int, default=50)
     ap.add_argument("--no-residual", action="store_true")
+    ap.add_argument("--postproc", action="store_true",
+                    help="Enable lapse/MOS/IDW/OI post-processing evaluation")
+    ap.add_argument("--mos-model", default="live_runtime_bundle/learned_mos_t2m_19stations.joblib",
+                    help="Path to learned MOS joblib")
+    ap.add_argument("--base-time", default="2020-06-01T00:00",
+                    help="Base time for MOS/OI valid times (ISO format)")
     args = ap.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -253,6 +289,44 @@ def main():
     mse_pers  = np.zeros((AR, C))   # persistence (last real 0.25° obs)
     n_per_step = np.zeros(AR, dtype=int)
 
+    # Post-processing accumulators (t2m only, idx 0)
+    PP_CONFIGS = []
+    if args.postproc:
+        PP_CONFIGS = [
+            "gnn+lapse",
+            "casc+lapse",
+            "gnn+mos",
+            "casc+mos",
+            "gnn+lapse+mos",
+            "casc+lapse+mos",
+            "gnn+lapse+mos+idw",
+            "casc+lapse+mos+idw",
+        ]
+    mse_pp = {k: np.zeros((AR, C)) for k in PP_CONFIGS}
+
+    # Load MOS model if needed
+    mos_bundle = None
+    if args.postproc:
+        mos_path = Path(args.mos_model)
+        if mos_path.exists():
+            mos_bundle = load_learned_mos(mos_path)
+            print(f"[MOS] Loaded from {mos_path}")
+        else:
+            print(f"[MOS] WARNING: {mos_path} not found, MOS disabled")
+
+    # Fine grid lats/lons as flat arrays for MOS/lapse
+    fine_lats_flat = np.repeat(target_lats, len(target_lons)).astype(np.float32)  # (H*W,)
+    fine_lons_flat = np.tile(target_lons, len(target_lats)).astype(np.float32)    # (H*W,)
+
+    # z_surf for lapse: from fine static channel 7 (z_surf), if available
+    z_surf_fine = None  # (H, W)
+    if static_fine is not None and 7 in static_ch:
+        z_idx_in_static = static_ch.index(7)
+        z_surf_fine = static_fine[:, :, z_idx_in_static]  # (H, W) in m²/s²
+    mean_station_elev = np.mean([s["elev"] for s in MOS_STATIONS])
+
+    base_time = datetime.fromisoformat(args.base_time).replace(tzinfo=timezone.utc)
+
     # Physical units & formatting helpers
     UNITS = {
         "t2m": "°C", "10u": "m/s", "10v": "m/s", "msl": "Pa",
@@ -361,6 +435,67 @@ def main():
 
             # Denormalize cascade to physical
             cascade_phys = cascade_norm * ds_std + ds_mean
+
+            # ── Post-processing (t2m only) ──
+            def _apply_lapse(field_hw_c):
+                """Apply lapse correction to t2m (index 0) using z_surf."""
+                if z_surf_fine is None:
+                    return field_hw_c
+                corrected = field_hw_c.copy()
+                # z_surf in m²/s² → elevation in m
+                elev_m = z_surf_fine / 9.81  # (H, W)
+                delta_elev = mean_station_elev - elev_m
+                corrected[:, :, 0] += LAPSE_RATE * delta_elev  # warm valleys, cool peaks
+                return corrected
+
+            def _apply_mos_grid(field_hw_c, step_idx, valid_time, spatial_idw=False):
+                """Apply learned MOS (HistGBR) to t2m. Reshape H,W,C → G,steps,C → apply → back."""
+                if mos_bundle is None:
+                    return field_hw_c
+                H, W, Cf = field_hw_c.shape
+                pred_g = field_hw_c.reshape(H * W, 1, Cf)  # (G, 1, C)
+                corrected, _ = apply_learned_mos_t2m(
+                    pred_g, var_names, mos_bundle,
+                    fine_lats_flat, fine_lons_flat,
+                    [valid_time],
+                    stations=MOS_STATIONS,
+                    spatial_idw=spatial_idw,
+                    idw_power=2.0, idw_max_radius_km=300.0,
+                )
+                return corrected.reshape(H, W, Cf)
+
+            if PP_CONFIGS:
+                valid_time = base_time + timedelta(hours=6 * (i * AR + step + 1))
+
+                gnn_lapse = _apply_lapse(coarse_phys)
+                casc_lapse = _apply_lapse(cascade_phys)
+
+                gnn_mos = _apply_mos_grid(coarse_phys, step, valid_time, spatial_idw=False)
+                casc_mos = _apply_mos_grid(cascade_phys, step, valid_time, spatial_idw=False)
+
+                gnn_lapse_mos = _apply_mos_grid(gnn_lapse, step, valid_time, spatial_idw=False)
+                casc_lapse_mos = _apply_mos_grid(casc_lapse, step, valid_time, spatial_idw=False)
+
+                gnn_lapse_mos_idw = _apply_mos_grid(gnn_lapse, step, valid_time, spatial_idw=True)
+                casc_lapse_mos_idw = _apply_mos_grid(casc_lapse, step, valid_time, spatial_idw=True)
+
+                pp_preds = {
+                    "gnn+lapse": gnn_lapse,
+                    "casc+lapse": casc_lapse,
+                    "gnn+mos": gnn_mos,
+                    "casc+mos": casc_mos,
+                    "gnn+lapse+mos": gnn_lapse_mos,
+                    "casc+lapse+mos": casc_lapse_mos,
+                    "gnn+lapse+mos+idw": gnn_lapse_mos_idw,
+                    "casc+lapse+mos+idw": casc_lapse_mos_idw,
+                }
+                for pp_name, pp_pred in pp_preds.items():
+                    for c in range(C):
+                        if c in static_ch:
+                            continue
+                        mse_pp[pp_name][step, c] += np.mean(
+                            (pp_pred[:, :, c] - fine_target[:, :, c]) ** 2
+                        )
 
             # Per-channel MSE (skip static)
             for c in range(C):
@@ -477,11 +612,64 @@ def main():
     mean_sk_g = np.mean([(1 - rmse_casc[s_last, c] / (rmse_gnn[s_last, c] + 1e-12)) for c in dyn_ch]) * 100
     print(f"  {'MEAN':>10} {'':>6}  {'':>8}  {'':>8}  {'':>8}  {mean_sk_p:+6.1f}%  {mean_sk_g:+6.1f}%")
 
+    # ── Post-processing results (t2m focus) ──
+    rmse_pp = {}
+    if PP_CONFIGS:
+        print(f"\n{'=' * 80}")
+        print(f"Post-processing results — t2m RMSE (°C) on 0.25° grid")
+        print(f"{'=' * 80}")
+
+        for pp_name in PP_CONFIGS:
+            rmse_pp[pp_name] = np.zeros((AR, C))
+            for s in range(AR):
+                if n_per_step[s] > 0:
+                    rmse_pp[pp_name][s] = np.sqrt(mse_pp[pp_name][s] / n_per_step[s])
+
+        header = f"  {'Config':>25}"
+        for s in range(AR):
+            header += f"  +{(s+1)*6:02d}h"
+        print(header)
+        print("  " + "-" * (25 + AR * 7))
+
+        t2m_idx = 0
+        # Baseline rows
+        for label, rmse_arr in [("Persistence", rmse_pers), ("GNN (bilinear)", rmse_gnn), ("Cascade (GNN+UNet)", rmse_casc)]:
+            row = f"  {label:>25}"
+            for s in range(AR):
+                row += f"  {rmse_arr[s, t2m_idx]:5.2f}"
+            print(row)
+
+        print("  " + "-" * (25 + AR * 7))
+        for pp_name in PP_CONFIGS:
+            row = f"  {pp_name:>25}"
+            for s in range(AR):
+                row += f"  {rmse_pp[pp_name][s, t2m_idx]:5.2f}"
+            print(row)
+
+        # Skill vs GNN for t2m
+        print(f"\n  t2m Skill vs GNN (bilinear):")
+        header = f"  {'Config':>25}"
+        for s in range(AR):
+            header += f"  +{(s+1)*6:02d}h"
+        print(header)
+        print("  " + "-" * (25 + AR * 7))
+        for pp_name in PP_CONFIGS:
+            row = f"  {pp_name:>25}"
+            for s in range(AR):
+                sk = (1 - rmse_pp[pp_name][s, t2m_idx] / (rmse_gnn[s, t2m_idx] + 1e-12)) * 100
+                row += f" {sk:+5.1f}%"
+            print(row)
+        row = f"  {'Cascade':>25}"
+        for s in range(AR):
+            sk = (1 - rmse_casc[s, t2m_idx] / (rmse_gnn[s, t2m_idx] + 1e-12)) * 100
+            row += f" {sk:+5.1f}%"
+        print(row)
+
     # ── Save results.json ──
     results = {}
     for s in range(AR):
         h = (s + 1) * 6
-        results[f"+{h}h"] = {
+        step_results = {
             "n_samples": int(n_per_step[s]),
             "per_channel": {
                 var_names[c]: {
@@ -492,6 +680,15 @@ def main():
                 for c in dyn_ch
             },
         }
+        if PP_CONFIGS:
+            step_results["postproc"] = {
+                pp_name: {
+                    var_names[c]: float(rmse_pp[pp_name][s, c])
+                    for c in dyn_ch
+                }
+                for pp_name in PP_CONFIGS
+            }
+        results[f"+{h}h"] = step_results
     out_path = ds_dir / "cascade_results.json"
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
