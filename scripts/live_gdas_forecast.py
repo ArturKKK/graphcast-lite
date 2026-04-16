@@ -36,6 +36,22 @@ from src.unet.model import WeatherUNet
 CITY_BBOX = (55.5, 56.5, 92.0, 94.0)
 GDAS_BASE = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod"
 
+# ── Fields needed for selective GDAS download (idx shortName : level) ──
+SELECTIVE_FIELDS = [
+    ("PRMSL", "mean sea level"),
+    ("TMP",   "2 m above ground"),
+    ("UGRD",  "10 m above ground"),
+    ("VGRD",  "10 m above ground"),
+    ("PRES",  "surface"),
+    ("PWAT",  "entire atmosphere"),
+    ("PRATE", "surface"),
+    ("TMP",   "850 mb"), ("UGRD", "850 mb"), ("VGRD", "850 mb"),
+    ("HGT",   "850 mb"), ("SPFH", "850 mb"),
+    ("TMP",   "500 mb"), ("UGRD", "500 mb"), ("VGRD", "500 mb"),
+    ("HGT",   "500 mb"), ("SPFH", "500 mb"),
+    ("HGT",   "surface"),
+]
+
 DEFAULT_VAR_ORDER = [
     "t2m", "10u", "10v", "msl", "tp",
     "sp", "tcwv",
@@ -115,6 +131,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--wind-scale", default=None,
                         help="Path to wind monthly scaling JSON (from build_wind_scale.py). "
                              "Applies seasonal multiplicative wind speed correction.")
+    parser.add_argument("--selective", action="store_true",
+                        help="Download only the ~18 GRIB messages needed (via byte-range). "
+                             "Reduces ~440 MB download to ~14 MB per cycle (96.8%% savings).")
     parser.add_argument("--cascade-experiment", default=None,
                         help="UNet downscaler experiment dir for cascade inference (e.g. experiments/downscaler_krsk)")
     parser.add_argument("--cascade-data", default=None,
@@ -234,6 +253,74 @@ def download_file(url: str, dest: Path, timeout: int) -> Path:
         if total_bytes and written != total_bytes:
             dest.unlink(missing_ok=True)
             raise RuntimeError(f"Downloaded truncated file {dest}: wrote {written} bytes, expected {total_bytes}")
+    return dest
+
+
+def download_selective(url: str, dest: Path, timeout: int) -> Path:
+    """Download only the needed GRIB messages via HTTP byte-range requests.
+
+    Fetches the NOMADS .idx file to get byte offsets, then downloads only
+    the 18 fields required by our model (~14 MB instead of ~440 MB).
+    """
+    if dest.exists() and dest.stat().st_size > 0:
+        print(f"[cache] Using existing {dest}")
+        return dest
+
+    idx_url = url + ".idx"
+    try:
+        idx_resp = requests.get(idx_url, timeout=min(timeout, 60))
+        idx_resp.raise_for_status()
+    except requests.RequestException:
+        print(f"[selective] .idx not available, falling back to full download")
+        return download_file(url, dest, timeout)
+
+    # Parse idx: "NUM:OFFSET:d=DATE:SHORTNAME:LEVEL:anl:"
+    entries = []
+    for line in idx_resp.text.strip().split("\n"):
+        parts = line.split(":")
+        if len(parts) >= 6:
+            entries.append({
+                "num": int(parts[0]),
+                "offset": int(parts[1]),
+                "shortName": parts[3],
+                "level": parts[4],
+            })
+
+    if not entries:
+        print(f"[selective] Empty idx, falling back to full download")
+        return download_file(url, dest, timeout)
+
+    # Find byte ranges for each needed field
+    ranges = []
+    for shortName, level_desc in SELECTIVE_FIELDS:
+        for i, e in enumerate(entries):
+            if e["shortName"] == shortName and level_desc in e["level"]:
+                start = e["offset"]
+                end = entries[i + 1]["offset"] - 1 if i + 1 < len(entries) else None
+                ranges.append((shortName, level_desc, start, end))
+                break
+
+    if len(ranges) < len(SELECTIVE_FIELDS) - 2:  # tolerate 2 missing
+        missing = len(SELECTIVE_FIELDS) - len(ranges)
+        print(f"[selective] Only {len(ranges)}/{len(SELECTIVE_FIELDS)} fields found in idx "
+              f"({missing} missing), falling back to full download")
+        return download_file(url, dest, timeout)
+
+    ranges.sort(key=lambda r: r[2])
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    total_bytes = 0
+    session = requests.Session()
+    with dest.open("wb") as f:
+        for shortName, level_desc, start, end in ranges:
+            range_header = f"bytes={start}-{end}" if end is not None else f"bytes={start}-"
+            resp = session.get(url, headers={"Range": range_header}, timeout=timeout)
+            resp.raise_for_status()
+            f.write(resp.content)
+            total_bytes += len(resp.content)
+
+    print(f"[selective] Downloaded {len(ranges)} fields: "
+          f"{total_bytes / 1024 / 1024:.1f} MB (vs ~440 MB full)")
     return dest
 
 
@@ -657,10 +744,11 @@ def main() -> None:
         print(f"  - {cycle_dt.isoformat()}")
 
     cycle_payloads = []
+    _download = download_selective if args.selective else download_file
     for cycle_dt in cycles:
         label = cycle_label(cycle_dt)
         grib_path = cache_dir / f"gdas_{label}.grib2"
-        download_file(cycle_url(cycle_dt), grib_path, args.timeout)
+        _download(cycle_url(cycle_dt), grib_path, args.timeout)
         payload = open_gdas_payload(grib_path)
         cycle_payloads.append((cycle_dt, grib_path, payload))
 
