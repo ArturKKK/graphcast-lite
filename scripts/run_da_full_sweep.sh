@@ -64,20 +64,23 @@ echo "$(date '+%H:%M:%S') ══════════════════
 run_exp interp "$DATA_INTERP" "$OUT_INTERP" "baseline" 200 --assim-method none
 
 # --- OI 10%: full corr_len × sigma grid (screening: 50 samples) ---
-for corr in 10 25 50 100 150 200 300 500; do
+# NOTE: --oi-corr-len is in METERS. We pass km values multiplied by 1000.
+for corr_km in 10 25 50 100 150 200 300 500; do
+    corr_m=$((corr_km * 1000))
     for sigma in 0.3 0.5 1.0; do
-        run_exp interp "$DATA_INTERP" "$OUT_INTERP" "oi10_c${corr}_s${sigma}" 50 \
+        run_exp interp "$DATA_INTERP" "$OUT_INTERP" "oi10_c${corr_km}km_s${sigma}" 50 \
             --assim-method oi --obs-sparsity 0.1 \
-            --oi-corr-len "$corr" --oi-sigma-o "$sigma"
+            --oi-corr-len "$corr_m" --oi-sigma-o "$sigma"
     done
 done
 
 # --- OI 1%: full corr_len × sigma grid (screening: 50 samples) ---
-for corr in 10 25 50 100 150 200 300 500; do
+for corr_km in 10 25 50 100 150 200 300 500; do
+    corr_m=$((corr_km * 1000))
     for sigma in 0.3 0.5 1.0; do
-        run_exp interp "$DATA_INTERP" "$OUT_INTERP" "oi1_c${corr}_s${sigma}" 50 \
+        run_exp interp "$DATA_INTERP" "$OUT_INTERP" "oi1_c${corr_km}km_s${sigma}" 50 \
             --assim-method oi --obs-sparsity 0.01 \
-            --oi-corr-len "$corr" --oi-sigma-o "$sigma"
+            --oi-corr-len "$corr_m" --oi-sigma-o "$sigma"
     done
 done
 
@@ -109,25 +112,25 @@ for alpha in 0.1 0.3 0.5 0.7 0.9; do
         --nudging-alpha "$alpha" --nudging-mode offline
 done
 
-# --- Variable group experiments (OI 10%, c=100, σ=0.5, screening) ---
+# --- Variable group experiments (OI 10%, c=100km, σ=0.5, screening) ---
 run_exp interp "$DATA_INTERP" "$OUT_INTERP" "vargroup_t2m_oi10" 50 \
     --assim-method oi --obs-sparsity 0.1 \
-    --oi-corr-len 100 --oi-sigma-o 0.5 \
+    --oi-corr-len 100000 --oi-sigma-o 0.5 \
     --obs-channels "t2m"
 
 run_exp interp "$DATA_INTERP" "$OUT_INTERP" "vargroup_twind_oi10" 50 \
     --assim-method oi --obs-sparsity 0.1 \
-    --oi-corr-len 100 --oi-sigma-o 0.5 \
+    --oi-corr-len 100000 --oi-sigma-o 0.5 \
     --obs-channels "t2m,10u,10v"
 
 run_exp interp "$DATA_INTERP" "$OUT_INTERP" "vargroup_surface_oi10" 50 \
     --assim-method oi --obs-sparsity 0.1 \
-    --oi-corr-len 100 --oi-sigma-o 0.5 \
+    --oi-corr-len 100000 --oi-sigma-o 0.5 \
     --obs-channels "t2m,10u,10v,msl,sp"
 
 run_exp interp "$DATA_INTERP" "$OUT_INTERP" "vargroup_surfupper_oi10" 50 \
     --assim-method oi --obs-sparsity 0.1 \
-    --oi-corr-len 100 --oi-sigma-o 0.5 \
+    --oi-corr-len 100000 --oi-sigma-o 0.5 \
     --obs-channels "t2m,10u,10v,msl,sp,t@850,u@850,v@850,t@500,u@500,v@500"
 
 # ═══════════════════════════════════════════════════════
@@ -153,20 +156,23 @@ echo "$(date '+%H:%M:%S') ══════════════════
 run_exp merge "$DATA_MERGE" "$OUT_MERGE" "baseline" 200 --assim-method none
 
 # --- OI 10%: full corr_len × sigma grid (screening: 50 samples) ---
-for corr in 10 25 50 100 150 200 300 500; do
+# NOTE: --oi-corr-len is in METERS. We pass km values multiplied by 1000.
+for corr_km in 10 25 50 100 150 200 300 500; do
+    corr_m=$((corr_km * 1000))
     for sigma in 0.3 0.5 1.0; do
-        run_exp merge "$DATA_MERGE" "$OUT_MERGE" "oi10_c${corr}_s${sigma}" 50 \
+        run_exp merge "$DATA_MERGE" "$OUT_MERGE" "oi10_c${corr_km}km_s${sigma}" 50 \
             --assim-method oi --obs-sparsity 0.1 \
-            --oi-corr-len "$corr" --oi-sigma-o "$sigma"
+            --oi-corr-len "$corr_m" --oi-sigma-o "$sigma"
     done
 done
 
 # --- OI 1%: full corr_len × sigma grid (screening: 50 samples) ---
-for corr in 10 25 50 100 150 200 300 500; do
+for corr_km in 10 25 50 100 150 200 300 500; do
+    corr_m=$((corr_km * 1000))
     for sigma in 0.3 0.5 1.0; do
-        run_exp merge "$DATA_MERGE" "$OUT_MERGE" "oi1_c${corr}_s${sigma}" 50 \
+        run_exp merge "$DATA_MERGE" "$OUT_MERGE" "oi1_c${corr_km}km_s${sigma}" 50 \
             --assim-method oi --obs-sparsity 0.01 \
-            --oi-corr-len "$corr" --oi-sigma-o "$sigma"
+            --oi-corr-len "$corr_m" --oi-sigma-o "$sigma"
     done
 done
 
@@ -198,25 +204,25 @@ for alpha in 0.1 0.3 0.5 0.7 0.9; do
         --nudging-alpha "$alpha" --nudging-mode offline
 done
 
-# --- Variable group experiments (OI 10%, c=100, σ=0.5) ---
+# --- Variable group experiments (OI 10%, c=100km, σ=0.5) ---
 run_exp merge "$DATA_MERGE" "$OUT_MERGE" "vargroup_t2m_oi10" 50 \
     --assim-method oi --obs-sparsity 0.1 \
-    --oi-corr-len 100 --oi-sigma-o 0.5 \
+    --oi-corr-len 100000 --oi-sigma-o 0.5 \
     --obs-channels "t2m"
 
 run_exp merge "$DATA_MERGE" "$OUT_MERGE" "vargroup_twind_oi10" 50 \
     --assim-method oi --obs-sparsity 0.1 \
-    --oi-corr-len 100 --oi-sigma-o 0.5 \
+    --oi-corr-len 100000 --oi-sigma-o 0.5 \
     --obs-channels "t2m,10u,10v"
 
 run_exp merge "$DATA_MERGE" "$OUT_MERGE" "vargroup_surface_oi10" 50 \
     --assim-method oi --obs-sparsity 0.1 \
-    --oi-corr-len 100 --oi-sigma-o 0.5 \
+    --oi-corr-len 100000 --oi-sigma-o 0.5 \
     --obs-channels "t2m,10u,10v,msl,sp"
 
 run_exp merge "$DATA_MERGE" "$OUT_MERGE" "vargroup_surfupper_oi10" 50 \
     --assim-method oi --obs-sparsity 0.1 \
-    --oi-corr-len 100 --oi-sigma-o 0.5 \
+    --oi-corr-len 100000 --oi-sigma-o 0.5 \
     --obs-channels "t2m,10u,10v,msl,sp,t@850,u@850,v@850,t@500,u@500,v@500"
 
 # ═══════════════════════════════════════════════════════
@@ -227,39 +233,44 @@ echo "$(date '+%H:%M:%S') ══════════════════
 echo "BEST CONFIGS — 200 SAMPLES WITH PER-CHANNEL"
 echo "$(date '+%H:%M:%S') ════════════════════════════════════════"
 
-# Interpolate: Best OI 10% (likely c=100, σ=0.3 or 0.5)
-for corr in 50 100 150; do
+# Interpolate: Best OI 10% (likely c=100km, σ=0.3 or 0.5)
+# NOTE: --oi-corr-len is in METERS, multiply km by 1000
+for corr_km in 50 100 150; do
+    corr_m=$((corr_km * 1000))
     for sigma in 0.3 0.5; do
-        run_exp interp "$DATA_INTERP" "$OUT_INTERP" "BEST_oi10_c${corr}_s${sigma}" 200 \
+        run_exp interp "$DATA_INTERP" "$OUT_INTERP" "BEST_oi10_c${corr_km}km_s${sigma}" 200 \
             --assim-method oi --obs-sparsity 0.1 \
-            --oi-corr-len "$corr" --oi-sigma-o "$sigma"
+            --oi-corr-len "$corr_m" --oi-sigma-o "$sigma"
     done
 done
 
-# Interpolate: Best OI 1% (likely c=150-200, σ=0.3 or 0.5)
-for corr in 100 150 200; do
+# Interpolate: Best OI 1% (likely c=150-200km, σ=0.3 or 0.5)
+for corr_km in 100 150 200; do
+    corr_m=$((corr_km * 1000))
     for sigma in 0.3 0.5; do
-        run_exp interp "$DATA_INTERP" "$OUT_INTERP" "BEST_oi1_c${corr}_s${sigma}" 200 \
+        run_exp interp "$DATA_INTERP" "$OUT_INTERP" "BEST_oi1_c${corr_km}km_s${sigma}" 200 \
             --assim-method oi --obs-sparsity 0.01 \
-            --oi-corr-len "$corr" --oi-sigma-o "$sigma"
+            --oi-corr-len "$corr_m" --oi-sigma-o "$sigma"
     done
 done
 
 # Merge: Best OI 10% 
-for corr in 50 100 150; do
+for corr_km in 50 100 150; do
+    corr_m=$((corr_km * 1000))
     for sigma in 0.3 0.5; do
-        run_exp merge "$DATA_MERGE" "$OUT_MERGE" "BEST_oi10_c${corr}_s${sigma}" 200 \
+        run_exp merge "$DATA_MERGE" "$OUT_MERGE" "BEST_oi10_c${corr_km}km_s${sigma}" 200 \
             --assim-method oi --obs-sparsity 0.1 \
-            --oi-corr-len "$corr" --oi-sigma-o "$sigma"
+            --oi-corr-len "$corr_m" --oi-sigma-o "$sigma"
     done
 done
 
 # Merge: Best OI 1%
-for corr in 100 150 200 300; do
+for corr_km in 100 150 200 300; do
+    corr_m=$((corr_km * 1000))
     for sigma in 0.3 0.5; do
-        run_exp merge "$DATA_MERGE" "$OUT_MERGE" "BEST_oi1_c${corr}_s${sigma}" 200 \
+        run_exp merge "$DATA_MERGE" "$OUT_MERGE" "BEST_oi1_c${corr_km}km_s${sigma}" 200 \
             --assim-method oi --obs-sparsity 0.01 \
-            --oi-corr-len "$corr" --oi-sigma-o "$sigma"
+            --oi-corr-len "$corr_m" --oi-sigma-o "$sigma"
     done
 done
 

@@ -75,10 +75,14 @@ def parse_log(logpath):
     return result
 
 
+def _parse_corr_km(s):
+    """Parse corr_len value from name fragment like '100' or '100km'."""
+    return int(s.replace("km", ""))
+
 def make_oi_table(results, density_prefix, metric_key="skill"):
     """Build corr_len × sigma table for OI experiments."""
     corr_lens = sorted(set(
-        int(r["name"].split("_c")[1].split("_")[0])
+        _parse_corr_km(r["name"].split("_c")[1].split("_")[0])
         for r in results if r["name"].startswith(density_prefix + "_c")
     ))
     sigmas = sorted(set(
@@ -91,7 +95,7 @@ def make_oi_table(results, density_prefix, metric_key="skill"):
         if not r["name"].startswith(density_prefix + "_c"):
             continue
         parts = r["name"].split("_")
-        c = int(parts[1][1:])
+        c = _parse_corr_km(parts[1][1:])
         s = float(parts[2][1:])
         if r.get("region") and 6 in r["region"]:
             lookup[(c, s)] = r["region"][6].get(metric_key, "—")
