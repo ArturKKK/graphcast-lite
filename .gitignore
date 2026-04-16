@@ -183,3 +183,6 @@ mlg-env/
 #Model files
 experiments/*/results.json
 experiments/*/best_model.pth
+
+# Website generated data
+website/static/forecast.json

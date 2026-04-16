@@ -1,0 +1,369 @@
+/* ── CSS Variables ── */
+:root {
+  --bg-primary: #0f1923;
+  --bg-card: #1a2332;
+  --bg-card-hover: #1f2b3d;
+  --bg-table-alt: #151e2b;
+  --border: #2a3a4e;
+  --text-primary: #e8edf3;
+  --text-secondary: #8899aa;
+  --text-dim: #5a6a7a;
+  --accent: #4fc3f7;
+  --accent-warm: #ff8a65;
+  --accent-cold: #81d4fa;
+  --accent-green: #66bb6a;
+  --accent-red: #ef5350;
+  --radius: 12px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+.header {
+  background: linear-gradient(135deg, #1a2332 0%, #0d2137 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 1.2rem 1.5rem;
+}
+.header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.logo {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.logo-icon { font-size: 1.6rem; }
+.city-name {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+/* ── Main ── */
+.main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1rem 1rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ── Status bar ── */
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.status-update { color: var(--text-dim); }
+
+/* ── Scope toggle ── */
+.scope-toggle {
+  display: flex;
+  gap: 0.5rem;
+}
+.scope-btn {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.scope-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+.scope-btn.active {
+  background: var(--accent);
+  color: #0f1923;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  box-shadow: var(--shadow);
+}
+.card h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.8rem;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+}
+.card-header h2 { margin-bottom: 0; }
+
+/* ── Current forecast card ── */
+.current-time {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+.current-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.current-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+.current-temp {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.weather-emoji { font-size: 3rem; }
+.big-value {
+  font-size: 3.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+.unit {
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  align-self: flex-start;
+  margin-top: 0.5rem;
+}
+.label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.value {
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+.wind-arrow {
+  display: inline-block;
+  font-size: 1.4rem;
+  transition: transform 0.3s;
+}
+.gust-hint {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.precip-type-hint {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.temp-range {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  font-weight: 400;
+  margin-left: 0.5rem;
+  align-self: flex-end;
+  margin-bottom: 0.3rem;
+}
+.range-hint {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  font-weight: 400;
+  margin-left: 0.3rem;
+}
+
+/* ── City avg badge ── */
+.city-avg-badge {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--text-dim);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+/* ── Map ── */
+.map-section .card-header { margin-bottom: 0.5rem; }
+
+.map-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.slider-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.step-slider {
+  width: 180px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.map-container {
+  width: 100%;
+  height: 420px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.map-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.legend-bar {
+  height: 10px;
+  width: 180px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #313695, #4575b4, #74add1, #abd9e9, #fee090, #fdae61, #f46d43, #d73027, #a50026);
+}
+
+/* Leaflet tooltip override */
+.leaflet-tooltip.forecast-tip {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.82rem;
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+}
+.leaflet-tooltip.forecast-tip::before { border-top-color: var(--bg-card); }
+
+/* ── Forecast table ── */
+.table-wrap { overflow-x: auto; }
+.forecast-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.forecast-table th {
+  text-align: left;
+  padding: 0.6rem 0.8rem;
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.forecast-table td {
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid rgba(42,58,78,0.4);
+  white-space: nowrap;
+}
+.forecast-table tbody tr:nth-child(even) { background: var(--bg-table-alt); }
+.forecast-table tbody tr:hover { background: var(--bg-card-hover); }
+
+.temp-cell { font-weight: 600; }
+.temp-warm { color: var(--accent-warm); }
+.temp-cold { color: var(--accent-cold); }
+.temp-mild { color: var(--accent-green); }
+
+.wind-dir-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.table-wind-arrow {
+  display: inline-block;
+  font-size: 1rem;
+  transition: transform 0.3s;
+}
+.gust-table {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.precip-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* ── Chart ── */
+#temp-chart { max-height: 300px; }
+
+/* ── Footer ── */
+.footer {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 2rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+.disclaimer {
+  margin-bottom: 0.4rem;
+  color: var(--text-secondary);
+}
+.model-info { font-style: italic; }
+
+/* ── Error state ── */
+.error-msg {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--accent-red);
+  font-size: 1.1rem;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .header-inner { flex-direction: column; gap: 0.2rem; }
+  .logo { font-size: 1.15rem; }
+  .city-name { font-size: 0.95rem; }
+  .main { padding: 0.7rem 0.5rem 1.5rem; }
+  .card { padding: 0.9rem; }
+  .current-grid { grid-template-columns: 1fr; }
+  .current-temp { flex-direction: row; }
+  .big-value { font-size: 2.8rem; }
+  .weather-emoji { font-size: 2.4rem; }
+  .map-container { height: 320px; }
+  .step-slider { width: 120px; }
+  .map-controls { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
+  .forecast-table { font-size: 0.82rem; }
+  .forecast-table th, .forecast-table td { padding: 0.45rem 0.5rem; }
+}

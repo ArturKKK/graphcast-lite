@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Прогноз погоды · Красноярск</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <h1 class="logo">
+        <span class="logo-icon">&#9729;</span>
+        Прогноз погоды
+      </h1>
+      <p class="city-name">Красноярск</p>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- Scope toggle -->
+    <div class="scope-toggle">
+      <button class="scope-btn active" data-scope="city">🏙️ Город (9 точек)</button>
+      <button class="scope-btn" data-scope="region">🗺️ Регион (45 точек)</button>
+    </div>
+
+    <!-- Current forecast card -->
+    <section id="current-card" class="card current-card" style="display:none;">
+      <div class="card-header">
+        <h2>Сейчас <span class="city-avg-badge" id="city-avg-badge">среднее по городу</span></h2>
+        <span id="current-time" class="current-time"></span>
+      </div>
+      <div class="current-grid">
+        <div class="current-item current-temp">
+          <span id="current-emoji" class="weather-emoji"></span>
+          <span id="current-temp" class="big-value"></span>
+          <span class="unit">°C</span>
+          <span id="current-temp-range" class="temp-range"></span>
+        </div>
+        <div class="current-item">
+          <span class="label">Ветер</span>
+          <span id="current-wind" class="value"></span>
+          <span id="current-wind-arrow" class="wind-arrow"></span>
+          <span id="current-gust" class="gust-hint"></span>
+        </div>
+        <div class="current-item">
+          <span class="label">Давление</span>
+          <span id="current-pressure" class="value"></span>
+        </div>
+        <div class="current-item">
+          <span class="label">Осадки</span>
+          <span id="current-precip" class="value"></span>
+          <span id="current-precip-type" class="precip-type-hint"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive map -->
+    <section class="card map-section">
+      <div class="card-header">
+        <h2>Карта прогноза</h2>
+        <div class="map-controls">
+          <label for="map-step-slider" class="slider-label">
+            Горизонт: <span id="map-step-label">+6ч</span>
+          </label>
+          <input type="range" id="map-step-slider" min="0" max="11" value="0" class="step-slider">
+        </div>
+      </div>
+      <div id="map" class="map-container"></div>
+      <div class="map-legend" id="map-legend"></div>
+    </section>
+
+    <!-- Forecast table -->
+    <section class="card">
+      <h2>Прогноз на 3 суток <span class="city-avg-badge">среднее по <span id="table-scope-label">городу</span> · <span id="table-city-pts"></span> точек</span></h2>
+      <div class="table-wrap">
+        <table id="forecast-table" class="forecast-table">
+          <thead>
+            <tr>
+              <th>Время, UTC+7</th>
+              <th></th>
+              <th>T, °C</th>
+              <th>Ветер, м/с</th>
+              <th>Направл.</th>
+              <th>Давл., мм рт.ст.</th>
+              <th>Осадки, мм</th>
+            </tr>
+          </thead>
+          <tbody id="forecast-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Temperature chart -->
+    <section class="card">
+      <h2>Температура</h2>
+      <canvas id="temp-chart" height="260"></canvas>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p class="disclaimer">
+      ⚠️ Экспериментальный прогноз на базе нейросетевой модели. Не является официальным метеопрогнозом.
+    </p>
+    <p class="model-info">
+      Модель: GraphCast-lite (GNN, 5.9M параметров, 12 MP steps) + MOS-коррекция по 19 станциям
+    </p>
+  </footer>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
