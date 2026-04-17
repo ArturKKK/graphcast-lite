@@ -45,6 +45,12 @@
   var tempChart = null;
   var currentScope = "core"; // "core", "city", or "region"
 
+  // Overlay state
+  var overlayMeta = null;
+  var overlayLayers = {};   // { temp: L.imageOverlay, ... }
+  var windArrowMarkers = [];
+  var layerState = { temp: true, wind: false, precip: false, pressure: false, points: true };
+
   // ── Scope helper ──
   function getActiveSummary(data) {
     if (currentScope === "core") return data.summary_core || data.summary_city || data.summary || [];
@@ -184,6 +190,7 @@
     renderChart(data);
     updateLegend();
     renderMapMarkers(data, currentStep);
+    updateOverlays(currentStep);
   }
 
   function renderStatus(data) {
@@ -353,16 +360,147 @@
       maxZoom: 14,
     }).addTo(map);
 
+    // Krasnoyarsk marker
+    L.marker([56.01, 92.87], {
+      icon: L.divIcon({
+        className: "",
+        html: '<div style="color:#4fc3f7;font-size:18px;text-shadow:0 0 6px #000;line-height:1">★</div>',
+        iconSize: [20, 20], iconAnchor: [10, 10]
+      }),
+      zIndex: 1000
+    }).addTo(map).bindTooltip("Красноярск", { direction: "right", className: "forecast-tip" });
+
     document.getElementById("map-legend").innerHTML = "";
+  }
+
+  function fetchOverlayMeta() {
+    return fetch("/static/overlays/meta.json")
+      .then(function(r) { return r.json(); })
+      .then(function(meta) { overlayMeta = meta; })
+      .catch(function() { overlayMeta = null; });
+  }
+
+  function initOverlays() {
+    if (!overlayMeta) return;
+    var bounds = overlayMeta.bounds;
+    ["temp", "wind", "precip", "pressure"].forEach(function(layer) {
+      overlayLayers[layer] = L.imageOverlay("", bounds, {
+        opacity: 0.9, interactive: false, zIndex: 200
+      });
+    });
+  }
+
+  function updateOverlays(step) {
+    if (!overlayMeta) return;
+    ["temp", "wind", "precip", "pressure"].forEach(function(layer) {
+      var url = "/static/overlays/" + layer + "_" + step + ".png";
+      overlayLayers[layer].setUrl(url);
+      if (layerState[layer]) {
+        if (!map.hasLayer(overlayLayers[layer])) overlayLayers[layer].addTo(map);
+      } else {
+        if (map.hasLayer(overlayLayers[layer])) map.removeLayer(overlayLayers[layer]);
+      }
+    });
+    // Wind arrows
+    if (layerState.wind) {
+      drawWindArrows(step);
+    } else {
+      clearWindArrows();
+    }
+  }
+
+  // ── Wind arrows ──
+  function clearWindArrows() {
+    windArrowMarkers.forEach(function(m) { m.remove(); });
+    windArrowMarkers = [];
+  }
+
+  function drawWindArrows(step) {
+    clearWindArrows();
+    if (!overlayMeta || !overlayMeta.wind_arrows) return;
+    var arrows = overlayMeta.wind_arrows[String(step)];
+    if (!arrows) return;
+    var wsMax = overlayMeta.ranges.wind[1];
+
+    arrows.forEach(function(a) {
+      var ws = a.ws, wd = a.wd;
+      var size = 14 + (ws / wsMax) * 16;
+      // Color by speed
+      var f = Math.min(ws / wsMax, 1);
+      var r, g, b;
+      if (f < 0.2) { r = lerp(77,153,f*5); g = lerp(191,230,f*5); b = lerp(77,51,f*5); }
+      else if (f < 0.5) { r = lerp(153,255,(f-0.2)/0.3); g = lerp(230,217,(f-0.2)/0.3); b = lerp(51,26,(f-0.2)/0.3); }
+      else if (f < 0.75) { r = lerp(255,217,(f-0.5)/0.25); g = lerp(217,38,(f-0.5)/0.25); b = lerp(26,38,(f-0.5)/0.25); }
+      else { r = lerp(217,140,(f-0.75)/0.25); g = lerp(38,0,(f-0.75)/0.25); b = lerp(38,0,(f-0.75)/0.25); }
+      var color = "rgb(" + Math.round(r) + "," + Math.round(g) + "," + Math.round(b) + ")";
+
+      var icon = L.divIcon({
+        className: "",
+        html: '<div style="transform:rotate(' + wd + 'deg);font-size:' + size +
+              'px;color:' + color + ';text-shadow:0 0 4px rgba(0,0,0,0.9);line-height:1;font-weight:bold">↓</div>',
+        iconSize: [size, size], iconAnchor: [size/2, size/2]
+      });
+      var m = L.marker([a.lat, a.lon], { icon: icon, interactive: false, zIndex: 300 }).addTo(map);
+      windArrowMarkers.push(m);
+    });
+  }
+
+  // ── Layer toggles ──
+  function setupLayerToggles() {
+    document.querySelectorAll(".layer-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var layer = btn.dataset.layer;
+        layerState[layer] = !layerState[layer];
+        btn.classList.toggle("on", layerState[layer]);
+
+        if (layer === "points") {
+          // Show/hide grid point markers
+          mapMarkers.forEach(function(m) {
+            if (layerState.points) { if (!map.hasLayer(m)) m.addTo(map); }
+            else { if (map.hasLayer(m)) map.removeLayer(m); }
+          });
+        } else {
+          updateOverlays(currentStep);
+        }
+      });
+    });
   }
 
   function updateLegend() {
     var legendEl = document.getElementById("map-legend");
-    var tMinS = tMin > 0 ? "+" + tMin : "" + tMin;
-    var tMaxS = tMax > 0 ? "+" + tMax : "" + tMax;
-    legendEl.innerHTML =
-      "<span>" + tMinS + "\u00B0C</span><div class=\"legend-bar\"></div><span>" + tMaxS + "\u00B0C</span>" +
-      '<span style="margin-left:1rem;color:var(--text-dim)">\u25CF \u0442\u043E\u0447\u043A\u0438 \u0441\u0435\u0442\u043A\u0438 GNN (0.25\u00B0)</span>';
+    if (!overlayMeta) {
+      var tMinS = tMin > 0 ? "+" + tMin : "" + tMin;
+      var tMaxS = tMax > 0 ? "+" + tMax : "" + tMax;
+      legendEl.innerHTML =
+        "<span>" + tMinS + "\u00B0C</span><div class=\"legend-bar\"></div><span>" + tMaxS + "\u00B0C</span>";
+      return;
+    }
+    var r = overlayMeta.ranges;
+    var items = [];
+    if (layerState.temp) items.push(
+      '<span>' + r.temp[0].toFixed(0) + '°</span>' +
+      '<div class="legend-bar" style="background:linear-gradient(90deg,#1e2896,#3264be,#50a5dc,#8cd7e6,#ffeb78,#ffaa46,#f05a32,#c81e1e)"></div>' +
+      '<span>' + r.temp[1].toFixed(0) + '°C</span>'
+    );
+    if (layerState.wind) items.push(
+      '<span>0</span>' +
+      '<div class="legend-bar" style="background:linear-gradient(90deg,#4dc04d,#99e633,#ffda1a,#ff801a,#d92626,#8c0000)"></div>' +
+      '<span>' + r.wind[1].toFixed(0) + ' м/с</span>'
+    );
+    if (layerState.precip) items.push(
+      '<span>0</span>' +
+      '<div class="legend-bar" style="background:linear-gradient(90deg,rgba(180,217,255,0),#5999f2,#2666d9,#0d33b3,#050d73)"></div>' +
+      '<span>' + r.precip[1].toFixed(1) + ' мм</span>'
+    );
+    if (layerState.pressure) items.push(
+      '<span>' + r.pressure[0].toFixed(0) + '</span>' +
+      '<div class="legend-bar" style="background:linear-gradient(90deg,#1a4d80,#268c8c,#4dc080,#b3d94d,#f2c033,#f28026)"></div>' +
+      '<span>' + r.pressure[1].toFixed(0) + ' мм рт.</span>'
+    );
+    if (layerState.points) items.push(
+      '<span style="color:var(--text-dim)">● точки сетки GNN (0.25°) — наведите для деталей</span>'
+    );
+    legendEl.innerHTML = items.join('<span style="margin:0 0.5rem;color:var(--border)">|</span>');
   }
 
   function renderMapMarkers(data, step) {
@@ -370,34 +508,37 @@
     mapMarkers = [];
     if (!data.grid_points || data.grid_points.length === 0) return;
 
-    var summary = getActiveSummary(data);
-    var validTime = summary[step] ? formatKrskTime(summary[step].valid_time_utc) : "+" + ((step + 1) * 6) + "\u0447";
-
     for (var i = 0; i < data.grid_points.length; i++) {
       var pt = data.grid_points[i];
       var sd = pt.steps[step];
       if (!sd) continue;
 
-      var color = tempColor(sd.t);
       var tSign = sd.t > 0 ? "+" : "";
       var arrow = windArrowChar(sd.wd);
 
       var marker = L.circleMarker([pt.lat, pt.lon], {
-        radius: 10,
-        fillColor: color,
-        fillOpacity: 0.92,
-        color: "#1a2332",
-        weight: 2.5,
-        opacity: 1,
-      }).addTo(map);
+        radius: 5,
+        fillColor: "rgba(79,195,247,0.5)",
+        fillOpacity: 0.5,
+        color: "#4fc3f7",
+        weight: 1,
+        opacity: 0.6,
+        zIndexOffset: 400,
+      });
 
-      var tip = "<b>" + tSign + sd.t + "\u00B0C</b> &nbsp; " + sd.ws + " \u043C/\u0441 " + arrow;
-      if (sd.wg > sd.ws + 0.5) tip += " (\u043F. " + sd.wg + ")";
-      tip += " &nbsp; " + sd.pr + " \u043C\u043C";
-      if (sd.p > 0.1 && sd.pi) tip += " &nbsp; " + sd.pi;
-      if (sd.p > 0.1 && sd.pt) tip += " " + sd.pt;
+      var tip = "<b>" + tSign + sd.t + "\u00B0C</b>";
+      tip += " &nbsp; " + sd.ws + " \u043C/\u0441 " + arrow;
+      if (sd.wg > sd.ws + 0.5) tip += " (\u043F\u043E\u0440. " + sd.wg + ")";
+      tip += " &nbsp; " + sd.pr + " \u043C\u043C \u0440\u0442.\u0441\u0442.";
+      if (sd.p > 0.05) {
+        tip += "<br>" + sd.p + " \u043C\u043C \u043E\u0441\u0430\u0434\u043A\u0438";
+        if (sd.pi) tip += " " + sd.pi;
+        if (sd.pt) tip += " " + sd.pt;
+      }
 
-      marker.bindTooltip(tip, { className: "forecast-tip", direction: "top", offset: [0, -8] });
+      marker.bindTooltip(tip, { className: "forecast-tip", direction: "top", offset: [0, -6] });
+
+      if (layerState.points) marker.addTo(map);
       mapMarkers.push(marker);
     }
   }
@@ -417,6 +558,8 @@
       var timeStr = summary[step] ? formatKrskTime(summary[step].valid_time_utc) : "";
       label.textContent = "+" + h + "\u0447" + (timeStr ? " (" + timeStr + ")" : "");
       renderMapMarkers(forecastData, step);
+      updateOverlays(step);
+      updateLegend();
     }
 
     slider.removeEventListener("input", slider._handler);
@@ -425,12 +568,115 @@
     update();
   }
 
+  // ── Yandex Weather Comparison ──
+
+  function fetchYandexWeather() {
+    return fetch("/api/yandex")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+  }
+
+  function renderYandexWidget(yData) {
+    var container = document.getElementById("yandex-widget");
+    if (!container || !yData || yData.error) {
+      if (container) container.innerHTML = '<p class="yandex-error">Данные Яндекс.Погоды недоступны</p>';
+      return;
+    }
+
+    var c = yData.current || {};
+    var daily = yData.daily || [];
+
+    // Current weather card
+    var html = '<div class="yandex-current">';
+    html += '<div class="yandex-current-main">';
+    html += '<span class="yandex-temp">' + (c.temp > 0 ? '+' : '') + c.temp + '°</span>';
+    html += '<span class="yandex-condition">' + (c.condition || '') + '</span>';
+    html += '</div>';
+    html += '<div class="yandex-current-details">';
+    html += '<span>Ощущается: ' + (c.feels_like > 0 ? '+' : '') + (c.feels_like || '') + '°</span>';
+    html += '<span>Ветер: ' + (c.wind_speed || '') + ' м/с, ' + (c.wind_dir || '') + '</span>';
+    html += '<span>Давление: ' + (c.pressure_mmhg || '') + ' мм рт.ст.</span>';
+    html += '<span>Влажность: ' + (c.humidity || '') + '%</span>';
+    html += '</div>';
+    html += '</div>';
+
+    // Daily forecast table
+    if (daily.length > 0) {
+      html += '<table class="yandex-daily">';
+      html += '<colgroup><col class="day-label"><col><col><col><col></colgroup>';
+      html += '<thead><tr><th></th><th>Утро</th><th>День</th><th>Вечер</th><th>Ночь</th></tr></thead>';
+      html += '<tbody>';
+      for (var i = 0; i < daily.length; i++) {
+        var d = daily[i];
+        var p = d.parts || {};
+        html += '<tr>';
+        html += '<td class="yandex-day-name">' + d.day + '<br><small>' + d.date + '</small></td>';
+        var parts = ['утром', 'днём', 'вечером', 'ночью'];
+        for (var j = 0; j < parts.length; j++) {
+          var part = p[parts[j]];
+          if (part) {
+            var t = part.temp;
+            var tc = t <= -20 ? '#88f' : t <= -10 ? '#aaf' : t <= 0 ? '#cce' : t <= 10 ? '#ffa' : t <= 20 ? '#fa0' : '#f44';
+            html += '<td><span class="yandex-day-temp" style="color:' + tc + '">' + (t > 0 ? '+' : '') + t + '°</span>';
+            html += '<span class="yandex-day-wind">' + part.wind_speed + ' м/с</span></td>';
+          } else {
+            html += '<td>—</td>';
+          }
+        }
+        html += '</tr>';
+      }
+      html += '</tbody></table>';
+    }
+
+    // Comparison with our forecast
+    if (forecastData) {
+      var summary = getActiveSummary(forecastData);
+      if (summary.length > 0 && daily.length > 0) {
+        html += '<div class="yandex-comparison">';
+        html += '<h4>Сравнение с нашим прогнозом (ближайший шаг)</h4>';
+        var ourT = summary[0].t2m_celsius;
+        var ourW = summary[0].wind_speed;
+        var ourP = summary[0].pressure_mmhg;
+        var yT = c.temp;
+        var yW = c.wind_speed;
+        var yP = c.pressure_mmhg;
+        html += '<table class="yandex-compare-table">';
+        html += '<thead><tr><th></th><th>GraphCast-lite</th><th>Яндекс.Погода</th><th>Δ</th></tr></thead>';
+        html += '<tbody>';
+        if (ourT !== undefined && yT !== undefined) {
+          var dT = (ourT - yT).toFixed(1);
+          html += '<tr><td>Температура</td><td>' + ourT.toFixed(1) + '°</td><td>' + yT + '°</td><td>' + (dT > 0 ? '+' : '') + dT + '°</td></tr>';
+        }
+        if (ourW !== undefined && yW !== undefined) {
+          var dW = (ourW - yW).toFixed(1);
+          html += '<tr><td>Ветер</td><td>' + ourW.toFixed(1) + ' м/с</td><td>' + yW + ' м/с</td><td>' + (dW > 0 ? '+' : '') + dW + '</td></tr>';
+        }
+        if (ourP !== undefined && yP !== undefined) {
+          var dP = (ourP - yP).toFixed(1);
+          html += '<tr><td>Давление</td><td>' + ourP.toFixed(0) + '</td><td>' + yP + '</td><td>' + (dP > 0 ? '+' : '') + dP + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        html += '</div>';
+      }
+    }
+
+    html += '<div class="yandex-footer">';
+    if (yData._stale) html += '<span class="yandex-stale">⚠ кэшированные данные</span> ';
+    html += '<small>Обновлено: ' + (yData.scraped_at || '—') + '</small> ';
+    html += '<a href="' + yData.url + '" target="_blank" rel="noopener">Открыть на Яндексе →</a>';
+    html += '</div>';
+
+    container.innerHTML = html;
+  }
+
   // ── Main ──
 
   function init() {
     setupScopeToggle();
+    setupLayerToggles();
 
-    fetchForecast().then(function (data) {
+    Promise.all([fetchForecast(), fetchOverlayMeta()]).then(function(results) {
+      var data = results[0];
       if (!data) return;
       forecastData = data;
 
@@ -441,15 +687,22 @@
       renderChart(forecastData);
 
       initMap();
+      initOverlays();
       updateLegend();
       setupMapSlider(forecastData);
+
     });
+
+    // Fetch Yandex weather independently
+    fetchYandexWeather().then(renderYandexWidget);
 
     // Auto-refresh
     setInterval(function () {
-      fetchForecast().then(function (newData) {
+      Promise.all([fetchForecast(), fetchOverlayMeta()]).then(function(results) {
+        var newData = results[0];
         if (newData && forecastData && newData.generated_at !== forecastData.generated_at) {
           forecastData = newData;
+          initOverlays();
           renderAll(forecastData);
           setupMapSlider(forecastData);
         }

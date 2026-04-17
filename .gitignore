@@ -171,18 +171,72 @@ cython_debug/
 
 # data files
 # *.nc
-/data/datasets
+/data/datasets/
 
 # Wandb
-/wandb
+/wandb/
 
 # virtualenv
 mlg-env/
 
+# ===== Project-specific ignores =====
 
-#Model files
-experiments/*/results.json
-experiments/*/best_model.pth
+# Model weights & predictions
+*.pth
+*.pt
+*.onnx
+*.safetensors
+
+# Data files
+*.npy
+*.npz
+*.grib2
+*.nc
+*.hdf5
+*.h5
+
+# Archives
+*.tar.gz
+*.zip
+*.b64
+
+# Images & presentations
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.pdf
+*.pptx
+
+# ML artifacts
+*.joblib
+*.idx
+
+# Junk / scratch directories
+/aaaa/
+/data-for-diplom/
+/vm_backup/
+/slides_visuals/
+/notebooks/data/
+/results/
+
+# Live runtime bundle (binary blobs)
+/live_runtime_bundle/*.npz
+/live_runtime_bundle/*.npy
+/live_runtime_bundle/*.joblib
+/live_runtime_bundle/*.json
+!live_runtime_bundle/variables.json
+!live_runtime_bundle/bundle_meta.json
+
+# Experiment checkpoints & predictions (keep configs)
+experiments/*/checkpoints/
+experiments/*/pred_*.pt
+experiments/*/predictions.pt
+experiments/*/tune_*.pt
+experiments/*/*.pth
 
 # Website generated data
 website/static/forecast.json
+website/static/overlays/*.png
+website/yandex_cache.json

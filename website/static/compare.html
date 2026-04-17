@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Карта — V3 vs V4</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a1117; color: #c8d6e5; font-family: 'Segoe UI', sans-serif; }
+
+    .tabs { display: flex; justify-content: center; gap: 8px; padding: 16px; }
+    .tab-btn {
+      padding: 10px 28px; border: 1px solid #2a3a4e; border-radius: 8px;
+      background: #131f2b; color: #8899aa; cursor: pointer; font-size: 15px;
+      transition: all .2s;
+    }
+    .tab-btn.active { background: #1e3a5f; color: #4fc3f7; border-color: #4fc3f7; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* V3: 4 panels */
+    .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 12px 12px; height: calc(100vh - 160px); }
+    .panel { border-radius: 8px; overflow: hidden; position: relative; }
+    .panel-label {
+      position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+      z-index: 999; background: rgba(15,25,35,0.85); color: #4fc3f7;
+      padding: 4px 14px; border-radius: 6px; font-size: 13px; font-weight: 600;
+      pointer-events: none;
+    }
+
+    /* V4: single map */
+    .full-map { margin: 0 12px 12px; height: calc(100vh - 160px); border-radius: 8px; overflow: hidden; }
+
+    /* Controls bar */
+    .controls {
+      display: flex; align-items: center; justify-content: center; gap: 20px;
+      padding: 8px 16px; background: #131f2b; border-bottom: 1px solid #2a3a4e;
+    }
+    .controls label { color: #8899aa; font-size: 13px; }
+    .controls input[type=range] {
+      width: 280px; accent-color: #4fc3f7;
+    }
+    .step-display { color: #4fc3f7; font-weight: 600; min-width: 80px; }
+
+    /* Layer toggles */
+    .layer-toggles { display: flex; gap: 6px; }
+    .layer-btn {
+      padding: 5px 14px; border: 1px solid #2a3a4e; border-radius: 6px;
+      background: #1a2a3a; color: #8899aa; cursor: pointer; font-size: 12px;
+      transition: all .2s;
+    }
+    .layer-btn.on { background: #1e3a5f; color: #4fc3f7; border-color: #4fc3f7; }
+
+    /* Legend bars */
+    .legend-row {
+      display: flex; gap: 20px; justify-content: center; padding: 6px 0;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8899aa;
+    }
+    .legend-bar {
+      width: 100px; height: 10px; border-radius: 3px;
+    }
+    .legend-label { white-space: nowrap; }
+
+    /* Leaflet dark tiles */
+    .leaflet-container { background: #0f1923 !important; }
+    .leaflet-tile-pane { filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7); }
+  </style>
+</head>
+<body>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="v4">V4 — Полная карта (слои)</button>
+    <button class="tab-btn" data-tab="v3">V3 — 4 панели</button>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <label>Горизонт прогноза:</label>
+    <input type="range" id="step-slider" min="0" max="11" value="0">
+    <span class="step-display" id="step-label">+6ч</span>
+
+    <div class="layer-toggles" id="layer-toggles">
+      <button class="layer-btn on" data-layer="temp">🌡 Температура</button>
+      <button class="layer-btn on" data-layer="wind">💨 Ветер</button>
+      <button class="layer-btn" data-layer="precip">🌧 Осадки</button>
+      <button class="layer-btn" data-layer="pressure">🔵 Давление</button>
+    </div>
+  </div>
+
+  <!-- V4: single map with toggleable layers -->
+  <div class="tab-content active" id="tab-v4">
+    <div class="legend-row" id="legend-v4"></div>
+    <div id="map-v4" class="full-map"></div>
+  </div>
+
+  <!-- V3: 4 panels -->
+  <div class="tab-content" id="tab-v3">
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-label">🌡 Температура, °C</div>
+        <div id="map-v3-temp" style="width:100%;height:100%"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-label">💨 Скорость ветра, м/с</div>
+        <div id="map-v3-wind" style="width:100%;height:100%"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-label">🌧 Осадки, мм</div>
+        <div id="map-v3-precip" style="width:100%;height:100%"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-label">🔵 Давление, мм рт.ст.</div>
+        <div id="map-v3-pressure" style="width:100%;height:100%"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function() {
+  "use strict";
+
+  var META = null;
+  var currentStep = 0;
+
+  // Layer state (for V4)
+  var layers = { temp: true, wind: true, precip: false, pressure: false };
+
+  // Maps
+  var mapV4 = null;
+  var mapsV3 = {};
+  var overlaysV4 = {};    // { temp: L.imageOverlay, ... }
+  var overlaysV3 = {};    // { temp: L.imageOverlay, ... }
+  var windMarkersV4 = []; // wind arrow markers on V4
+  var windMarkersV3 = []; // wind arrow markers on V3-wind panel
+
+  var MAP_CENTER = [56.01, 92.87];
+  var MAP_ZOOM = 8;
+
+  // ── Color helpers for legends ──
+  var RDYLBU = [
+    "rgb(49,54,149)", "rgb(69,117,180)", "rgb(116,173,209)",
+    "rgb(171,217,233)", "rgb(254,224,144)", "rgb(253,174,97)",
+    "rgb(244,109,67)", "rgb(215,48,39)"
+  ];
+  var WIND = ["rgb(140,211,140)", "rgb(102,204,102)", "rgb(255,230,77)", "rgb(255,153,51)", "rgb(230,51,51)"];
+  var PRECIP = ["rgba(217,235,250,0)", "rgba(153,199,242,0.3)", "rgba(77,140,217,0.5)",
+                "rgba(38,89,191,0.7)", "rgba(26,51,153,0.85)"];
+
+  function gradientCSS(stops) {
+    return "linear-gradient(90deg, " + stops.join(", ") + ")";
+  }
+
+  // ── Init ──
+  function init() {
+    fetch("/static/overlays/meta.json")
+      .then(function(r) { return r.json(); })
+      .then(function(meta) {
+        META = meta;
+        setupMaps();
+        setupControls();
+        updateStep(0);
+        buildLegend();
+      });
+  }
+
+  function tileLayer() {
+    return L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 14 });
+  }
+
+  function krasnoyarskMarker(map) {
+    L.marker(MAP_CENTER, {
+      icon: L.divIcon({
+        className: "",
+        html: '<div style="color:#4fc3f7;font-size:18px;text-shadow:0 0 6px #000">★</div>',
+        iconSize: [20, 20], iconAnchor: [10, 10]
+      })
+    }).addTo(map).bindTooltip("Красноярск", {
+      permanent: false, direction: "right",
+      className: "city-tip"
+    });
+  }
+
+  function setupMaps() {
+    // V4
+    mapV4 = L.map("map-v4", { center: MAP_CENTER, zoom: MAP_ZOOM, zoomControl: true, attributionControl: false });
+    tileLayer().addTo(mapV4);
+    krasnoyarskMarker(mapV4);
+
+    // Create image overlays for V4
+    ["temp", "wind", "precip", "pressure"].forEach(function(layer) {
+      overlaysV4[layer] = L.imageOverlay("", META.bounds, { opacity: 0.9, interactive: false });
+    });
+
+    // V3 panels
+    ["temp", "wind", "precip", "pressure"].forEach(function(layer) {
+      var m = L.map("map-v3-" + layer, {
+        center: MAP_CENTER, zoom: MAP_ZOOM - 1, zoomControl: false, attributionControl: false
+      });
+      tileLayer().addTo(m);
+      krasnoyarskMarker(m);
+      mapsV3[layer] = m;
+      overlaysV3[layer] = L.imageOverlay("", META.bounds, { opacity: 0.9, interactive: false }).addTo(m);
+    });
+
+    // Fix Leaflet sizing after tab switch
+    setTimeout(function() { mapV4.invalidateSize(); }, 100);
+  }
+
+  // ── Wind arrows ──
+  function clearWindArrows(arr) {
+    arr.forEach(function(m) { m.remove(); });
+    arr.length = 0;
+  }
+
+  function drawWindArrows(map, step, arr) {
+    clearWindArrows(arr);
+    if (!META || !META.wind_arrows || !META.wind_arrows[String(step)]) return;
+
+    var arrows = META.wind_arrows[String(step)];
+    var wsMax = META.ranges.wind[1];
+
+    arrows.forEach(function(a) {
+      var ws = a.ws;
+      var wd = a.wd;
+      // Arrow rotated by wind direction
+      var rotation = wd; // degrees from North
+      var size = 12 + (ws / wsMax) * 18; // 12-30px
+
+      // Color by speed
+      var f = Math.min(ws / wsMax, 1);
+      var r, g, b;
+      if (f < 0.25) { r = lerp(140,102,f*4); g = lerp(211,204,f*4); b = lerp(140,102,f*4); }
+      else if (f < 0.5) { r = lerp(102,255,(f-0.25)*4); g = lerp(204,230,(f-0.25)*4); b = lerp(102,77,(f-0.25)*4); }
+      else if (f < 0.75) { r = lerp(255,255,(f-0.5)*4); g = lerp(230,153,(f-0.5)*4); b = lerp(77,51,(f-0.5)*4); }
+      else { r = lerp(255,230,(f-0.75)*4); g = lerp(153,51,(f-0.75)*4); b = lerp(51,51,(f-0.75)*4); }
+      var color = "rgb(" + Math.round(r) + "," + Math.round(g) + "," + Math.round(b) + ")";
+
+      var icon = L.divIcon({
+        className: "",
+        html: '<div style="transform:rotate(' + rotation + 'deg);font-size:' + size + 'px;color:' + color +
+              ';text-shadow:0 0 3px rgba(0,0,0,0.8);line-height:1">↓</div>',
+        iconSize: [size, size],
+        iconAnchor: [size/2, size/2]
+      });
+
+      var m = L.marker([a.lat, a.lon], { icon: icon, interactive: false }).addTo(map);
+      arr.push(m);
+    });
+  }
+
+  function lerp(a, b, t) { return a + (b - a) * Math.min(1, Math.max(0, t)); }
+
+  // ── Update step ──
+  function updateStep(step) {
+    currentStep = step;
+    var h = (step + 1) * 6;
+    document.getElementById("step-label").textContent = "+" + h + "ч";
+
+    // Update V4 overlays
+    ["temp", "wind", "precip", "pressure"].forEach(function(layer) {
+      var url = "/static/overlays/" + layer + "_" + step + ".png";
+      overlaysV4[layer].setUrl(url);
+
+      if (layers[layer]) {
+        if (!mapV4.hasLayer(overlaysV4[layer])) overlaysV4[layer].addTo(mapV4);
+      } else {
+        if (mapV4.hasLayer(overlaysV4[layer])) mapV4.removeLayer(overlaysV4[layer]);
+      }
+
+      // V3 panels always shown
+      overlaysV3[layer].setUrl(url);
+    });
+
+    // Wind arrows
+    if (layers.wind) {
+      drawWindArrows(mapV4, step, windMarkersV4);
+    } else {
+      clearWindArrows(windMarkersV4);
+    }
+    drawWindArrows(mapsV3.wind, step, windMarkersV3);
+  }
+
+  // ── Controls ──
+  function setupControls() {
+    var slider = document.getElementById("step-slider");
+    slider.max = META.n_steps - 1;
+    slider.addEventListener("input", function() {
+      updateStep(parseInt(this.value));
+    });
+
+    // Tab switching
+    document.querySelectorAll(".tab-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var tab = btn.dataset.tab;
+        document.querySelectorAll(".tab-btn").forEach(function(b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        document.querySelectorAll(".tab-content").forEach(function(c) { c.classList.remove("active"); });
+        document.getElementById("tab-" + tab).classList.add("active");
+
+        // Fix map sizes after tab switch
+        setTimeout(function() {
+          mapV4.invalidateSize();
+          Object.values(mapsV3).forEach(function(m) { m.invalidateSize(); });
+        }, 50);
+      });
+    });
+
+    // Layer toggles (V4 only)
+    document.querySelectorAll(".layer-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var layer = btn.dataset.layer;
+        layers[layer] = !layers[layer];
+        btn.classList.toggle("on", layers[layer]);
+        updateStep(currentStep);
+      });
+    });
+  }
+
+  // ── Legend ──
+  function buildLegend() {
+    var el = document.getElementById("legend-v4");
+    var r = META.ranges;
+
+    var items = [
+      { label: "Температура", range: r.temp, unit: "°C", grad: gradientCSS(RDYLBU) },
+      { label: "Ветер", range: r.wind, unit: "м/с", grad: gradientCSS(WIND) },
+      { label: "Осадки", range: r.precip, unit: "мм", grad: gradientCSS(PRECIP) },
+      { label: "Давление", range: r.pressure, unit: "мм рт.", grad: "linear-gradient(90deg, #7b1fa2, #ce93d8, #fce4ec)" },
+    ];
+
+    el.innerHTML = items.map(function(it) {
+      return '<div class="legend-item">' +
+        '<span class="legend-label">' + it.label + '</span>' +
+        '<span class="legend-label">' + it.range[0].toFixed(0) + '</span>' +
+        '<div class="legend-bar" style="background:' + it.grad + '"></div>' +
+        '<span class="legend-label">' + it.range[1].toFixed(0) + ' ' + it.unit + '</span>' +
+      '</div>';
+    }).join("");
+  }
+
+  // ── Boot ──
+  document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>
