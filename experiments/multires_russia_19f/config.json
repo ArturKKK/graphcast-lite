@@ -10,7 +10,7 @@
   "max_ar_steps": 4,
   "use_residual": true,
   "roi_only_loss": false,
-  "data_dir": "data/datasets/multires_krsk_19f_merge",
+  "data_dir": "/data/datasets/multires_russia_19f",
   "freeze_processor_epochs": 10,
   "finetune_processor_lr_factor": 0.05,
 
