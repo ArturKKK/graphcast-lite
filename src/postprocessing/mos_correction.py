@@ -279,8 +279,9 @@ def _idw_interpolate_bias(
     n_steps: int,
     power: float = 2.0,
     max_radius_km: float = 300.0,
+    bbox: tuple[float, float, float, float] | None = None,
 ) -> np.ndarray:
-    """Interpolate station biases to all grid nodes via IDW.
+    """Interpolate station biases to grid nodes via IDW.
 
     Parameters
     ----------
@@ -289,6 +290,8 @@ def _idw_interpolate_bias(
     n_steps : forecast steps
     power : IDW exponent (2 = inverse-square)
     max_radius_km : only stations within this radius contribute
+    bbox : (lat_min, lat_max, lon_min, lon_max) — if set, only interpolate
+        within this bounding box (huge speedup: 133K→~300-2000 nodes)
 
     Returns
     -------
@@ -305,7 +308,21 @@ def _idw_interpolate_bias(
     st_lons = np.array([longitudes[i] for i in st_indices])
     st_bias_arr = np.array([station_biases[i] for i in st_indices])  # (K, steps)
 
-    for g in range(G):
+    # Pre-filter nodes to bbox if provided (133K → ~300-2000)
+    if bbox is not None:
+        lat_min, lat_max, lon_min, lon_max = bbox
+        candidates = np.where(
+            (latitudes >= lat_min) & (latitudes <= lat_max) &
+            (longitudes >= lon_min) & (longitudes <= lon_max)
+        )[0]
+    else:
+        candidates = np.arange(G)
+
+    # Always include station grid points
+    station_set = set(station_biases.keys())
+    candidate_set = set(candidates.tolist()) | station_set
+
+    for g in candidate_set:
         if g in station_biases:
             # station grid point — use its own exact bias
             bias_field[g, :] = station_biases[g]
@@ -424,6 +441,7 @@ def apply_learned_mos_wind(
     spatial_idw: bool = False,
     idw_power: float = 2.0,
     idw_max_radius_km: float = 300.0,
+    idw_bbox: tuple[float, float, float, float] | None = None,
 ) -> tuple[np.ndarray, int]:
     """Apply learned MOS correction to 10m wind speed.
 
@@ -500,6 +518,7 @@ def apply_learned_mos_wind(
         bias_field = _idw_interpolate_bias(
             station_biases, latitudes, longitudes, n_steps,
             power=idw_power, max_radius_km=idw_max_radius_km,
+            bbox=idw_bbox,
         )
         for g in range(len(latitudes)):
             if np.abs(bias_field[g]).max() > 1e-6:
@@ -536,6 +555,7 @@ def apply_wind_scaling(
     idw_power: float = 2.0,
     idw_max_radius_km: float = 300.0,
     min_wind_for_scaling: float = 0.3,
+    idw_bbox: tuple[float, float, float, float] | None = None,
 ) -> tuple[np.ndarray, int]:
     """Apply monthly wind speed scaling based on ISD/ERA5 climatological ratios.
 
@@ -608,6 +628,7 @@ def apply_wind_scaling(
         bias_field = _idw_interpolate_bias(
             scale_bias, latitudes, longitudes, n_steps,
             power=idw_power, max_radius_km=idw_max_radius_km,
+            bbox=idw_bbox,
         )
         # Convert back to scale: scale = 1.0 + interpolated_bias
         scale_field = bias_field + 1.0
@@ -638,6 +659,7 @@ def apply_learned_mos_t2m(
     spatial_idw: bool = False,
     idw_power: float = 2.0,
     idw_max_radius_km: float = 300.0,
+    idw_bbox: tuple[float, float, float, float] | None = None,
 ) -> np.ndarray:
     """Apply learned MOS correction to t2m at station grid points.
 
@@ -722,6 +744,7 @@ def apply_learned_mos_t2m(
         bias_field = _idw_interpolate_bias(
             station_biases, latitudes, longitudes, n_steps,
             power=idw_power, max_radius_km=idw_max_radius_km,
+            bbox=idw_bbox,
         )
         corrected[:, :, t2m_idx] += bias_field
         n_corrected = int((np.abs(bias_field).max(axis=1) > 1e-6).sum())

@@ -1,0 +1,30 @@
+{
+  "flat_grid": true,
+  "n_nodes": 133279,
+  "n_feat": 19,
+  "variables": [
+    "t2m",
+    "10u",
+    "10v",
+    "msl",
+    "tp",
+    "sp",
+    "tcwv",
+    "z_surf",
+    "lsm",
+    "t@850",
+    "u@850",
+    "v@850",
+    "z@850",
+    "q@850",
+    "t@500",
+    "u@500",
+    "v@500",
+    "z@500",
+    "q@500"
+  ],
+  "static_fields": [
+    "lsm",
+    "z_surf"
+  ]
+}

@@ -119,6 +119,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--spatial-idw", action="store_true",
                         help="Interpolate MOS bias correction to ALL grid nodes via IDW "
                              "(instead of correcting only station grid points).")
+    parser.add_argument("--idw-bbox", type=float, nargs=4, default=None,
+                        metavar=("LAT_MIN", "LAT_MAX", "LON_MIN", "LON_MAX"),
+                        help="Limit IDW interpolation to this bounding box. "
+                             "E.g. --idw-bbox 54 57 90 96 for Krasnoyarsk region. "
+                             "Implies --spatial-idw. Speeds up IDW from 133K to ~300 nodes.")
     parser.add_argument("--cycle", default=None, help="Optional cycle anchor in ISO form, e.g. 2026-03-23T12:00:00+00:00")
     parser.add_argument("--lapse-target-elevation", type=float, default=None,
                         help="Target station elevation in metres for lapse-rate t2m correction. "
@@ -140,6 +145,10 @@ def parse_args() -> argparse.Namespace:
                         help="Downscaler dataset dir with scalers/coords/static_fine.npy. "
                              "Falls back to live_runtime_bundle if not set.")
     args = parser.parse_args()
+    # --idw-bbox implies --spatial-idw
+    if args.idw_bbox is not None:
+        args.spatial_idw = True
+        args.idw_bbox = tuple(args.idw_bbox)
     if args.data_dir is None and args.runtime_bundle is None:
         parser.error("either --data-dir or --runtime-bundle must be provided")
     return args
@@ -922,6 +931,7 @@ def main() -> None:
                 latitudes, longitudes, forecast_valid_times,
                 stations=mos_stations,
                 spatial_idw=args.spatial_idw,
+                idw_bbox=getattr(args, 'idw_bbox', None),
             )
             if isinstance(result, tuple):
                 prediction_phys, n_pts = result
@@ -938,6 +948,7 @@ def main() -> None:
                     latitudes, longitudes, forecast_valid_times,
                     stations=mos_stations,
                     spatial_idw=args.spatial_idw,
+                    idw_bbox=getattr(args, 'idw_bbox', None),
                 )
                 print(f"[Learned MOS] Applied ML wind correction, grid points: {n_wind_pts}")
                 print(f"  Wind test MAE: {learned_mos_bundle.get('wind_test_mae', '?')} m/s")
@@ -953,6 +964,7 @@ def main() -> None:
                 prediction_phys, var_order, wind_scale_table,
                 latitudes, longitudes, forecast_valid_times,
                 spatial_idw=args.spatial_idw,
+                idw_bbox=getattr(args, 'idw_bbox', None),
             )
             meta = wind_scale_table.get('_meta', {})
             print(f"[Wind Scale] Applied seasonal wind correction from {ws_path.name}")
