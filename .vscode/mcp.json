@@ -1,0 +1,20 @@
+{
+  "servers": {
+    "mem-palace": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/Users/a.s.tabakov/Developer/mem-palace",
+        "run",
+        "--system-certs",
+        "python",
+        "-m",
+        "mem_palace.server"
+      ],
+      "env": {
+        "HTTPS_PROXY": "socks5://192.168.1.1:1080",
+        "HTTP_PROXY": "socks5://192.168.1.1:1080"
+      }
+    }
+  }
+}

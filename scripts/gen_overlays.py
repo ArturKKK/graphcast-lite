@@ -1,5 +1,6 @@
 """Generate transparent overlay PNGs for Leaflet for each variable × time step."""
 
+import argparse
 import json
 import numpy as np
 from scipy.interpolate import griddata
@@ -178,4 +179,12 @@ def main():
 
 
 if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--input", type=Path, help="Path to forecast.json")
+    ap.add_argument("--output-dir", type=Path, help="Output directory for overlays")
+    args = ap.parse_args()
+    if args.input:
+        FORECAST_JSON = args.input
+    if args.output_dir:
+        OUTPUT_DIR = args.output_dir
     main()

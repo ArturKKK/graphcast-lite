@@ -1,0 +1,8 @@
+description: "graphcast v2"
+image: docker-hosted.artifactory.tcsbank.ru/ai-platform/notebook-images/notebook-python-3.10:release-v0.7.141
+flavor: a100-1x
+inputs:
+  - type: s3
+    src: macos-build-infra-astabakov:/
+    dst: /data/datasets/
+    region: S3_MSK

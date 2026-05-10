@@ -436,6 +436,14 @@ def train(
     # --- Fine-tuning: freeze/unfreeze processor ---
     freeze_proc_epochs = getattr(config, 'freeze_processor_epochs', 0)
 
+    # Если возобновляемся уже после стадии freeze — сразу размораживаем processor.
+    # (иначе ветка `epoch == freeze_proc_epochs` ниже никогда не сработает.)
+    if freeze_proc_epochs > 0 and start_epoch >= freeze_proc_epochs:
+        for p in model.processor.parameters():
+            p.requires_grad = True
+        print(f"\n>>> [resume] processor РАЗМОРОЖЕН "
+              f"(start_epoch={start_epoch} >= freeze_proc_epochs={freeze_proc_epochs})\n")
+
     # Основной цикл обучения  
     for epoch in range(start_epoch, num_epochs):  
         print()

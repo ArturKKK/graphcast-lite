@@ -1,0 +1,4 @@
+*.pth binary
+*.npy binary
+*.npz binary
+*.joblib binary

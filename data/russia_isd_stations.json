@@ -1,0 +1,6912 @@
+{
+  "200870": {
+    "name": "MGMS IM. G.F. USHAKOVA",
+    "lat": 79.55,
+    "lon": 90.567,
+    "elev": 8.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2762,
+    "obs_per_day": 7.6
+  },
+  "202920": {
+    "name": "GMO IM.E.K. FEDOROVA",
+    "lat": 77.717,
+    "lon": 104.3,
+    "elev": 15.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "204710": {
+    "name": "IZVESTIJ TSIK",
+    "lat": 75.95,
+    "lon": 82.95,
+    "elev": 11.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2802,
+    "obs_per_day": 7.7
+  },
+  "204760": {
+    "name": "MYS STERLEGOVA",
+    "lat": 75.417,
+    "lon": 88.9,
+    "elev": 11.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2851,
+    "obs_per_day": 7.8
+  },
+  "206670": {
+    "name": "IM. M.V. POPOVA",
+    "lat": 73.333,
+    "lon": 70.05,
+    "elev": 7.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2857,
+    "obs_per_day": 7.8
+  },
+  "206740": {
+    "name": "OSTROV DIKSON",
+    "lat": 73.5,
+    "lon": 80.4,
+    "elev": 47.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2828,
+    "obs_per_day": 7.7
+  },
+  "207440": {
+    "name": "MALYE KARMAKULY",
+    "lat": 72.367,
+    "lon": 52.7,
+    "elev": 19.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2851,
+    "obs_per_day": 7.8
+  },
+  "208710": {
+    "name": "SOPOCHNAYA KARGA",
+    "lat": 71.883,
+    "lon": 82.7,
+    "elev": 5.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2617,
+    "obs_per_day": 7.2
+  },
+  "208910": {
+    "name": "HATANGA",
+    "lat": 71.983,
+    "lon": 102.467,
+    "elev": 33.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2462,
+    "obs_per_day": 6.7
+  },
+  "209670": {
+    "name": "SEYAHA",
+    "lat": 70.167,
+    "lon": 72.517,
+    "elev": 17.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2805,
+    "obs_per_day": 7.7
+  },
+  "209780": {
+    "name": "KARAUL",
+    "lat": 70.083,
+    "lon": 83.167,
+    "elev": 28.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2787,
+    "obs_per_day": 7.6
+  },
+  "209820": {
+    "name": "VOLOCHANKA",
+    "lat": 70.967,
+    "lon": 94.5,
+    "elev": 40.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1694,
+    "obs_per_day": 4.6
+  },
+  "214320": {
+    "name": "OSTROV KOTEL'NYJ",
+    "lat": 76.0,
+    "lon": 137.867,
+    "elev": 8.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2839,
+    "obs_per_day": 7.8
+  },
+  "215350": {
+    "name": "SANNIKOVA",
+    "lat": 74.667,
+    "lon": 138.9,
+    "elev": 14.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "216080": {
+    "name": "ANABAR",
+    "lat": 73.217,
+    "lon": 113.5,
+    "elev": 13.3,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2653,
+    "obs_per_day": 7.3
+  },
+  "216360": {
+    "name": "KIGILYAH",
+    "lat": 73.336,
+    "lon": 139.867,
+    "elev": 24.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "217110": {
+    "name": "UST' OLENEK",
+    "lat": 73.0,
+    "lon": 119.867,
+    "elev": 14.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2477,
+    "obs_per_day": 6.8
+  },
+  "217210": {
+    "name": "IM YU A HABAROVA",
+    "lat": 72.4,
+    "lon": 126.35,
+    "elev": 19.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2524,
+    "obs_per_day": 6.9
+  },
+  "218020": {
+    "name": "SASKYLAH",
+    "lat": 71.967,
+    "lon": 114.083,
+    "elev": 18.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "218130": {
+    "name": "TYUMYATI",
+    "lat": 71.917,
+    "lon": 123.567,
+    "elev": 26.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "218210": {
+    "name": "BYKOV (MYS)",
+    "lat": 72.0,
+    "lon": 129.117,
+    "elev": 16.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2858,
+    "obs_per_day": 7.8
+  },
+  "218230": {
+    "name": "YAKUTSK",
+    "lat": 62.093,
+    "lon": 129.771,
+    "elev": 99.1,
+    "icao": "UEEE",
+    "wban": "99999",
+    "avg_obs_yr": 17197,
+    "obs_per_day": 47.1
+  },
+  "218240": {
+    "name": "TIKSI",
+    "lat": 71.698,
+    "lon": 128.903,
+    "elev": 9.1,
+    "icao": "UE38",
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "219080": {
+    "name": "DZALINDA",
+    "lat": 70.133,
+    "lon": 113.967,
+    "elev": 62.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2838,
+    "obs_per_day": 7.8
+  },
+  "219210": {
+    "name": "KJUSJUR",
+    "lat": 70.683,
+    "lon": 127.4,
+    "elev": 33.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "219310": {
+    "name": "JUBILEJNAJA",
+    "lat": 70.767,
+    "lon": 136.217,
+    "elev": 24.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2823,
+    "obs_per_day": 7.7
+  },
+  "219460": {
+    "name": "CHOKURDAH",
+    "lat": 70.617,
+    "lon": 147.883,
+    "elev": 61.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "219780": {
+    "name": "VAL' KARKAY",
+    "lat": 70.083,
+    "lon": 170.933,
+    "elev": 5.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2578,
+    "obs_per_day": 7.1
+  },
+  "220030": {
+    "name": "VAIDA GUBA (BAY)",
+    "lat": 69.933,
+    "lon": 31.983,
+    "elev": 8.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2873,
+    "obs_per_day": 7.9
+  },
+  "220040": {
+    "name": "NIKEL",
+    "lat": 69.4,
+    "lon": 30.233,
+    "elev": 92.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2824,
+    "obs_per_day": 7.7
+  },
+  "220280": {
+    "name": "TERIBERKA",
+    "lat": 69.2,
+    "lon": 35.117,
+    "elev": 30.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2808,
+    "obs_per_day": 7.7
+  },
+  "221060": {
+    "name": "PADUN",
+    "lat": 68.6,
+    "lon": 31.8,
+    "elev": 63.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2818,
+    "obs_per_day": 7.7
+  },
+  "221130": {
+    "name": "MURMANSK",
+    "lat": 68.782,
+    "lon": 32.751,
+    "elev": 81.1,
+    "icao": "ULMM",
+    "wban": "99999",
+    "avg_obs_yr": 20426,
+    "obs_per_day": 56.0
+  },
+  "221270": {
+    "name": "LOVOZERO",
+    "lat": 68.0,
+    "lon": 35.033,
+    "elev": 162.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2873,
+    "obs_per_day": 7.9
+  },
+  "221650": {
+    "name": "KANIN NOS",
+    "lat": 68.65,
+    "lon": 43.3,
+    "elev": 49.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2621,
+    "obs_per_day": 7.2
+  },
+  "221930": {
+    "name": "BUGRINO",
+    "lat": 68.783,
+    "lon": 49.3,
+    "elev": 7.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2837,
+    "obs_per_day": 7.8
+  },
+  "222120": {
+    "name": "MONCHEGORSK",
+    "lat": 67.933,
+    "lon": 32.917,
+    "elev": 132.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2828,
+    "obs_per_day": 7.7
+  },
+  "222130": {
+    "name": "APATITY",
+    "lat": 67.55,
+    "lon": 33.35,
+    "elev": 134.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2829,
+    "obs_per_day": 7.7
+  },
+  "222170": {
+    "name": "KANDALAKSHA",
+    "lat": 67.15,
+    "lon": 32.35,
+    "elev": 25.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2874,
+    "obs_per_day": 7.9
+  },
+  "222350": {
+    "name": "KRASNOSCEL'E",
+    "lat": 67.35,
+    "lon": 37.05,
+    "elev": 156.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2875,
+    "obs_per_day": 7.9
+  },
+  "222490": {
+    "name": "KANEVKA",
+    "lat": 67.133,
+    "lon": 39.667,
+    "elev": 151.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2815,
+    "obs_per_day": 7.7
+  },
+  "222710": {
+    "name": "SHOJNA",
+    "lat": 67.883,
+    "lon": 44.15,
+    "elev": 18.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2848,
+    "obs_per_day": 7.8
+  },
+  "222920": {
+    "name": "INDIGA",
+    "lat": 67.683,
+    "lon": 48.683,
+    "elev": 4.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2858,
+    "obs_per_day": 7.8
+  },
+  "223120": {
+    "name": "KOVDA",
+    "lat": 66.7,
+    "lon": 32.883,
+    "elev": 18.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "223240": {
+    "name": "UMBA",
+    "lat": 66.683,
+    "lon": 34.35,
+    "elev": 40.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2873,
+    "obs_per_day": 7.9
+  },
+  "223340": {
+    "name": "KASHKARANTSY",
+    "lat": 66.333,
+    "lon": 36.017,
+    "elev": 3.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2837,
+    "obs_per_day": 7.8
+  },
+  "223490": {
+    "name": "PJALICA",
+    "lat": 66.183,
+    "lon": 39.533,
+    "elev": 9.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2734,
+    "obs_per_day": 7.5
+  },
+  "223650": {
+    "name": "ABRAMOVSKIJ MAJAK",
+    "lat": 66.383,
+    "lon": 43.25,
+    "elev": 21.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2818,
+    "obs_per_day": 7.7
+  },
+  "223830": {
+    "name": "NIZHNYAYA PESHA",
+    "lat": 66.739,
+    "lon": 47.72,
+    "elev": 11.5,
+    "icao": "ULAV",
+    "wban": "99999",
+    "avg_obs_yr": 2834,
+    "obs_per_day": 7.8
+  },
+  "224080": {
+    "name": "KALEVALA",
+    "lat": 65.217,
+    "lon": 31.167,
+    "elev": 120.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "224130": {
+    "name": "ENGOZERO",
+    "lat": 65.783,
+    "lon": 33.933,
+    "elev": 80.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2718,
+    "obs_per_day": 7.4
+  },
+  "224290": {
+    "name": "SOLOVKI",
+    "lat": 65.033,
+    "lon": 35.7,
+    "elev": 7.4,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2838,
+    "obs_per_day": 7.8
+  },
+  "224380": {
+    "name": "ZIZGIN",
+    "lat": 65.2,
+    "lon": 36.817,
+    "elev": 17.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2638,
+    "obs_per_day": 7.2
+  },
+  "224460": {
+    "name": "ZIMNEGORSKIJ MAJAK",
+    "lat": 65.467,
+    "lon": 39.733,
+    "elev": 77.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2492,
+    "obs_per_day": 6.8
+  },
+  "224560": {
+    "name": "KEPINO",
+    "lat": 65.383,
+    "lon": 41.883,
+    "elev": 68.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2784,
+    "obs_per_day": 7.6
+  },
+  "224710": {
+    "name": "MEZEN'",
+    "lat": 65.867,
+    "lon": 44.217,
+    "elev": 19.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "224810": {
+    "name": "MOSEEVO",
+    "lat": 65.767,
+    "lon": 46.2,
+    "elev": 42.2,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2848,
+    "obs_per_day": 7.8
+  },
+  "225200": {
+    "name": "KEM' PORT",
+    "lat": 64.983,
+    "lon": 34.8,
+    "elev": 8.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "225250": {
+    "name": "RAZNAVOLOK",
+    "lat": 64.567,
+    "lon": 34.917,
+    "elev": 9.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2275,
+    "obs_per_day": 6.2
+  },
+  "225290": {
+    "name": "KOLEZMA",
+    "lat": 64.233,
+    "lon": 35.883,
+    "elev": 3.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2714,
+    "obs_per_day": 7.4
+  },
+  "225460": {
+    "name": "SEVERODVINSK",
+    "lat": 64.55,
+    "lon": 39.767,
+    "elev": 7.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2854,
+    "obs_per_day": 7.8
+  },
+  "225500": {
+    "name": "TALAGI",
+    "lat": 64.6,
+    "lon": 40.717,
+    "elev": 18.9,
+    "icao": "ULAA",
+    "wban": "99999",
+    "avg_obs_yr": 16789,
+    "obs_per_day": 46.0
+  },
+  "225590": {
+    "name": "HOLMOGORY",
+    "lat": 64.217,
+    "lon": 41.667,
+    "elev": 12.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2039,
+    "obs_per_day": 5.6
+  },
+  "225630": {
+    "name": "PINEGA",
+    "lat": 64.7,
+    "lon": 43.383,
+    "elev": 31.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "225730": {
+    "name": "LESUKONSKOE",
+    "lat": 64.9,
+    "lon": 45.767,
+    "elev": 71.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "225830": {
+    "name": "KOJNAS",
+    "lat": 64.75,
+    "lon": 47.65,
+    "elev": 64.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2727,
+    "obs_per_day": 7.5
+  },
+  "226020": {
+    "name": "REBOLY",
+    "lat": 63.833,
+    "lon": 30.817,
+    "elev": 182.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2846,
+    "obs_per_day": 7.8
+  },
+  "226190": {
+    "name": "PADANY",
+    "lat": 63.267,
+    "lon": 33.417,
+    "elev": 128.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "226410": {
+    "name": "ONEGA",
+    "lat": 63.9,
+    "lon": 38.117,
+    "elev": 13.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1712,
+    "obs_per_day": 4.7
+  },
+  "226480": {
+    "name": "TURCASOVO",
+    "lat": 63.117,
+    "lon": 39.233,
+    "elev": 34.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2848,
+    "obs_per_day": 7.8
+  },
+  "226560": {
+    "name": "EMECK",
+    "lat": 63.483,
+    "lon": 41.8,
+    "elev": 18.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "226710": {
+    "name": "KARPOGORY",
+    "lat": 64.017,
+    "lon": 44.45,
+    "elev": 65.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2837,
+    "obs_per_day": 7.8
+  },
+  "226760": {
+    "name": "SURA",
+    "lat": 63.583,
+    "lon": 45.633,
+    "elev": 62.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "226950": {
+    "name": "KOSLAN",
+    "lat": 63.45,
+    "lon": 48.9,
+    "elev": 158.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2830,
+    "obs_per_day": 7.8
+  },
+  "227210": {
+    "name": "MEDVEZEGORSK",
+    "lat": 62.917,
+    "lon": 34.433,
+    "elev": 81.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2856,
+    "obs_per_day": 7.8
+  },
+  "227490": {
+    "name": "KONEVO",
+    "lat": 62.133,
+    "lon": 39.3,
+    "elev": 101.3,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2864,
+    "obs_per_day": 7.8
+  },
+  "227620": {
+    "name": "DVINSKIJ BEREZNIK",
+    "lat": 62.817,
+    "lon": 42.783,
+    "elev": 34.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1794,
+    "obs_per_day": 4.9
+  },
+  "227680": {
+    "name": "SHENKURSK",
+    "lat": 62.1,
+    "lon": 42.9,
+    "elev": 45.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2819,
+    "obs_per_day": 7.7
+  },
+  "227780": {
+    "name": "VERHNJAJA TOJMA",
+    "lat": 62.233,
+    "lon": 45.017,
+    "elev": 58.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "227980": {
+    "name": "JARENSK",
+    "lat": 62.167,
+    "lon": 49.117,
+    "elev": 92.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2865,
+    "obs_per_day": 7.8
+  },
+  "228020": {
+    "name": "SORTAVALA",
+    "lat": 61.717,
+    "lon": 30.717,
+    "elev": 19.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2864,
+    "obs_per_day": 7.8
+  },
+  "228050": {
+    "name": "VALAAM",
+    "lat": 61.367,
+    "lon": 30.883,
+    "elev": 16.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2705,
+    "obs_per_day": 7.4
+  },
+  "228200": {
+    "name": "PETROZAVODSK",
+    "lat": 61.817,
+    "lon": 34.267,
+    "elev": 110.0,
+    "icao": "ULPB",
+    "wban": "99999",
+    "avg_obs_yr": 15791,
+    "obs_per_day": 43.3
+  },
+  "228310": {
+    "name": "PUDOZ",
+    "lat": 61.8,
+    "lon": 36.583,
+    "elev": 44.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "228450": {
+    "name": "KARGOPOL'",
+    "lat": 61.5,
+    "lon": 38.933,
+    "elev": 126.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "228540": {
+    "name": "NJANDOMA",
+    "lat": 61.667,
+    "lon": 40.183,
+    "elev": 233.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2846,
+    "obs_per_day": 7.8
+  },
+  "228670": {
+    "name": "VEL'SK",
+    "lat": 61.083,
+    "lon": 42.067,
+    "elev": 91.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "228690": {
+    "name": "SHANGALY",
+    "lat": 61.133,
+    "lon": 43.35,
+    "elev": 117.2,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2864,
+    "obs_per_day": 7.8
+  },
+  "228760": {
+    "name": "KRASNOBORSK",
+    "lat": 61.55,
+    "lon": 45.933,
+    "elev": 59.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "228870": {
+    "name": "KOTLAS",
+    "lat": 61.233,
+    "lon": 46.717,
+    "elev": 56.0,
+    "icao": "ULKK",
+    "wban": "99999",
+    "avg_obs_yr": 2824,
+    "obs_per_day": 7.7
+  },
+  "228890": {
+    "name": "VILEGODSKOE",
+    "lat": 61.117,
+    "lon": 48.0,
+    "elev": 69.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2862,
+    "obs_per_day": 7.8
+  },
+  "228920": {
+    "name": "VYBORG",
+    "lat": 60.717,
+    "lon": 28.733,
+    "elev": 13.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "229120": {
+    "name": "OLONEC",
+    "lat": 60.983,
+    "lon": 32.983,
+    "elev": 12.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2722,
+    "obs_per_day": 7.5
+  },
+  "229130": {
+    "name": "LODEJNOE POLE",
+    "lat": 60.717,
+    "lon": 33.55,
+    "elev": 23.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "229170": {
+    "name": "NOVAJA LADOGA",
+    "lat": 60.117,
+    "lon": 32.317,
+    "elev": 9.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "229250": {
+    "name": "VINNICY",
+    "lat": 60.633,
+    "lon": 34.783,
+    "elev": 111.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "229390": {
+    "name": "BELOZERSK",
+    "lat": 60.017,
+    "lon": 37.75,
+    "elev": 131.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2665,
+    "obs_per_day": 7.3
+  },
+  "229510": {
+    "name": "KONOSHA",
+    "lat": 60.983,
+    "lon": 40.25,
+    "elev": 226.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2865,
+    "obs_per_day": 7.8
+  },
+  "229540": {
+    "name": "VOZEGA",
+    "lat": 60.467,
+    "lon": 40.2,
+    "elev": 202.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2805,
+    "obs_per_day": 7.7
+  },
+  "229810": {
+    "name": "VELIKIJ USTJUG",
+    "lat": 60.767,
+    "lon": 46.25,
+    "elev": 99.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2801,
+    "obs_per_day": 7.7
+  },
+  "229830": {
+    "name": "LAL' SK",
+    "lat": 60.7,
+    "lon": 47.6,
+    "elev": 84.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2860,
+    "obs_per_day": 7.8
+  },
+  "229960": {
+    "name": "OB'JACEVO",
+    "lat": 60.367,
+    "lon": 49.65,
+    "elev": 152.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1721,
+    "obs_per_day": 4.7
+  },
+  "230220": {
+    "name": "AMADERMA",
+    "lat": 69.75,
+    "lon": 61.7,
+    "elev": 49.0,
+    "icao": "ULDD",
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "230320": {
+    "name": "MARESALE",
+    "lat": 69.717,
+    "lon": 66.8,
+    "elev": 25.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "230780": {
+    "name": "NORIL'SK",
+    "lat": 69.333,
+    "lon": 88.25,
+    "elev": 64.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "231120": {
+    "name": "VARANDEY",
+    "lat": 68.8,
+    "lon": 57.983,
+    "elev": 6.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2829,
+    "obs_per_day": 7.7
+  },
+  "231140": {
+    "name": "MYS KONSTANTINOVSKIJ",
+    "lat": 68.533,
+    "lon": 55.5,
+    "elev": 6.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2834,
+    "obs_per_day": 7.8
+  },
+  "231790": {
+    "name": "SNEZHNOGORSK",
+    "lat": 68.1,
+    "lon": 87.767,
+    "elev": 93.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2806,
+    "obs_per_day": 7.7
+  },
+  "232050": {
+    "name": "NAR'JAN-MAR",
+    "lat": 67.633,
+    "lon": 53.033,
+    "elev": 12.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2084,
+    "obs_per_day": 5.7
+  },
+  "232215": {
+    "name": "MAGNITOGORSK",
+    "lat": 53.393,
+    "lon": 58.756,
+    "elev": 435.9,
+    "icao": "USCM",
+    "wban": "99999",
+    "avg_obs_yr": 17374,
+    "obs_per_day": 47.6
+  },
+  "232260": {
+    "name": "VORKUTA",
+    "lat": 67.483,
+    "lon": 64.017,
+    "elev": 172.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2864,
+    "obs_per_day": 7.8
+  },
+  "232420": {
+    "name": "NOVYJ PORT",
+    "lat": 67.683,
+    "lon": 72.883,
+    "elev": 12.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2132,
+    "obs_per_day": 5.8
+  },
+  "232560": {
+    "name": "TAZOVSKIJ",
+    "lat": 67.467,
+    "lon": 78.733,
+    "elev": 8.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2857,
+    "obs_per_day": 7.8
+  },
+  "232740": {
+    "name": "IGARKA",
+    "lat": 67.467,
+    "lon": 86.567,
+    "elev": 28.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2856,
+    "obs_per_day": 7.8
+  },
+  "233050": {
+    "name": "OKUNEV NOS",
+    "lat": 66.25,
+    "lon": 52.55,
+    "elev": 22.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2504,
+    "obs_per_day": 6.9
+  },
+  "233240": {
+    "name": "PETRUN'",
+    "lat": 66.433,
+    "lon": 60.767,
+    "elev": 62.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2852,
+    "obs_per_day": 7.8
+  },
+  "233300": {
+    "name": "SALEHARD",
+    "lat": 66.533,
+    "lon": 66.667,
+    "elev": 16.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1847,
+    "obs_per_day": 5.1
+  },
+  "233390": {
+    "name": "POLUJ",
+    "lat": 66.033,
+    "lon": 68.683,
+    "elev": 35.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1770,
+    "obs_per_day": 4.8
+  },
+  "233450": {
+    "name": "NYDA",
+    "lat": 66.633,
+    "lon": 72.933,
+    "elev": 7.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "233580": {
+    "name": "NOVYJ URENGOJ",
+    "lat": 66.1,
+    "lon": 76.783,
+    "elev": 61.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2863,
+    "obs_per_day": 7.8
+  },
+  "233760": {
+    "name": "SVETLOGORSK",
+    "lat": 66.933,
+    "lon": 88.367,
+    "elev": 100.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2801,
+    "obs_per_day": 7.7
+  },
+  "234050": {
+    "name": "UST'-CIL'MA",
+    "lat": 65.433,
+    "lon": 52.267,
+    "elev": 68.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2862,
+    "obs_per_day": 7.8
+  },
+  "234120": {
+    "name": "UST'-USA",
+    "lat": 65.967,
+    "lon": 56.917,
+    "elev": 78.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "234180": {
+    "name": "PECHORA",
+    "lat": 65.133,
+    "lon": 57.133,
+    "elev": 53.2,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "234260": {
+    "name": "MUZHI",
+    "lat": 65.483,
+    "lon": 64.717,
+    "elev": 19.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2860,
+    "obs_per_day": 7.8
+  },
+  "234310": {
+    "name": "PITLYAR",
+    "lat": 65.833,
+    "lon": 65.933,
+    "elev": 16.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2846,
+    "obs_per_day": 7.8
+  },
+  "234430": {
+    "name": "PANGODY",
+    "lat": 65.833,
+    "lon": 74.5,
+    "elev": 51.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2019,
+    "obs_per_day": 5.5
+  },
+  "234450": {
+    "name": "NADYM",
+    "lat": 65.467,
+    "lon": 72.667,
+    "elev": 19.0,
+    "icao": "USMM",
+    "wban": "99999",
+    "avg_obs_yr": 2857,
+    "obs_per_day": 7.8
+  },
+  "234530": {
+    "name": "URENGOJ",
+    "lat": 65.95,
+    "lon": 78.4,
+    "elev": 23.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2586,
+    "obs_per_day": 7.1
+  },
+  "234650": {
+    "name": "KRASNOSEL' KUPSK",
+    "lat": 65.7,
+    "lon": 82.45,
+    "elev": 24.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2857,
+    "obs_per_day": 7.8
+  },
+  "234710": {
+    "name": "NIZHNEVARTOVSK",
+    "lat": 60.949,
+    "lon": 76.484,
+    "elev": 53.9,
+    "icao": "USNN",
+    "wban": "99999",
+    "avg_obs_yr": 20184,
+    "obs_per_day": 55.3
+  },
+  "234720": {
+    "name": "TURUHANSK",
+    "lat": 65.783,
+    "lon": 87.989,
+    "elev": 38.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2873,
+    "obs_per_day": 7.9
+  },
+  "235030": {
+    "name": "IZHMA",
+    "lat": 65.033,
+    "lon": 53.967,
+    "elev": 52.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2795,
+    "obs_per_day": 7.7
+  },
+  "235180": {
+    "name": "UST'-SUGOR",
+    "lat": 64.267,
+    "lon": 57.617,
+    "elev": 75.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1537,
+    "obs_per_day": 4.2
+  },
+  "235270": {
+    "name": "SARAN-PAUL'",
+    "lat": 64.283,
+    "lon": 60.883,
+    "elev": 29.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2862,
+    "obs_per_day": 7.8
+  },
+  "235780": {
+    "name": "VERESHCHAGINO",
+    "lat": 64.233,
+    "lon": 87.567,
+    "elev": 30.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "235890": {
+    "name": "TUTONCHANY",
+    "lat": 64.2,
+    "lon": 93.783,
+    "elev": 105.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1907,
+    "obs_per_day": 5.2
+  },
+  "236060": {
+    "name": "UHTA",
+    "lat": 63.55,
+    "lon": 53.817,
+    "elev": 137.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2860,
+    "obs_per_day": 7.8
+  },
+  "236250": {
+    "name": "SOSVA",
+    "lat": 63.65,
+    "lon": 62.1,
+    "elev": 28.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2851,
+    "obs_per_day": 7.8
+  },
+  "236310": {
+    "name": "BEREZOVO",
+    "lat": 63.933,
+    "lon": 65.05,
+    "elev": 32.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2864,
+    "obs_per_day": 7.8
+  },
+  "236350": {
+    "name": "YUIL' SK",
+    "lat": 63.667,
+    "lon": 69.6,
+    "elev": 85.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2862,
+    "obs_per_day": 7.8
+  },
+  "236570": {
+    "name": "NOYABR' SK",
+    "lat": 63.117,
+    "lon": 75.283,
+    "elev": 131.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2833,
+    "obs_per_day": 7.8
+  },
+  "236620": {
+    "name": "TOL'KA",
+    "lat": 63.983,
+    "lon": 82.083,
+    "elev": 33.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "236780": {
+    "name": "VERHNEIMBATSK",
+    "lat": 63.15,
+    "lon": 87.95,
+    "elev": 46.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2848,
+    "obs_per_day": 7.8
+  },
+  "237010": {
+    "name": "VESLJANA",
+    "lat": 62.983,
+    "lon": 50.9,
+    "elev": 103.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2251,
+    "obs_per_day": 6.2
+  },
+  "237080": {
+    "name": "LUN'",
+    "lat": 62.233,
+    "lon": 52.483,
+    "elev": 120.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2854,
+    "obs_per_day": 7.8
+  },
+  "237110": {
+    "name": "TROICKO-PECHERSKOE",
+    "lat": 62.7,
+    "lon": 56.2,
+    "elev": 139.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2456,
+    "obs_per_day": 6.7
+  },
+  "237240": {
+    "name": "NJAKSIMVOL'",
+    "lat": 62.433,
+    "lon": 60.867,
+    "elev": 51.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2858,
+    "obs_per_day": 7.8
+  },
+  "237410": {
+    "name": "NIZHNESORTYMSK",
+    "lat": 62.75,
+    "lon": 71.667,
+    "elev": 85.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2373,
+    "obs_per_day": 6.5
+  },
+  "237480": {
+    "name": "KOGALYM",
+    "lat": 62.19,
+    "lon": 74.534,
+    "elev": 67.1,
+    "icao": "USRK",
+    "wban": "99999",
+    "avg_obs_yr": 2861,
+    "obs_per_day": 7.8
+  },
+  "237580": {
+    "name": "RADUZHNY",
+    "lat": 62.158,
+    "lon": 77.313,
+    "elev": 78.0,
+    "icao": "USNR",
+    "wban": "99999",
+    "avg_obs_yr": 2257,
+    "obs_per_day": 6.2
+  },
+  "237740": {
+    "name": "KELLOG",
+    "lat": 62.483,
+    "lon": 86.283,
+    "elev": 60.4,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2556,
+    "obs_per_day": 7.0
+  },
+  "237760": {
+    "name": "BAHTA",
+    "lat": 62.467,
+    "lon": 89.017,
+    "elev": 57.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2852,
+    "obs_per_day": 7.8
+  },
+  "237880": {
+    "name": "KUZ' MOVKA",
+    "lat": 62.317,
+    "lon": 92.117,
+    "elev": 62.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2709,
+    "obs_per_day": 7.4
+  },
+  "238030": {
+    "name": "UST'-KULOM",
+    "lat": 61.683,
+    "lon": 53.683,
+    "elev": 144.0,
+    "icao": "UUYT",
+    "wban": "99999",
+    "avg_obs_yr": 2863,
+    "obs_per_day": 7.8
+  },
+  "238040": {
+    "name": "SYKTYVKAR",
+    "lat": 61.647,
+    "lon": 50.845,
+    "elev": 98.8,
+    "icao": "UUYY",
+    "wban": "99999",
+    "avg_obs_yr": 18873,
+    "obs_per_day": 51.7
+  },
+  "238045": {
+    "name": "OSTAFYEVO",
+    "lat": 55.508,
+    "lon": 37.505,
+    "elev": 172.0,
+    "icao": "UUMO",
+    "wban": "99999",
+    "avg_obs_yr": 14847,
+    "obs_per_day": 40.7
+  },
+  "238120": {
+    "name": "JAKSHA",
+    "lat": 61.833,
+    "lon": 56.867,
+    "elev": 131.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2565,
+    "obs_per_day": 7.0
+  },
+  "238230": {
+    "name": "VONEGAN",
+    "lat": 61.95,
+    "lon": 64.9,
+    "elev": 111.4,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1760,
+    "obs_per_day": 4.8
+  },
+  "238470": {
+    "name": "SYTOMINO",
+    "lat": 61.3,
+    "lon": 71.3,
+    "elev": 33.4,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2861,
+    "obs_per_day": 7.8
+  },
+  "238490": {
+    "name": "SURGUT",
+    "lat": 61.344,
+    "lon": 73.402,
+    "elev": 61.0,
+    "icao": "USRR",
+    "wban": "99999",
+    "avg_obs_yr": 20381,
+    "obs_per_day": 55.8
+  },
+  "238620": {
+    "name": "KORLIKI",
+    "lat": 61.533,
+    "lon": 82.417,
+    "elev": 71.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2100,
+    "obs_per_day": 5.8
+  },
+  "238670": {
+    "name": "LAR' YAK",
+    "lat": 61.1,
+    "lon": 80.25,
+    "elev": 57.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2839,
+    "obs_per_day": 7.8
+  },
+  "238840": {
+    "name": "BOR",
+    "lat": 61.6,
+    "lon": 90.017,
+    "elev": 58.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2849,
+    "obs_per_day": 7.8
+  },
+  "238910": {
+    "name": "BAJKIT",
+    "lat": 61.667,
+    "lon": 96.367,
+    "elev": 262.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2755,
+    "obs_per_day": 7.5
+  },
+  "239090": {
+    "name": "GAJNY",
+    "lat": 60.283,
+    "lon": 54.35,
+    "elev": 198.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2005,
+    "obs_per_day": 5.5
+  },
+  "239140": {
+    "name": "CHERDYN'",
+    "lat": 60.4,
+    "lon": 56.517,
+    "elev": 207.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2010,
+    "obs_per_day": 5.5
+  },
+  "239210": {
+    "name": "IVDEL'",
+    "lat": 60.683,
+    "lon": 60.45,
+    "elev": 95.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2293,
+    "obs_per_day": 6.3
+  },
+  "239290": {
+    "name": "SAIM",
+    "lat": 60.317,
+    "lon": 64.217,
+    "elev": 53.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2857,
+    "obs_per_day": 7.8
+  },
+  "239330": {
+    "name": "KHANTY MANSIYSK",
+    "lat": 61.028,
+    "lon": 69.086,
+    "elev": 23.2,
+    "icao": "USHH",
+    "wban": "99999",
+    "avg_obs_yr": 20205,
+    "obs_per_day": 55.4
+  },
+  "239390": {
+    "name": "ALTAY",
+    "lat": 60.333,
+    "lon": 68.967,
+    "elev": 32.3,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1968,
+    "obs_per_day": 5.4
+  },
+  "239460": {
+    "name": "UGUT",
+    "lat": 60.5,
+    "lon": 74.017,
+    "elev": 48.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2854,
+    "obs_per_day": 7.8
+  },
+  "239470": {
+    "name": "SALYM",
+    "lat": 60.067,
+    "lon": 71.483,
+    "elev": 54.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2863,
+    "obs_per_day": 7.8
+  },
+  "239550": {
+    "name": "ALEKSANDROVSKOE",
+    "lat": 60.433,
+    "lon": 77.867,
+    "elev": 48.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "239660": {
+    "name": "VANZIL'-KYNAK",
+    "lat": 60.35,
+    "lon": 84.083,
+    "elev": 99.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2850,
+    "obs_per_day": 7.8
+  },
+  "239730": {
+    "name": "VOROGOVO",
+    "lat": 61.033,
+    "lon": 89.633,
+    "elev": 49.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2841,
+    "obs_per_day": 7.8
+  },
+  "239750": {
+    "name": "SYM",
+    "lat": 60.35,
+    "lon": 88.367,
+    "elev": 86.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2768,
+    "obs_per_day": 7.6
+  },
+  "239820": {
+    "name": "VEL'MO",
+    "lat": 61.017,
+    "lon": 93.433,
+    "elev": 121.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2861,
+    "obs_per_day": 7.8
+  },
+  "239860": {
+    "name": "SEVERO-ENISEJSK",
+    "lat": 60.367,
+    "lon": 93.033,
+    "elev": 511.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "239870": {
+    "name": "JARCEVO",
+    "lat": 60.25,
+    "lon": 90.233,
+    "elev": 58.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2865,
+    "obs_per_day": 7.8
+  },
+  "240760": {
+    "name": "DEPUTATSKI",
+    "lat": 69.333,
+    "lon": 139.667,
+    "elev": 284.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2858,
+    "obs_per_day": 7.8
+  },
+  "241360": {
+    "name": "SUHANA",
+    "lat": 68.617,
+    "lon": 118.333,
+    "elev": 77.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2788,
+    "obs_per_day": 7.6
+  },
+  "241430": {
+    "name": "DZARDZAN",
+    "lat": 68.733,
+    "lon": 124.0,
+    "elev": 39.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2844,
+    "obs_per_day": 7.8
+  },
+  "241940": {
+    "name": "BELAYA GORA",
+    "lat": 68.55,
+    "lon": 146.217,
+    "elev": 41.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2378,
+    "obs_per_day": 6.5
+  },
+  "242190": {
+    "name": "YAROL'IN",
+    "lat": 67.133,
+    "lon": 108.533,
+    "elev": 235.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2654,
+    "obs_per_day": 7.3
+  },
+  "242610": {
+    "name": "BATAGAJ-ALYTA",
+    "lat": 67.8,
+    "lon": 130.383,
+    "elev": 491.2,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1656,
+    "obs_per_day": 4.5
+  },
+  "242630": {
+    "name": "BATAGAJ",
+    "lat": 67.65,
+    "lon": 134.683,
+    "elev": 214.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2860,
+    "obs_per_day": 7.8
+  },
+  "242660": {
+    "name": "VERHOJANSK",
+    "lat": 67.567,
+    "lon": 133.4,
+    "elev": 138.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2857,
+    "obs_per_day": 7.8
+  },
+  "243220": {
+    "name": "POLIARNY",
+    "lat": 66.4,
+    "lon": 112.03,
+    "elev": 506.0,
+    "icao": "UERP",
+    "wban": "99999",
+    "avg_obs_yr": 13632,
+    "obs_per_day": 37.3
+  },
+  "243290": {
+    "name": "SHELAGONTSY",
+    "lat": 66.25,
+    "lon": 114.283,
+    "elev": 236.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2646,
+    "obs_per_day": 7.2
+  },
+  "243380": {
+    "name": "EJK",
+    "lat": 66.033,
+    "lon": 117.4,
+    "elev": 304.3,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "243430": {
+    "name": "ZHIGANSK",
+    "lat": 66.767,
+    "lon": 123.4,
+    "elev": 92.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2843,
+    "obs_per_day": 7.8
+  },
+  "243710": {
+    "name": "UST'-CHARKI",
+    "lat": 66.8,
+    "lon": 136.683,
+    "elev": 273.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2759,
+    "obs_per_day": 7.6
+  },
+  "243820": {
+    "name": "UST'-MOMA",
+    "lat": 66.45,
+    "lon": 143.233,
+    "elev": 196.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "244490": {
+    "name": "BESTYAHSKAYA ZVEROFERMA",
+    "lat": 65.3,
+    "lon": 127.117,
+    "elev": 73.3,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2838,
+    "obs_per_day": 7.8
+  },
+  "244620": {
+    "name": "SEBYAN-KYUEL'",
+    "lat": 65.3,
+    "lon": 130.0,
+    "elev": 777.2,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2816,
+    "obs_per_day": 7.7
+  },
+  "244770": {
+    "name": "IEMA",
+    "lat": 65.3,
+    "lon": 135.8,
+    "elev": 674.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2480,
+    "obs_per_day": 6.8
+  },
+  "245070": {
+    "name": "TURA",
+    "lat": 64.267,
+    "lon": 100.233,
+    "elev": 168.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "245250": {
+    "name": "HABARDINO",
+    "lat": 64.6,
+    "lon": 112.517,
+    "elev": 251.2,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "245380": {
+    "name": "CHUMPURUK",
+    "lat": 64.233,
+    "lon": 116.917,
+    "elev": 139.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2739,
+    "obs_per_day": 7.5
+  },
+  "245570": {
+    "name": "SOGO-HAYA",
+    "lat": 64.283,
+    "lon": 126.45,
+    "elev": 85.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2819,
+    "obs_per_day": 7.7
+  },
+  "245850": {
+    "name": "NERA",
+    "lat": 64.55,
+    "lon": 144.4,
+    "elev": 518.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2861,
+    "obs_per_day": 7.8
+  },
+  "245880": {
+    "name": "YURTY",
+    "lat": 64.05,
+    "lon": 141.883,
+    "elev": 589.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2755,
+    "obs_per_day": 7.5
+  },
+  "246060": {
+    "name": "KISLOKAN",
+    "lat": 63.583,
+    "lon": 103.967,
+    "elev": 211.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2610,
+    "obs_per_day": 7.2
+  },
+  "246390": {
+    "name": "NJURBA",
+    "lat": 63.283,
+    "lon": 118.333,
+    "elev": 119.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "246410": {
+    "name": "VILJUJSK",
+    "lat": 63.767,
+    "lon": 121.617,
+    "elev": 111.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "246430": {
+    "name": "HATYAYK-HOMO",
+    "lat": 63.95,
+    "lon": 124.833,
+    "elev": 76.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2783,
+    "obs_per_day": 7.6
+  },
+  "246440": {
+    "name": "VERHNEVILJUJSK",
+    "lat": 63.45,
+    "lon": 120.317,
+    "elev": 115.3,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2860,
+    "obs_per_day": 7.8
+  },
+  "246520": {
+    "name": "SANGARY",
+    "lat": 63.967,
+    "lon": 127.467,
+    "elev": 96.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2757,
+    "obs_per_day": 7.6
+  },
+  "246560": {
+    "name": "BATAMAJ",
+    "lat": 63.517,
+    "lon": 129.483,
+    "elev": 79.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "246610": {
+    "name": "SEGEN-KYUEL'",
+    "lat": 64.0,
+    "lon": 130.3,
+    "elev": 208.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2834,
+    "obs_per_day": 7.8
+  },
+  "246680": {
+    "name": "VERHOJANSK PEREVOZ",
+    "lat": 63.317,
+    "lon": 132.017,
+    "elev": 90.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2834,
+    "obs_per_day": 7.8
+  },
+  "246710": {
+    "name": "TOMPO",
+    "lat": 63.95,
+    "lon": 135.867,
+    "elev": 402.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2462,
+    "obs_per_day": 6.7
+  },
+  "246790": {
+    "name": "VOSTOCHNAYA",
+    "lat": 63.217,
+    "lon": 139.6,
+    "elev": 1287.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2740,
+    "obs_per_day": 7.5
+  },
+  "246840": {
+    "name": "AGAYAKAN",
+    "lat": 63.333,
+    "lon": 141.733,
+    "elev": 776.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "246880": {
+    "name": "OJMJAKON",
+    "lat": 63.25,
+    "lon": 143.15,
+    "elev": 741.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2849,
+    "obs_per_day": 7.8
+  },
+  "246910": {
+    "name": "DELYANKIR",
+    "lat": 63.833,
+    "lon": 145.6,
+    "elev": 800.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2671,
+    "obs_per_day": 7.3
+  },
+  "247240": {
+    "name": "CHERNISHEVSKIJ",
+    "lat": 63.033,
+    "lon": 112.483,
+    "elev": 422.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2865,
+    "obs_per_day": 7.8
+  },
+  "247250": {
+    "name": "TUOJ-HAYA",
+    "lat": 62.533,
+    "lon": 111.233,
+    "elev": 259.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "247260": {
+    "name": "MIRNY",
+    "lat": 62.535,
+    "lon": 114.039,
+    "elev": 352.0,
+    "icao": "UERR",
+    "wban": "99999",
+    "avg_obs_yr": 16278,
+    "obs_per_day": 44.6
+  },
+  "247370": {
+    "name": "KRESTYAH",
+    "lat": 62.267,
+    "lon": 116.15,
+    "elev": 139.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "247380": {
+    "name": "SUNTAR",
+    "lat": 62.15,
+    "lon": 117.65,
+    "elev": 133.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2820,
+    "obs_per_day": 7.7
+  },
+  "247530": {
+    "name": "NAMTSY",
+    "lat": 62.733,
+    "lon": 129.667,
+    "elev": 89.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2874,
+    "obs_per_day": 7.9
+  },
+  "247580": {
+    "name": "BERDIGESTYAH",
+    "lat": 62.267,
+    "lon": 127.067,
+    "elev": 231.4,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "247630": {
+    "name": "KREST-HAL' DZHAY",
+    "lat": 62.817,
+    "lon": 134.433,
+    "elev": 114.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "247680": {
+    "name": "CURAPCA",
+    "lat": 62.033,
+    "lon": 132.6,
+    "elev": 186.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "247710": {
+    "name": "TEPLY KLJUCH",
+    "lat": 62.783,
+    "lon": 136.85,
+    "elev": 288.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2863,
+    "obs_per_day": 7.8
+  },
+  "247900": {
+    "name": "SUSUMAN",
+    "lat": 62.783,
+    "lon": 148.167,
+    "elev": 655.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "248020": {
+    "name": "STRELKA CHUNYA",
+    "lat": 61.733,
+    "lon": 102.817,
+    "elev": 358.2,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2650,
+    "obs_per_day": 7.3
+  },
+  "248070": {
+    "name": "MUTORAJ",
+    "lat": 61.333,
+    "lon": 100.483,
+    "elev": 331.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2751,
+    "obs_per_day": 7.5
+  },
+  "248170": {
+    "name": "ERBOGACEN",
+    "lat": 61.267,
+    "lon": 108.017,
+    "elev": 291.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2873,
+    "obs_per_day": 7.9
+  },
+  "248260": {
+    "name": "DOROZHNYJ",
+    "lat": 61.617,
+    "lon": 114.617,
+    "elev": 353.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "248430": {
+    "name": "TONGULAH",
+    "lat": 61.917,
+    "lon": 124.55,
+    "elev": 199.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2837,
+    "obs_per_day": 7.8
+  },
+  "248560": {
+    "name": "POKROVSK",
+    "lat": 61.483,
+    "lon": 129.15,
+    "elev": 115.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2863,
+    "obs_per_day": 7.8
+  },
+  "248710": {
+    "name": "OHOTSKIJPEREVOZ",
+    "lat": 61.867,
+    "lon": 135.5,
+    "elev": 140.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "248940": {
+    "name": "KOLYMSKAYA",
+    "lat": 61.85,
+    "lon": 147.667,
+    "elev": 838.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2794,
+    "obs_per_day": 7.7
+  },
+  "248980": {
+    "name": "UST' OMCHUG",
+    "lat": 61.117,
+    "lon": 149.633,
+    "elev": 574.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "249080": {
+    "name": "VANAVARA",
+    "lat": 60.333,
+    "lon": 102.267,
+    "elev": 260.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2830,
+    "obs_per_day": 7.8
+  },
+  "249180": {
+    "name": "PREOBRAZHENKA",
+    "lat": 60.05,
+    "lon": 108.083,
+    "elev": 295.2,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2852,
+    "obs_per_day": 7.8
+  },
+  "249230": {
+    "name": "LENSK",
+    "lat": 60.717,
+    "lon": 114.883,
+    "elev": 234.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "249280": {
+    "name": "KOMAKA",
+    "lat": 60.267,
+    "lon": 111.733,
+    "elev": 298.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2759,
+    "obs_per_day": 7.6
+  },
+  "249330": {
+    "name": "KILEER",
+    "lat": 60.95,
+    "lon": 119.3,
+    "elev": 249.3,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2835,
+    "obs_per_day": 7.8
+  },
+  "249440": {
+    "name": "OLEKMINSK",
+    "lat": 60.4,
+    "lon": 120.417,
+    "elev": 229.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "249510": {
+    "name": "ISIT'",
+    "lat": 60.817,
+    "lon": 125.317,
+    "elev": 118.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2863,
+    "obs_per_day": 7.8
+  },
+  "249590": {
+    "name": "JAKUTSK",
+    "lat": 62.017,
+    "lon": 129.717,
+    "elev": 101.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "249620": {
+    "name": "AMGA",
+    "lat": 60.9,
+    "lon": 131.983,
+    "elev": 146.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "249660": {
+    "name": "UST'-MAJYA",
+    "lat": 60.383,
+    "lon": 134.45,
+    "elev": 170.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "249670": {
+    "name": "TEGYULTYA",
+    "lat": 60.467,
+    "lon": 130.0,
+    "elev": 171.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2842,
+    "obs_per_day": 7.8
+  },
+  "249820": {
+    "name": "UEGA",
+    "lat": 60.717,
+    "lon": 142.783,
+    "elev": 398.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2792,
+    "obs_per_day": 7.6
+  },
+  "249880": {
+    "name": "ARKA",
+    "lat": 60.083,
+    "lon": 142.333,
+    "elev": 198.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "250170": {
+    "name": "ADRYUSKINO",
+    "lat": 69.167,
+    "lon": 154.5,
+    "elev": 16.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2807,
+    "obs_per_day": 7.7
+  },
+  "250340": {
+    "name": "BUHTA AMBARCIK",
+    "lat": 69.617,
+    "lon": 162.3,
+    "elev": 23.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1933,
+    "obs_per_day": 5.3
+  },
+  "250420": {
+    "name": "AJON",
+    "lat": 69.917,
+    "lon": 167.967,
+    "elev": 13.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2861,
+    "obs_per_day": 7.8
+  },
+  "250440": {
+    "name": "RAUCHUA",
+    "lat": 69.5,
+    "lon": 166.583,
+    "elev": 4.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2333,
+    "obs_per_day": 6.4
+  },
+  "250510": {
+    "name": "PEVEK",
+    "lat": 69.783,
+    "lon": 170.597,
+    "elev": 3.4,
+    "icao": "UHMP",
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "250620": {
+    "name": "MYS BILLINGSA",
+    "lat": 69.883,
+    "lon": 175.767,
+    "elev": 3.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2192,
+    "obs_per_day": 6.0
+  },
+  "251210": {
+    "name": "KOLYMSKAYA",
+    "lat": 68.733,
+    "lon": 158.717,
+    "elev": 12.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2794,
+    "obs_per_day": 7.7
+  },
+  "251230": {
+    "name": "CHERSKIJ",
+    "lat": 68.75,
+    "lon": 161.283,
+    "elev": 28.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "251290": {
+    "name": "KONSTANTINOVSKAYA",
+    "lat": 68.15,
+    "lon": 161.167,
+    "elev": 8.4,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2568,
+    "obs_per_day": 7.0
+  },
+  "251380": {
+    "name": "OSTROVNOE",
+    "lat": 68.117,
+    "lon": 164.167,
+    "elev": 94.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "251470": {
+    "name": "BILIBINO",
+    "lat": 68.05,
+    "lon": 166.45,
+    "elev": 279.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "251510": {
+    "name": "CHAUN",
+    "lat": 68.883,
+    "lon": 170.783,
+    "elev": 4.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2498,
+    "obs_per_day": 6.8
+  },
+  "252060": {
+    "name": "CREDNEKOLYMSK",
+    "lat": 67.45,
+    "lon": 153.717,
+    "elev": 21.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "252480": {
+    "name": "ILIRNEJ",
+    "lat": 67.25,
+    "lon": 167.967,
+    "elev": 353.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2582,
+    "obs_per_day": 7.1
+  },
+  "253350": {
+    "name": "BAIMKA",
+    "lat": 66.533,
+    "lon": 164.283,
+    "elev": 286.3,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "254000": {
+    "name": "ZYRYANKA",
+    "lat": 65.733,
+    "lon": 150.9,
+    "elev": 43.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2864,
+    "obs_per_day": 7.8
+  },
+  "254280": {
+    "name": "OMOLON",
+    "lat": 65.233,
+    "lon": 160.533,
+    "elev": 264.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "254690": {
+    "name": "KANCHALAN",
+    "lat": 65.183,
+    "lon": 176.767,
+    "elev": 18.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2717,
+    "obs_per_day": 7.4
+  },
+  "255030": {
+    "name": "KORKODON",
+    "lat": 64.75,
+    "lon": 153.967,
+    "elev": 98.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2842,
+    "obs_per_day": 7.8
+  },
+  "255510": {
+    "name": "MARKOVO",
+    "lat": 64.683,
+    "lon": 170.417,
+    "elev": 26.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "255630": {
+    "name": "UGOLNY",
+    "lat": 64.735,
+    "lon": 177.741,
+    "elev": 59.1,
+    "icao": "UHMA",
+    "wban": "99999",
+    "avg_obs_yr": 17328,
+    "obs_per_day": 47.5
+  },
+  "256270": {
+    "name": "LABAZNAYA",
+    "lat": 63.3,
+    "lon": 158.5,
+    "elev": 709.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2857,
+    "obs_per_day": 7.8
+  },
+  "256480": {
+    "name": "SLAUTNOE",
+    "lat": 63.2,
+    "lon": 167.85,
+    "elev": 44.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2274,
+    "obs_per_day": 6.2
+  },
+  "257000": {
+    "name": "EL' GEN (SOVHOZ)",
+    "lat": 62.8,
+    "lon": 150.667,
+    "elev": 312.4,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2857,
+    "obs_per_day": 7.8
+  },
+  "257030": {
+    "name": "SEJMCHAN",
+    "lat": 62.917,
+    "lon": 152.417,
+    "elev": 205.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "257050": {
+    "name": "SREDNIKAN",
+    "lat": 62.45,
+    "lon": 152.317,
+    "elev": 260.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "257070": {
+    "name": "BOHAPCHA",
+    "lat": 62.1,
+    "lon": 150.683,
+    "elev": 348.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "257150": {
+    "name": "OMSUKCHAN",
+    "lat": 62.517,
+    "lon": 155.8,
+    "elev": 499.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "257450": {
+    "name": "KAMENSKOE",
+    "lat": 62.483,
+    "lon": 166.217,
+    "elev": 40.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2160,
+    "obs_per_day": 5.9
+  },
+  "258080": {
+    "name": "TALATA",
+    "lat": 61.133,
+    "lon": 152.383,
+    "elev": 707.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "258200": {
+    "name": "EVENSK",
+    "lat": 61.917,
+    "lon": 159.217,
+    "elev": 11.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "259040": {
+    "name": "MADAUN",
+    "lat": 60.6,
+    "lon": 150.7,
+    "elev": 521.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2832,
+    "obs_per_day": 7.8
+  },
+  "259130": {
+    "name": "SOKOL",
+    "lat": 59.911,
+    "lon": 150.72,
+    "elev": 175.0,
+    "icao": "UHMM",
+    "wban": "99999",
+    "avg_obs_yr": 16086,
+    "obs_per_day": 44.1
+  },
+  "259160": {
+    "name": "ALEVINA (MYS)",
+    "lat": 58.833,
+    "lon": 151.35,
+    "elev": 65.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "259190": {
+    "name": "BRAT' EV (MYS)",
+    "lat": 59.1,
+    "lon": 153.333,
+    "elev": 12.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2854,
+    "obs_per_day": 7.8
+  },
+  "259220": {
+    "name": "SHELIHOVA",
+    "lat": 60.717,
+    "lon": 155.883,
+    "elev": 33.3,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2863,
+    "obs_per_day": 7.8
+  },
+  "259270": {
+    "name": "BROHOVO",
+    "lat": 59.65,
+    "lon": 154.267,
+    "elev": 5.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2864,
+    "obs_per_day": 7.8
+  },
+  "259410": {
+    "name": "CHEMURNAUT",
+    "lat": 60.733,
+    "lon": 163.017,
+    "elev": 14.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2055,
+    "obs_per_day": 5.6
+  },
+  "259560": {
+    "name": "APUKA",
+    "lat": 60.433,
+    "lon": 169.667,
+    "elev": 5.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2841,
+    "obs_per_day": 7.8
+  },
+  "260590": {
+    "name": "KINGISEPP",
+    "lat": 59.367,
+    "lon": 28.6,
+    "elev": 19.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "260630": {
+    "name": "PULKOVO",
+    "lat": 59.8,
+    "lon": 30.263,
+    "elev": 24.1,
+    "icao": "ULLI",
+    "wban": "99999",
+    "avg_obs_yr": 20714,
+    "obs_per_day": 56.8
+  },
+  "260690": {
+    "name": "BELOGORKA",
+    "lat": 59.35,
+    "lon": 30.133,
+    "elev": 90.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "260720": {
+    "name": "SHLISSEL'BURG",
+    "lat": 59.933,
+    "lon": 31.0,
+    "elev": 17.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "260780": {
+    "name": "LJUBAN'",
+    "lat": 59.35,
+    "lon": 31.233,
+    "elev": 39.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2862,
+    "obs_per_day": 7.8
+  },
+  "260800": {
+    "name": "KIRISHI",
+    "lat": 59.45,
+    "lon": 32.033,
+    "elev": 26.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "260940": {
+    "name": "TIHVIN",
+    "lat": 59.65,
+    "lon": 33.55,
+    "elev": 61.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "260990": {
+    "name": "EFIMOVSKAJA",
+    "lat": 59.5,
+    "lon": 34.7,
+    "elev": 176.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2854,
+    "obs_per_day": 7.8
+  },
+  "261570": {
+    "name": "GDOV",
+    "lat": 58.733,
+    "lon": 27.833,
+    "elev": 40.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2836,
+    "obs_per_day": 7.8
+  },
+  "261670": {
+    "name": "NIKOLAEVSKOE",
+    "lat": 58.567,
+    "lon": 29.8,
+    "elev": 91.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "261790": {
+    "name": "NOVGOROD",
+    "lat": 58.517,
+    "lon": 31.25,
+    "elev": 24.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2841,
+    "obs_per_day": 7.8
+  },
+  "262580": {
+    "name": "PSKOV",
+    "lat": 57.784,
+    "lon": 28.396,
+    "elev": 46.9,
+    "icao": "ULOO",
+    "wban": "99999",
+    "avg_obs_yr": 18653,
+    "obs_per_day": 51.1
+  },
+  "262750": {
+    "name": "STARAYA RUSSA",
+    "lat": 58.017,
+    "lon": 31.317,
+    "elev": 25.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2863,
+    "obs_per_day": 7.8
+  },
+  "262910": {
+    "name": "BOROVICI",
+    "lat": 58.417,
+    "lon": 33.9,
+    "elev": 89.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2244,
+    "obs_per_day": 6.1
+  },
+  "263590": {
+    "name": "PUSKINSKIE GORY",
+    "lat": 57.017,
+    "lon": 28.9,
+    "elev": 108.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2853,
+    "obs_per_day": 7.8
+  },
+  "263780": {
+    "name": "HOLM",
+    "lat": 57.15,
+    "lon": 31.183,
+    "elev": 71.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "264560": {
+    "name": "OPOCHKA",
+    "lat": 56.717,
+    "lon": 28.717,
+    "elev": 99.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2820,
+    "obs_per_day": 7.7
+  },
+  "264770": {
+    "name": "VELIKIE LUKI",
+    "lat": 56.35,
+    "lon": 30.62,
+    "elev": 106.0,
+    "icao": "ULOL",
+    "wban": "99999",
+    "avg_obs_yr": 2852,
+    "obs_per_day": 7.8
+  },
+  "267020": {
+    "name": "KHRABROVO",
+    "lat": 54.89,
+    "lon": 20.593,
+    "elev": 13.1,
+    "icao": "UMKK",
+    "wban": "99999",
+    "avg_obs_yr": 18311,
+    "obs_per_day": 50.2
+  },
+  "267950": {
+    "name": "SPAS-DEMENSK",
+    "lat": 54.417,
+    "lon": 34.017,
+    "elev": 238.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1878,
+    "obs_per_day": 5.1
+  },
+  "268940": {
+    "name": "ZUKOVKA",
+    "lat": 53.533,
+    "lon": 33.75,
+    "elev": 177.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "268980": {
+    "name": "BRYANSK",
+    "lat": 53.214,
+    "lon": 34.176,
+    "elev": 202.1,
+    "icao": "UUBP",
+    "wban": "99999",
+    "avg_obs_yr": 12818,
+    "obs_per_day": 35.1
+  },
+  "269760": {
+    "name": "KRASNAJA GORA",
+    "lat": 53.017,
+    "lon": 31.6,
+    "elev": 148.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "269970": {
+    "name": "TRUBCHEVSK",
+    "lat": 52.583,
+    "lon": 33.767,
+    "elev": 178.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "270370": {
+    "name": "VOLOGDA",
+    "lat": 59.233,
+    "lon": 39.867,
+    "elev": 131.0,
+    "icao": "ULWW",
+    "wban": "99999",
+    "avg_obs_yr": 2829,
+    "obs_per_day": 7.8
+  },
+  "270510": {
+    "name": "TOTMA",
+    "lat": 59.967,
+    "lon": 42.767,
+    "elev": 134.0,
+    "icao": "ULWT",
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "270660": {
+    "name": "NIKOL'SK",
+    "lat": 59.533,
+    "lon": 45.467,
+    "elev": 143.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "270830": {
+    "name": "OPARINO",
+    "lat": 59.85,
+    "lon": 48.283,
+    "elev": 180.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "271130": {
+    "name": "CHEREPOVEC",
+    "lat": 59.267,
+    "lon": 38.017,
+    "elev": 114.0,
+    "icao": "ULWC",
+    "wban": "99999",
+    "avg_obs_yr": 16204,
+    "obs_per_day": 44.4
+  },
+  "271990": {
+    "name": "KIROV",
+    "lat": 58.567,
+    "lon": 49.567,
+    "elev": 158.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "272255": {
+    "name": "TUNOSHNA",
+    "lat": 57.561,
+    "lon": 40.157,
+    "elev": 87.5,
+    "icao": "UUDL",
+    "wban": "99999",
+    "avg_obs_yr": 17284,
+    "obs_per_day": 47.4
+  },
+  "272770": {
+    "name": "VETLUGA",
+    "lat": 57.85,
+    "lon": 45.767,
+    "elev": 136.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2829,
+    "obs_per_day": 7.8
+  },
+  "272830": {
+    "name": "KOTEL'NIC",
+    "lat": 58.3,
+    "lon": 48.35,
+    "elev": 127.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2862,
+    "obs_per_day": 7.8
+  },
+  "272960": {
+    "name": "KUMENY",
+    "lat": 58.1,
+    "lon": 49.917,
+    "elev": 177.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "273690": {
+    "name": "KRASNYE BAKI",
+    "lat": 57.133,
+    "lon": 45.167,
+    "elev": 110.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "273730": {
+    "name": "SAKUN'JA",
+    "lat": 57.667,
+    "lon": 46.633,
+    "elev": 175.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "273930": {
+    "name": "NOLINSK",
+    "lat": 57.55,
+    "lon": 49.95,
+    "elev": 136.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "274530": {
+    "name": "GORODEC",
+    "lat": 56.683,
+    "lon": 43.433,
+    "elev": 103.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "274590": {
+    "name": "STRIGINO",
+    "lat": 56.23,
+    "lon": 43.784,
+    "elev": 78.0,
+    "icao": "UWGG",
+    "wban": "99999",
+    "avg_obs_yr": 20488,
+    "obs_per_day": 56.1
+  },
+  "274790": {
+    "name": "KOZ'MODEM'JANSK",
+    "lat": 56.333,
+    "lon": 46.583,
+    "elev": 107.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "274850": {
+    "name": "JOSHKAR-OLA",
+    "lat": 56.633,
+    "lon": 47.767,
+    "elev": 106.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "274910": {
+    "name": "NOVYJ TOR'JAL",
+    "lat": 57.0,
+    "lon": 48.733,
+    "elev": 143.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "275155": {
+    "name": "SHEREMETYEVO",
+    "lat": 55.973,
+    "lon": 37.415,
+    "elev": 189.6,
+    "icao": "UUEE",
+    "wban": "99999",
+    "avg_obs_yr": 17647,
+    "obs_per_day": 48.3
+  },
+  "275185": {
+    "name": "VNUKOVO",
+    "lat": 55.592,
+    "lon": 37.261,
+    "elev": 208.8,
+    "icao": "UUWW",
+    "wban": "99999",
+    "avg_obs_yr": 17669,
+    "obs_per_day": 48.4
+  },
+  "275770": {
+    "name": "SERGAC",
+    "lat": 55.533,
+    "lon": 45.5,
+    "elev": 125.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "275950": {
+    "name": "KAZAN",
+    "lat": 55.606,
+    "lon": 49.279,
+    "elev": 126.2,
+    "icao": "UWKD",
+    "wban": "99999",
+    "avg_obs_yr": 19275,
+    "obs_per_day": 52.8
+  },
+  "276060": {
+    "name": "MALOJAROSLAVEC",
+    "lat": 55.017,
+    "lon": 36.483,
+    "elev": 197.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2854,
+    "obs_per_day": 7.8
+  },
+  "276070": {
+    "name": "BEGISHEVO",
+    "lat": 55.565,
+    "lon": 52.093,
+    "elev": 196.0,
+    "icao": "UWKE",
+    "wban": "99999",
+    "avg_obs_yr": 17465,
+    "obs_per_day": 47.8
+  },
+  "276430": {
+    "name": "VYKSA",
+    "lat": 55.333,
+    "lon": 42.117,
+    "elev": 114.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "276530": {
+    "name": "ARZAMAS",
+    "lat": 55.367,
+    "lon": 43.783,
+    "elev": 127.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "276650": {
+    "name": "LUKOJANOV",
+    "lat": 55.033,
+    "lon": 44.5,
+    "elev": 219.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2804,
+    "obs_per_day": 7.7
+  },
+  "276750": {
+    "name": "PORETSKOE",
+    "lat": 55.183,
+    "lon": 46.333,
+    "elev": 136.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2836,
+    "obs_per_day": 7.8
+  },
+  "276790": {
+    "name": "ALATYR'",
+    "lat": 54.817,
+    "lon": 46.583,
+    "elev": 180.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "277030": {
+    "name": "KALUGA",
+    "lat": 54.55,
+    "lon": 36.367,
+    "elev": 198.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 17087,
+    "obs_per_day": 46.8
+  },
+  "277450": {
+    "name": "SASOVO",
+    "lat": 54.35,
+    "lon": 41.967,
+    "elev": 115.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1600,
+    "obs_per_day": 4.4
+  },
+  "277520": {
+    "name": "TEMNIKOV",
+    "lat": 54.633,
+    "lon": 43.233,
+    "elev": 139.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2864,
+    "obs_per_day": 7.8
+  },
+  "277560": {
+    "name": "KRASNOSLOBODSK",
+    "lat": 54.433,
+    "lon": 43.767,
+    "elev": 188.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "277600": {
+    "name": "SARANSK AIRPORT",
+    "lat": 54.118,
+    "lon": 45.203,
+    "elev": 216.0,
+    "icao": "UWPS",
+    "wban": "99999",
+    "avg_obs_yr": 14338,
+    "obs_per_day": 39.3
+  },
+  "278170": {
+    "name": "MCENSK",
+    "lat": 53.383,
+    "lon": 36.533,
+    "elev": 201.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "278480": {
+    "name": "MORSANSK",
+    "lat": 53.45,
+    "lon": 41.8,
+    "elev": 142.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2861,
+    "obs_per_day": 7.8
+  },
+  "278580": {
+    "name": "PACELMA",
+    "lat": 53.333,
+    "lon": 43.317,
+    "elev": 261.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1671,
+    "obs_per_day": 4.6
+  },
+  "279060": {
+    "name": "OREL",
+    "lat": 52.933,
+    "lon": 36.0,
+    "elev": 196.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2797,
+    "obs_per_day": 7.7
+  },
+  "279280": {
+    "name": "ELEC",
+    "lat": 52.633,
+    "lon": 38.517,
+    "elev": 168.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "279300": {
+    "name": "LIPETSK ARPT",
+    "lat": 52.703,
+    "lon": 39.538,
+    "elev": 178.9,
+    "icao": "UUOL",
+    "wban": "99999",
+    "avg_obs_yr": 20146,
+    "obs_per_day": 55.2
+  },
+  "279350": {
+    "name": "MICURINSK",
+    "lat": 52.883,
+    "lon": 40.483,
+    "elev": 158.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2711,
+    "obs_per_day": 7.4
+  },
+  "279470": {
+    "name": "TAMBOV",
+    "lat": 52.8,
+    "lon": 41.333,
+    "elev": 128.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2865,
+    "obs_per_day": 7.9
+  },
+  "279550": {
+    "name": "BELINSKIY",
+    "lat": 52.967,
+    "lon": 43.4,
+    "elev": 205.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1657,
+    "obs_per_day": 4.5
+  },
+  "279570": {
+    "name": "KIRSANOV",
+    "lat": 52.667,
+    "lon": 42.717,
+    "elev": 169.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "279620": {
+    "name": "PENZA",
+    "lat": 53.133,
+    "lon": 45.017,
+    "elev": 174.0,
+    "icao": "UWPP",
+    "wban": "99999",
+    "avg_obs_yr": 2509,
+    "obs_per_day": 6.9
+  },
+  "279622": {
+    "name": "CHEBOKSARY",
+    "lat": 56.09,
+    "lon": 47.347,
+    "elev": 170.1,
+    "icao": "UWKS",
+    "wban": "99999",
+    "avg_obs_yr": 16972,
+    "obs_per_day": 46.5
+  },
+  "279720": {
+    "name": "RADISHCHEVO",
+    "lat": 53.05,
+    "lon": 46.433,
+    "elev": 252.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "280090": {
+    "name": "KIRS",
+    "lat": 59.35,
+    "lon": 52.25,
+    "elev": 168.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2861,
+    "obs_per_day": 7.8
+  },
+  "280440": {
+    "name": "SEROV",
+    "lat": 59.6,
+    "lon": 60.533,
+    "elev": 130.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1929,
+    "obs_per_day": 5.3
+  },
+  "280490": {
+    "name": "GARI",
+    "lat": 59.433,
+    "lon": 62.333,
+    "elev": 131.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2330,
+    "obs_per_day": 6.4
+  },
+  "280640": {
+    "name": "LEUSI",
+    "lat": 59.617,
+    "lon": 65.717,
+    "elev": 72.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2862,
+    "obs_per_day": 7.8
+  },
+  "280760": {
+    "name": "DEM'JANSKOE",
+    "lat": 59.6,
+    "lon": 69.283,
+    "elev": 57.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2865,
+    "obs_per_day": 7.8
+  },
+  "280970": {
+    "name": "TAUROVO",
+    "lat": 59.583,
+    "lon": 73.283,
+    "elev": 60.3,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2836,
+    "obs_per_day": 7.8
+  },
+  "281160": {
+    "name": "KUDYMKAR",
+    "lat": 58.983,
+    "lon": 54.65,
+    "elev": 186.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2058,
+    "obs_per_day": 5.6
+  },
+  "281380": {
+    "name": "BISER",
+    "lat": 58.517,
+    "lon": 58.85,
+    "elev": 463.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2555,
+    "obs_per_day": 7.0
+  },
+  "281440": {
+    "name": "VERHOTUR'E",
+    "lat": 58.867,
+    "lon": 60.783,
+    "elev": 125.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2432,
+    "obs_per_day": 6.7
+  },
+  "281650": {
+    "name": "KUMINSKAYA",
+    "lat": 58.717,
+    "lon": 66.083,
+    "elev": 81.2,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2861,
+    "obs_per_day": 7.8
+  },
+  "282140": {
+    "name": "GLAZOV",
+    "lat": 58.133,
+    "lon": 52.583,
+    "elev": 169.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2865,
+    "obs_per_day": 7.8
+  },
+  "282240": {
+    "name": "PERM'",
+    "lat": 58.0,
+    "lon": 56.333,
+    "elev": 170.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2423,
+    "obs_per_day": 6.6
+  },
+  "282750": {
+    "name": "TOBOL'SK",
+    "lat": 58.15,
+    "lon": 68.25,
+    "elev": 50.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2790,
+    "obs_per_day": 7.6
+  },
+  "283190": {
+    "name": "NOZOVKA",
+    "lat": 57.083,
+    "lon": 54.75,
+    "elev": 131.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2377,
+    "obs_per_day": 6.5
+  },
+  "283210": {
+    "name": "OHANSK",
+    "lat": 57.717,
+    "lon": 55.383,
+    "elev": 163.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2440,
+    "obs_per_day": 6.7
+  },
+  "283340": {
+    "name": "SAMARY",
+    "lat": 57.35,
+    "lon": 58.217,
+    "elev": 244.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2653,
+    "obs_per_day": 7.3
+  },
+  "283660": {
+    "name": "JARKOVO",
+    "lat": 57.417,
+    "lon": 67.083,
+    "elev": 52.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1837,
+    "obs_per_day": 5.0
+  },
+  "284110": {
+    "name": "IZHEVSK",
+    "lat": 56.833,
+    "lon": 53.45,
+    "elev": 159.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2808,
+    "obs_per_day": 7.7
+  },
+  "284180": {
+    "name": "SARAPUL",
+    "lat": 56.467,
+    "lon": 53.733,
+    "elev": 133.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2858,
+    "obs_per_day": 7.8
+  },
+  "284340": {
+    "name": "KRASNOUFIMSK",
+    "lat": 56.65,
+    "lon": 57.783,
+    "elev": 206.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1973,
+    "obs_per_day": 5.4
+  },
+  "284400": {
+    "name": "KOLTSOVO",
+    "lat": 56.743,
+    "lon": 60.803,
+    "elev": 232.9,
+    "icao": "USSS",
+    "wban": "99999",
+    "avg_obs_yr": 20003,
+    "obs_per_day": 54.8
+  },
+  "284650": {
+    "name": "JALTUROVOSK",
+    "lat": 56.683,
+    "lon": 66.35,
+    "elev": 61.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1686,
+    "obs_per_day": 4.6
+  },
+  "284810": {
+    "name": "VIKULOVO",
+    "lat": 56.817,
+    "lon": 70.617,
+    "elev": 78.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1960,
+    "obs_per_day": 5.4
+  },
+  "285020": {
+    "name": "VJATSKIE POLJANY",
+    "lat": 56.233,
+    "lon": 51.033,
+    "elev": 83.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "285220": {
+    "name": "ASKINO",
+    "lat": 56.11,
+    "lon": 56.574,
+    "elev": 206.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "285410": {
+    "name": "VERHNIJ UFALEJ",
+    "lat": 56.083,
+    "lon": 60.3,
+    "elev": 399.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2875,
+    "obs_per_day": 7.9
+  },
+  "285520": {
+    "name": "SADRINSK",
+    "lat": 56.067,
+    "lon": 63.65,
+    "elev": 89.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2216,
+    "obs_per_day": 6.1
+  },
+  "286210": {
+    "name": "BIRSK",
+    "lat": 55.417,
+    "lon": 55.533,
+    "elev": 186.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "286420": {
+    "name": "BALANDINO",
+    "lat": 55.306,
+    "lon": 61.503,
+    "elev": 234.4,
+    "icao": "USCC",
+    "wban": "99999",
+    "avg_obs_yr": 17297,
+    "obs_per_day": 47.4
+  },
+  "286450": {
+    "name": "CHELYABINSK-GOROD",
+    "lat": 55.15,
+    "lon": 61.3,
+    "elev": 237.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2078,
+    "obs_per_day": 5.7
+  },
+  "286610": {
+    "name": "KURGAN",
+    "lat": 55.467,
+    "lon": 65.4,
+    "elev": 74.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2217,
+    "obs_per_day": 6.1
+  },
+  "286660": {
+    "name": "MAKUSINO",
+    "lat": 55.25,
+    "lon": 67.3,
+    "elev": 140.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2211,
+    "obs_per_day": 6.1
+  },
+  "287190": {
+    "name": "AKSAKOVO",
+    "lat": 54.017,
+    "lon": 54.15,
+    "elev": 355.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "287220": {
+    "name": "UFA",
+    "lat": 54.558,
+    "lon": 55.874,
+    "elev": 136.9,
+    "icao": "UWUU",
+    "wban": "99999",
+    "avg_obs_yr": 18862,
+    "obs_per_day": 51.7
+  },
+  "287480": {
+    "name": "TROIZK",
+    "lat": 54.083,
+    "lon": 61.617,
+    "elev": 192.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2705,
+    "obs_per_day": 7.4
+  },
+  "287854": {
+    "name": "ABAKAN",
+    "lat": 53.74,
+    "lon": 91.385,
+    "elev": 253.3,
+    "icao": "UNAA",
+    "wban": "99999",
+    "avg_obs_yr": 17281,
+    "obs_per_day": 47.3
+  },
+  "287860": {
+    "name": "POLTAVKA",
+    "lat": 54.367,
+    "lon": 71.75,
+    "elev": 125.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2744,
+    "obs_per_day": 7.5
+  },
+  "287990": {
+    "name": "CERLAK",
+    "lat": 54.167,
+    "lon": 74.8,
+    "elev": 115.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1619,
+    "obs_per_day": 4.4
+  },
+  "288060": {
+    "name": "BUGURUSLAN",
+    "lat": 53.617,
+    "lon": 52.45,
+    "elev": 92.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "288250": {
+    "name": "STERLITAMAK",
+    "lat": 53.583,
+    "lon": 55.934,
+    "elev": 137.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "288380": {
+    "name": "MAGNITOGORSK",
+    "lat": 53.35,
+    "lon": 59.083,
+    "elev": 384.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2707,
+    "obs_per_day": 7.4
+  },
+  "289000": {
+    "name": "KURUMOCH",
+    "lat": 53.505,
+    "lon": 50.164,
+    "elev": 145.4,
+    "icao": "UWWW",
+    "wban": "99999",
+    "avg_obs_yr": 18856,
+    "obs_per_day": 51.7
+  },
+  "289080": {
+    "name": "AVANGARD ZERNOSOVHOZ",
+    "lat": 52.617,
+    "lon": 51.283,
+    "elev": 88.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "289160": {
+    "name": "SARLYK",
+    "lat": 52.933,
+    "lon": 54.75,
+    "elev": 190.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2864,
+    "obs_per_day": 7.8
+  },
+  "290230": {
+    "name": "NAPAS",
+    "lat": 59.85,
+    "lon": 81.95,
+    "elev": 76.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2768,
+    "obs_per_day": 7.6
+  },
+  "290590": {
+    "name": "ALEKSANDROVSKIJ SHLYUZ",
+    "lat": 59.433,
+    "lon": 89.283,
+    "elev": 102.2,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2818,
+    "obs_per_day": 7.7
+  },
+  "290680": {
+    "name": "NAZIMOVO",
+    "lat": 59.5,
+    "lon": 90.928,
+    "elev": 67.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2865,
+    "obs_per_day": 7.8
+  },
+  "291110": {
+    "name": "SREDNY VASJUGAN",
+    "lat": 59.217,
+    "lon": 78.233,
+    "elev": 69.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "291220": {
+    "name": "KARGASOK",
+    "lat": 59.05,
+    "lon": 80.833,
+    "elev": 57.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "291490": {
+    "name": "STEPANOVKA",
+    "lat": 58.633,
+    "lon": 86.733,
+    "elev": 105.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2865,
+    "obs_per_day": 7.8
+  },
+  "292030": {
+    "name": "NOVYJ VASYUGAN",
+    "lat": 58.583,
+    "lon": 76.517,
+    "elev": 80.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "292090": {
+    "name": "MAJSK",
+    "lat": 57.8,
+    "lon": 77.217,
+    "elev": 99.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2382,
+    "obs_per_day": 6.5
+  },
+  "292310": {
+    "name": "KOLPASEVO",
+    "lat": 58.317,
+    "lon": 82.95,
+    "elev": 75.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "292530": {
+    "name": "LOSINOBORSKOE",
+    "lat": 58.45,
+    "lon": 89.467,
+    "elev": 133.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2565,
+    "obs_per_day": 7.0
+  },
+  "292630": {
+    "name": "JENISEJSK",
+    "lat": 58.45,
+    "lon": 92.15,
+    "elev": 78.0,
+    "icao": "UNII",
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "292740": {
+    "name": "STRELKA",
+    "lat": 58.083,
+    "lon": 93.0,
+    "elev": 90.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "292760": {
+    "name": "MOTYGINO",
+    "lat": 58.183,
+    "lon": 94.75,
+    "elev": 161.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2851,
+    "obs_per_day": 7.8
+  },
+  "292820": {
+    "name": "BOGUCANY",
+    "lat": 58.383,
+    "lon": 97.45,
+    "elev": 133.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2873,
+    "obs_per_day": 7.9
+  },
+  "293130": {
+    "name": "PUDINO",
+    "lat": 57.533,
+    "lon": 79.431,
+    "elev": 97.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "293320": {
+    "name": "MOLCHANOVO",
+    "lat": 57.583,
+    "lon": 83.783,
+    "elev": 114.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "293480": {
+    "name": "PERVOMAJSKOE",
+    "lat": 57.067,
+    "lon": 86.217,
+    "elev": 114.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "293630": {
+    "name": "PIROVSKOE",
+    "lat": 57.633,
+    "lon": 92.267,
+    "elev": 179.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "293670": {
+    "name": "NOVOBIRILYUSSY",
+    "lat": 56.967,
+    "lon": 90.683,
+    "elev": 180.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2836,
+    "obs_per_day": 7.8
+  },
+  "293740": {
+    "name": "KAZACHINSKOE",
+    "lat": 57.683,
+    "lon": 93.267,
+    "elev": 92.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "293790": {
+    "name": "TASEEVO",
+    "lat": 57.2,
+    "lon": 94.55,
+    "elev": 168.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2829,
+    "obs_per_day": 7.8
+  },
+  "293930": {
+    "name": "CHERVYANKA",
+    "lat": 57.65,
+    "lon": 99.533,
+    "elev": 220.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2852,
+    "obs_per_day": 7.8
+  },
+  "294050": {
+    "name": "KYSTOVKA",
+    "lat": 56.6,
+    "lon": 76.567,
+    "elev": 116.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "294180": {
+    "name": "SEVERNOE",
+    "lat": 56.35,
+    "lon": 78.35,
+    "elev": 126.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "294300": {
+    "name": "TOMSK",
+    "lat": 56.5,
+    "lon": 84.917,
+    "elev": 139.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "294560": {
+    "name": "TJUHTET",
+    "lat": 56.533,
+    "lon": 89.317,
+    "elev": 205.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "294640": {
+    "name": "BOL'SOJ ULUJ",
+    "lat": 56.65,
+    "lon": 90.55,
+    "elev": 231.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "294670": {
+    "name": "ACHINSK",
+    "lat": 56.283,
+    "lon": 90.517,
+    "elev": 257.2,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "294710": {
+    "name": "BOL'SHAJA MURTA",
+    "lat": 56.9,
+    "lon": 93.133,
+    "elev": 180.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2861,
+    "obs_per_day": 7.8
+  },
+  "294770": {
+    "name": "SUHOBUZIMSKOE",
+    "lat": 56.5,
+    "lon": 93.283,
+    "elev": 164.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "294810": {
+    "name": "DZERZHINSKOE",
+    "lat": 56.85,
+    "lon": 95.217,
+    "elev": 188.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "294850": {
+    "name": "ABAN",
+    "lat": 56.683,
+    "lon": 96.05,
+    "elev": 244.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2861,
+    "obs_per_day": 7.8
+  },
+  "295240": {
+    "name": "KRESCHENKA",
+    "lat": 55.85,
+    "lon": 80.033,
+    "elev": 129.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "295530": {
+    "name": "BOGOTOL",
+    "lat": 56.217,
+    "lon": 89.55,
+    "elev": 290.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "295580": {
+    "name": "GGP KATEK",
+    "lat": 55.533,
+    "lon": 89.2,
+    "elev": 318.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "295610": {
+    "name": "NAZAROVO",
+    "lat": 56.033,
+    "lon": 90.317,
+    "elev": 255.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "295620": {
+    "name": "KEMCHUG",
+    "lat": 56.1,
+    "lon": 91.667,
+    "elev": 332.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "295630": {
+    "name": "KACA",
+    "lat": 56.117,
+    "lon": 92.2,
+    "elev": 479.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "295660": {
+    "name": "SHUMIHA",
+    "lat": 55.933,
+    "lon": 92.283,
+    "elev": 274.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "295710": {
+    "name": "MININO",
+    "lat": 56.067,
+    "lon": 92.733,
+    "elev": 234.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2764,
+    "obs_per_day": 7.6
+  },
+  "295760": {
+    "name": "UJAR",
+    "lat": 55.817,
+    "lon": 94.3,
+    "elev": 375.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "295780": {
+    "name": "SHALINSKOE",
+    "lat": 55.717,
+    "lon": 93.75,
+    "elev": 399.2,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "295800": {
+    "name": "SOLYANKA",
+    "lat": 56.167,
+    "lon": 95.267,
+    "elev": 357.2,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "295810": {
+    "name": "KANSK",
+    "lat": 56.2,
+    "lon": 95.633,
+    "elev": 207.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "295870": {
+    "name": "IRBEJSKOE",
+    "lat": 55.633,
+    "lon": 95.467,
+    "elev": 252.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "295940": {
+    "name": "TAJSHET",
+    "lat": 55.95,
+    "lon": 98.0,
+    "elev": 307.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2843,
+    "obs_per_day": 7.8
+  },
+  "296020": {
+    "name": "CHANY",
+    "lat": 55.3,
+    "lon": 76.75,
+    "elev": 111.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "296050": {
+    "name": "TATARSK",
+    "lat": 55.2,
+    "lon": 76.019,
+    "elev": 112.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "296310": {
+    "name": "KOLYVAN'",
+    "lat": 55.3,
+    "lon": 82.75,
+    "elev": 137.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "296340": {
+    "name": "TOLMACHEVO",
+    "lat": 55.013,
+    "lon": 82.651,
+    "elev": 111.3,
+    "icao": "UNNT",
+    "wban": "99999",
+    "avg_obs_yr": 17430,
+    "obs_per_day": 47.8
+  },
+  "296360": {
+    "name": "TOGUCHIN",
+    "lat": 55.233,
+    "lon": 84.4,
+    "elev": 173.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "296530": {
+    "name": "UZUR",
+    "lat": 55.3,
+    "lon": 89.817,
+    "elev": 387.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "296540": {
+    "name": "CENTRAL'NYJ RUDNIK",
+    "lat": 55.217,
+    "lon": 87.65,
+    "elev": 495.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "296620": {
+    "name": "BALAHTA",
+    "lat": 55.383,
+    "lon": 91.617,
+    "elev": 321.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "296640": {
+    "name": "SVETLOLYUBOVO",
+    "lat": 55.083,
+    "lon": 90.85,
+    "elev": 325.3,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "296760": {
+    "name": "AGINSKOE",
+    "lat": 55.25,
+    "lon": 94.883,
+    "elev": 337.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2807,
+    "obs_per_day": 7.7
+  },
+  "296980": {
+    "name": "NIZNE-UDINSK",
+    "lat": 54.883,
+    "lon": 99.033,
+    "elev": 410.0,
+    "icao": "UINN",
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "297060": {
+    "name": "KUPINO",
+    "lat": 54.367,
+    "lon": 77.283,
+    "elev": 115.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "297120": {
+    "name": "ZDVINSK",
+    "lat": 54.7,
+    "lon": 78.667,
+    "elev": 113.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "297240": {
+    "name": "KOCHKI",
+    "lat": 54.333,
+    "lon": 80.467,
+    "elev": 160.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "297260": {
+    "name": "ORDYNSKOE",
+    "lat": 54.367,
+    "lon": 81.883,
+    "elev": 132.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "297360": {
+    "name": "MASLJANINO",
+    "lat": 54.333,
+    "lon": 84.217,
+    "elev": 198.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2852,
+    "obs_per_day": 7.8
+  },
+  "297520": {
+    "name": "NENASTNAYA",
+    "lat": 54.75,
+    "lon": 88.817,
+    "elev": 1183.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "297590": {
+    "name": "KOMMUNAR",
+    "lat": 54.333,
+    "lon": 89.283,
+    "elev": 847.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "297660": {
+    "name": "IDRINSKOE",
+    "lat": 54.367,
+    "lon": 92.133,
+    "elev": 282.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "297680": {
+    "name": "LEBYAZH'E",
+    "lat": 54.2,
+    "lon": 91.583,
+    "elev": 252.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2851,
+    "obs_per_day": 7.8
+  },
+  "297710": {
+    "name": "SHCHETINKINO",
+    "lat": 55.35,
+    "lon": 92.1,
+    "elev": 804.3,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "297720": {
+    "name": "ARTEMOVSK",
+    "lat": 54.367,
+    "lon": 93.433,
+    "elev": 479.3,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "297890": {
+    "name": "VERHNJAJA GUTARA",
+    "lat": 54.217,
+    "lon": 96.967,
+    "elev": 984.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2757,
+    "obs_per_day": 7.6
+  },
+  "298140": {
+    "name": "KARASUK",
+    "lat": 53.733,
+    "lon": 78.017,
+    "elev": 115.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "298270": {
+    "name": "BAEVO",
+    "lat": 53.267,
+    "lon": 80.767,
+    "elev": 122.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "298640": {
+    "name": "UYBAT",
+    "lat": 53.717,
+    "lon": 90.367,
+    "elev": 525.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2827,
+    "obs_per_day": 7.7
+  },
+  "298660": {
+    "name": "MINUSINSK",
+    "lat": 53.717,
+    "lon": 91.7,
+    "elev": 254.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "298690": {
+    "name": "ERMAKOVSKOE",
+    "lat": 53.3,
+    "lon": 92.417,
+    "elev": 298.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "298740": {
+    "name": "KARATUZSKOE",
+    "lat": 53.583,
+    "lon": 92.883,
+    "elev": 319.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2865,
+    "obs_per_day": 7.9
+  },
+  "298760": {
+    "name": "KAZYR",
+    "lat": 53.683,
+    "lon": 94.2,
+    "elev": 446.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2493,
+    "obs_per_day": 6.8
+  },
+  "299150": {
+    "name": "SLAVGOROD",
+    "lat": 52.967,
+    "lon": 78.65,
+    "elev": 126.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "299370": {
+    "name": "ALEJSKAJA",
+    "lat": 52.517,
+    "lon": 82.767,
+    "elev": 175.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "299390": {
+    "name": "BIJSK ZONAL'NAYA",
+    "lat": 52.667,
+    "lon": 84.917,
+    "elev": 225.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "299560": {
+    "name": "TASTYP",
+    "lat": 52.8,
+    "lon": 89.917,
+    "elev": 455.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2873,
+    "obs_per_day": 7.9
+  },
+  "300540": {
+    "name": "VITIM",
+    "lat": 59.45,
+    "lon": 112.583,
+    "elev": 190.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "300890": {
+    "name": "DZHIKIMDA",
+    "lat": 59.017,
+    "lon": 121.767,
+    "elev": 175.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "301570": {
+    "name": "MAMA",
+    "lat": 58.317,
+    "lon": 112.867,
+    "elev": 224.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "301730": {
+    "name": "TYANYA",
+    "lat": 59.0,
+    "lon": 119.8,
+    "elev": 198.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2851,
+    "obs_per_day": 7.8
+  },
+  "301980": {
+    "name": "SUON-TIT",
+    "lat": 58.067,
+    "lon": 123.717,
+    "elev": 416.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2864,
+    "obs_per_day": 7.8
+  },
+  "302300": {
+    "name": "KIRENSK",
+    "lat": 57.767,
+    "lon": 108.067,
+    "elev": 258.0,
+    "icao": "UIKK",
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "302520": {
+    "name": "MAMAKAN",
+    "lat": 57.817,
+    "lon": 114.017,
+    "elev": 249.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "303090": {
+    "name": "BRATSK",
+    "lat": 56.371,
+    "lon": 101.698,
+    "elev": 490.7,
+    "icao": "UIBB",
+    "wban": "99999",
+    "avg_obs_yr": 20310,
+    "obs_per_day": 55.6
+  },
+  "303230": {
+    "name": "UST' KUT",
+    "lat": 56.8,
+    "lon": 105.8,
+    "elev": 325.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2840,
+    "obs_per_day": 7.8
+  },
+  "303370": {
+    "name": "KAZACHINSK",
+    "lat": 56.317,
+    "lon": 107.617,
+    "elev": 362.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2863,
+    "obs_per_day": 7.8
+  },
+  "303720": {
+    "name": "CHARA",
+    "lat": 56.9,
+    "lon": 118.267,
+    "elev": 711.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "303850": {
+    "name": "UST'-NJUKZHA",
+    "lat": 56.583,
+    "lon": 121.483,
+    "elev": 426.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "303930": {
+    "name": "CULMAN/NERIUGRI",
+    "lat": 56.833,
+    "lon": 124.867,
+    "elev": 859.0,
+    "icao": "UE40",
+    "wban": "99999",
+    "avg_obs_yr": 2802,
+    "obs_per_day": 7.7
+  },
+  "304050": {
+    "name": "TANGUJ",
+    "lat": 55.383,
+    "lon": 101.033,
+    "elev": 423.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "304550": {
+    "name": "UAKIT",
+    "lat": 55.467,
+    "lon": 113.617,
+    "elev": 1097.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2152,
+    "obs_per_day": 5.9
+  },
+  "304930": {
+    "name": "NAGORNYJ",
+    "lat": 55.967,
+    "lon": 124.883,
+    "elev": 861.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2714,
+    "obs_per_day": 7.4
+  },
+  "304990": {
+    "name": "TYNDA",
+    "lat": 55.183,
+    "lon": 124.667,
+    "elev": 528.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2876,
+    "obs_per_day": 7.9
+  },
+  "305040": {
+    "name": "TULUN",
+    "lat": 54.6,
+    "lon": 100.633,
+    "elev": 522.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2865,
+    "obs_per_day": 7.8
+  },
+  "305210": {
+    "name": "ZHIGALOVO",
+    "lat": 54.8,
+    "lon": 105.167,
+    "elev": 418.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2829,
+    "obs_per_day": 7.8
+  },
+  "305260": {
+    "name": "TIRKA",
+    "lat": 54.483,
+    "lon": 107.067,
+    "elev": 650.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2287,
+    "obs_per_day": 6.3
+  },
+  "305540": {
+    "name": "BAGDARIN",
+    "lat": 54.483,
+    "lon": 113.583,
+    "elev": 995.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2521,
+    "obs_per_day": 6.9
+  },
+  "306030": {
+    "name": "ZIMA",
+    "lat": 53.933,
+    "lon": 102.05,
+    "elev": 458.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "306120": {
+    "name": "BALAGANSK",
+    "lat": 54.0,
+    "lon": 103.067,
+    "elev": 427.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2864,
+    "obs_per_day": 7.8
+  },
+  "306220": {
+    "name": "KACUG",
+    "lat": 53.967,
+    "lon": 105.9,
+    "elev": 533.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "306270": {
+    "name": "BAJANDAJ",
+    "lat": 53.1,
+    "lon": 105.533,
+    "elev": 762.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "306350": {
+    "name": "UST'-BARGUZIN",
+    "lat": 53.417,
+    "lon": 109.017,
+    "elev": 461.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2862,
+    "obs_per_day": 7.8
+  },
+  "306360": {
+    "name": "BARGUZIN",
+    "lat": 53.617,
+    "lon": 109.633,
+    "elev": 489.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1883,
+    "obs_per_day": 5.2
+  },
+  "306500": {
+    "name": "ROMANOVKA",
+    "lat": 53.2,
+    "lon": 112.783,
+    "elev": 923.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2224,
+    "obs_per_day": 6.1
+  },
+  "306640": {
+    "name": "TUNGOKOCEN",
+    "lat": 53.533,
+    "lon": 115.617,
+    "elev": 811.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2853,
+    "obs_per_day": 7.8
+  },
+  "306730": {
+    "name": "MOGOCHA",
+    "lat": 53.75,
+    "lon": 119.733,
+    "elev": 625.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "306830": {
+    "name": "EROFEJ PAVLOVIC",
+    "lat": 53.967,
+    "lon": 121.933,
+    "elev": 522.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2865,
+    "obs_per_day": 7.9
+  },
+  "306950": {
+    "name": "DZALINDA",
+    "lat": 53.467,
+    "lon": 123.9,
+    "elev": 266.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2865,
+    "obs_per_day": 7.8
+  },
+  "307030": {
+    "name": "INGA",
+    "lat": 52.967,
+    "lon": 101.983,
+    "elev": 543.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "307100": {
+    "name": "IRKUTSK",
+    "lat": 52.268,
+    "lon": 104.389,
+    "elev": 510.5,
+    "icao": "UIII",
+    "wban": "99999",
+    "avg_obs_yr": 20509,
+    "obs_per_day": 56.2
+  },
+  "307310": {
+    "name": "GORJACINSK",
+    "lat": 52.983,
+    "lon": 108.283,
+    "elev": 487.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2583,
+    "obs_per_day": 7.1
+  },
+  "307410": {
+    "name": "ZAMAKTA",
+    "lat": 52.767,
+    "lon": 109.967,
+    "elev": 1286.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2631,
+    "obs_per_day": 7.2
+  },
+  "307450": {
+    "name": "SOSNOVO-OZERSKOE",
+    "lat": 52.533,
+    "lon": 111.55,
+    "elev": 952.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2337,
+    "obs_per_day": 6.4
+  },
+  "307580": {
+    "name": "KADALA",
+    "lat": 52.026,
+    "lon": 113.306,
+    "elev": 692.5,
+    "icao": "UIAA",
+    "wban": "99999",
+    "avg_obs_yr": 20135,
+    "obs_per_day": 55.2
+  },
+  "307640": {
+    "name": "USUGLI",
+    "lat": 52.65,
+    "lon": 115.167,
+    "elev": 646.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2854,
+    "obs_per_day": 7.8
+  },
+  "307770": {
+    "name": "SRETENSK",
+    "lat": 52.233,
+    "lon": 117.7,
+    "elev": 525.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2846,
+    "obs_per_day": 7.8
+  },
+  "307810": {
+    "name": "URJUPINO",
+    "lat": 52.75,
+    "lon": 120.033,
+    "elev": 370.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2774,
+    "obs_per_day": 7.6
+  },
+  "308020": {
+    "name": "MONDY",
+    "lat": 51.683,
+    "lon": 100.983,
+    "elev": 1304.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2104,
+    "obs_per_day": 5.8
+  },
+  "308150": {
+    "name": "HAMAR-DABAN",
+    "lat": 51.533,
+    "lon": 103.6,
+    "elev": 1442.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "308230": {
+    "name": "MUKHINO",
+    "lat": 51.808,
+    "lon": 107.438,
+    "elev": 515.1,
+    "icao": "UIUU",
+    "wban": "99999",
+    "avg_obs_yr": 18452,
+    "obs_per_day": 50.6
+  },
+  "308290": {
+    "name": "NOVOSELENGINSK",
+    "lat": 51.1,
+    "lon": 106.65,
+    "elev": 556.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2471,
+    "obs_per_day": 6.8
+  },
+  "308380": {
+    "name": "PETROVSKIJ ZAVOD",
+    "lat": 51.317,
+    "lon": 108.867,
+    "elev": 806.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2861,
+    "obs_per_day": 7.8
+  },
+  "308440": {
+    "name": "HILOK",
+    "lat": 51.35,
+    "lon": 110.467,
+    "elev": 802.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2852,
+    "obs_per_day": 7.8
+  },
+  "308460": {
+    "name": "ULETY",
+    "lat": 51.35,
+    "lon": 112.467,
+    "elev": 743.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "308590": {
+    "name": "AGINSKOE",
+    "lat": 51.1,
+    "lon": 114.517,
+    "elev": 681.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2856,
+    "obs_per_day": 7.8
+  },
+  "308620": {
+    "name": "SHILKA",
+    "lat": 51.867,
+    "lon": 116.033,
+    "elev": 597.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2857,
+    "obs_per_day": 7.8
+  },
+  "308790": {
+    "name": "NERCHINSKIJ ZAVOD",
+    "lat": 51.317,
+    "lon": 119.617,
+    "elev": 619.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2854,
+    "obs_per_day": 7.8
+  },
+  "309250": {
+    "name": "KJAHTA",
+    "lat": 50.367,
+    "lon": 106.45,
+    "elev": 797.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2450,
+    "obs_per_day": 6.7
+  },
+  "309350": {
+    "name": "KRASNYJ CHIKOJ",
+    "lat": 50.367,
+    "lon": 108.75,
+    "elev": 771.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2639,
+    "obs_per_day": 7.2
+  },
+  "309490": {
+    "name": "KYRA",
+    "lat": 49.567,
+    "lon": 111.967,
+    "elev": 908.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2311,
+    "obs_per_day": 6.3
+  },
+  "309570": {
+    "name": "AKSA",
+    "lat": 50.267,
+    "lon": 113.267,
+    "elev": 732.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2857,
+    "obs_per_day": 7.8
+  },
+  "309650": {
+    "name": "BORZYA",
+    "lat": 50.4,
+    "lon": 116.517,
+    "elev": 676.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2848,
+    "obs_per_day": 7.8
+  },
+  "309750": {
+    "name": "PRIARGUNSK",
+    "lat": 50.333,
+    "lon": 119.067,
+    "elev": 521.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2835,
+    "obs_per_day": 7.8
+  },
+  "310040": {
+    "name": "ALDAN",
+    "lat": 58.617,
+    "lon": 125.367,
+    "elev": 679.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2774,
+    "obs_per_day": 7.6
+  },
+  "310050": {
+    "name": "TOMMOT",
+    "lat": 58.967,
+    "lon": 126.267,
+    "elev": 283.5,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "310110": {
+    "name": "BUJAGA",
+    "lat": 59.667,
+    "lon": 127.05,
+    "elev": 278.4,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "310160": {
+    "name": "UGINO",
+    "lat": 58.633,
+    "lon": 128.5,
+    "elev": 230.6,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2818,
+    "obs_per_day": 7.7
+  },
+  "310260": {
+    "name": "UCHUR",
+    "lat": 58.733,
+    "lon": 130.617,
+    "elev": 197.4,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2801,
+    "obs_per_day": 7.7
+  },
+  "310410": {
+    "name": "UST'-MIL'",
+    "lat": 59.633,
+    "lon": 133.033,
+    "elev": 179.4,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "310540": {
+    "name": "UST'-JUDOMA",
+    "lat": 59.183,
+    "lon": 135.15,
+    "elev": 212.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2378,
+    "obs_per_day": 6.5
+  },
+  "310620": {
+    "name": "YUGORENOK",
+    "lat": 59.767,
+    "lon": 137.667,
+    "elev": 383.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2851,
+    "obs_per_day": 7.8
+  },
+  "310870": {
+    "name": "UL' YA",
+    "lat": 58.817,
+    "lon": 141.85,
+    "elev": 5.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2435,
+    "obs_per_day": 6.7
+  },
+  "310880": {
+    "name": "OHOTSK",
+    "lat": 59.367,
+    "lon": 143.2,
+    "elev": 6.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "310960": {
+    "name": "SPAFAR' EVA (OSTROV)",
+    "lat": 59.15,
+    "lon": 149.033,
+    "elev": 52.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2855,
+    "obs_per_day": 7.8
+  },
+  "311020": {
+    "name": "KANKU",
+    "lat": 57.65,
+    "lon": 125.967,
+    "elev": 1204.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2287,
+    "obs_per_day": 6.3
+  },
+  "311230": {
+    "name": "CJUL'BJU",
+    "lat": 57.767,
+    "lon": 130.9,
+    "elev": 255.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2386,
+    "obs_per_day": 6.5
+  },
+  "311370": {
+    "name": "TOKO",
+    "lat": 56.283,
+    "lon": 131.133,
+    "elev": 850.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2485,
+    "obs_per_day": 6.8
+  },
+  "311520": {
+    "name": "NEL' KAN",
+    "lat": 57.65,
+    "lon": 136.15,
+    "elev": 318.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2846,
+    "obs_per_day": 7.8
+  },
+  "311680": {
+    "name": "AYAN",
+    "lat": 56.45,
+    "lon": 138.15,
+    "elev": 8.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2802,
+    "obs_per_day": 7.7
+  },
+  "311740": {
+    "name": "BOL'SHOJ SHANTAR",
+    "lat": 54.833,
+    "lon": 137.533,
+    "elev": 21.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2864,
+    "obs_per_day": 7.8
+  },
+  "312530": {
+    "name": "BOMNAK",
+    "lat": 54.717,
+    "lon": 128.867,
+    "elev": 364.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "312850": {
+    "name": "UDSKOE",
+    "lat": 54.5,
+    "lon": 134.417,
+    "elev": 62.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "312950": {
+    "name": "MAGDAGACI",
+    "lat": 53.467,
+    "lon": 125.817,
+    "elev": 370.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2875,
+    "obs_per_day": 7.9
+  },
+  "313000": {
+    "name": "ZEJA",
+    "lat": 53.7,
+    "lon": 127.3,
+    "elev": 229.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "313289": {
+    "name": "IGNATYEVO",
+    "lat": 50.425,
+    "lon": 127.412,
+    "elev": 194.5,
+    "icao": "UHBB",
+    "wban": "99999",
+    "avg_obs_yr": 14470,
+    "obs_per_day": 39.6
+  },
+  "313290": {
+    "name": "EKIMCAN",
+    "lat": 53.067,
+    "lon": 132.933,
+    "elev": 543.0,
+    "icao": "UHBP",
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "313480": {
+    "name": "BURUKAN",
+    "lat": 53.05,
+    "lon": 136.033,
+    "elev": 153.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2757,
+    "obs_per_day": 7.6
+  },
+  "313690": {
+    "name": "NIKOLAEVSK-ON-AMUR",
+    "lat": 53.15,
+    "lon": 140.7,
+    "elev": 68.0,
+    "icao": "UHNN",
+    "wban": "99999",
+    "avg_obs_yr": 1949,
+    "obs_per_day": 5.3
+  },
+  "313710": {
+    "name": "CHERNJAEVO",
+    "lat": 52.783,
+    "lon": 126.0,
+    "elev": 210.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2372,
+    "obs_per_day": 6.5
+  },
+  "313880": {
+    "name": "NORSK",
+    "lat": 52.35,
+    "lon": 129.917,
+    "elev": 208.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2778,
+    "obs_per_day": 7.6
+  },
+  "314160": {
+    "name": "IM POLINY OSIPENKO",
+    "lat": 52.417,
+    "lon": 136.5,
+    "elev": 73.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "314180": {
+    "name": "VESELAJA GORKA",
+    "lat": 52.283,
+    "lon": 135.8,
+    "elev": 201.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2712,
+    "obs_per_day": 7.4
+  },
+  "314390": {
+    "name": "BOGORODSKOE",
+    "lat": 52.383,
+    "lon": 140.467,
+    "elev": 35.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "314420": {
+    "name": "SIMANOVSK",
+    "lat": 51.983,
+    "lon": 127.65,
+    "elev": 281.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2827,
+    "obs_per_day": 7.7
+  },
+  "314780": {
+    "name": "SOFIJSKIJ PRIISK",
+    "lat": 52.267,
+    "lon": 133.983,
+    "elev": 902.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2864,
+    "obs_per_day": 7.8
+  },
+  "314840": {
+    "name": "HULARIN",
+    "lat": 51.417,
+    "lon": 135.083,
+    "elev": 269.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "314890": {
+    "name": "GORIN",
+    "lat": 51.2,
+    "lon": 136.8,
+    "elev": 92.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2862,
+    "obs_per_day": 7.8
+  },
+  "315100": {
+    "name": "BLAGOVESCENSK",
+    "lat": 50.283,
+    "lon": 127.483,
+    "elev": 169.2,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2858,
+    "obs_per_day": 7.8
+  },
+  "315210": {
+    "name": "BRATOLJUBOVKA",
+    "lat": 50.783,
+    "lon": 129.333,
+    "elev": 227.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2861,
+    "obs_per_day": 7.8
+  },
+  "315270": {
+    "name": "ZAVITAJA",
+    "lat": 50.117,
+    "lon": 129.467,
+    "elev": 241.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "315320": {
+    "name": "CEKUNDA",
+    "lat": 50.867,
+    "lon": 132.25,
+    "elev": 272.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "315340": {
+    "name": "SEKTAGLI",
+    "lat": 50.433,
+    "lon": 131.017,
+    "elev": 230.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2828,
+    "obs_per_day": 7.7
+  },
+  "315380": {
+    "name": "SUTUR",
+    "lat": 50.067,
+    "lon": 132.133,
+    "elev": 347.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "315870": {
+    "name": "POJARKOVO",
+    "lat": 49.617,
+    "lon": 128.65,
+    "elev": 115.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "315940": {
+    "name": "ARHARA",
+    "lat": 49.417,
+    "lon": 130.083,
+    "elev": 135.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "316240": {
+    "name": "URMI",
+    "lat": 49.4,
+    "lon": 133.233,
+    "elev": 198.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2848,
+    "obs_per_day": 7.8
+  },
+  "316320": {
+    "name": "KUR",
+    "lat": 49.933,
+    "lon": 134.633,
+    "elev": 283.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2788,
+    "obs_per_day": 7.6
+  },
+  "316550": {
+    "name": "TROICKOE",
+    "lat": 49.45,
+    "lon": 136.567,
+    "elev": 29.0,
+    "icao": "UHHO",
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "316830": {
+    "name": "TUMNIN",
+    "lat": 49.65,
+    "lon": 140.083,
+    "elev": 58.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "317020": {
+    "name": "OBLUC'E",
+    "lat": 49.0,
+    "lon": 131.083,
+    "elev": 257.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "317070": {
+    "name": "EKATERINO-NIKOL'SKOE",
+    "lat": 47.733,
+    "lon": 130.967,
+    "elev": 73.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "317130": {
+    "name": "BIROBIDZHAN",
+    "lat": 48.733,
+    "lon": 132.95,
+    "elev": 80.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2873,
+    "obs_per_day": 7.9
+  },
+  "317250": {
+    "name": "SMIDOVICH",
+    "lat": 48.617,
+    "lon": 133.833,
+    "elev": 52.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "317540": {
+    "name": "TIVJAKU",
+    "lat": 48.6,
+    "lon": 137.05,
+    "elev": 403.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2510,
+    "obs_per_day": 6.9
+  },
+  "317700": {
+    "name": "SOVETSKAYA GAVAN",
+    "lat": 49.0,
+    "lon": 140.3,
+    "elev": 23.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2837,
+    "obs_per_day": 7.8
+  },
+  "318250": {
+    "name": "AGZU",
+    "lat": 47.6,
+    "lon": 138.4,
+    "elev": 165.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2713,
+    "obs_per_day": 7.4
+  },
+  "318450": {
+    "name": "KRASNYJ JAR",
+    "lat": 46.533,
+    "lon": 135.317,
+    "elev": 130.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2874,
+    "obs_per_day": 7.9
+  },
+  "318660": {
+    "name": "SOSUNOVO",
+    "lat": 46.533,
+    "lon": 138.333,
+    "elev": 4.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "318730": {
+    "name": "DAL'NERECHENSK",
+    "lat": 45.867,
+    "lon": 133.733,
+    "elev": 101.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2873,
+    "obs_per_day": 7.9
+  },
+  "319090": {
+    "name": "TERNEJ",
+    "lat": 45.0,
+    "lon": 136.6,
+    "elev": 68.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2799,
+    "obs_per_day": 7.7
+  },
+  "319150": {
+    "name": "POGRANICHNYJ",
+    "lat": 44.4,
+    "lon": 131.383,
+    "elev": 211.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2873,
+    "obs_per_day": 7.9
+  },
+  "319590": {
+    "name": "RUDNAJA PRISTAN'",
+    "lat": 44.367,
+    "lon": 135.85,
+    "elev": 34.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "319600": {
+    "name": "VLADIVOSTOK",
+    "lat": 43.117,
+    "lon": 131.933,
+    "elev": 183.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "319610": {
+    "name": "TIMIRYAZEVSKIJ",
+    "lat": 43.883,
+    "lon": 131.967,
+    "elev": 37.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "319690": {
+    "name": "POS'ET",
+    "lat": 42.65,
+    "lon": 130.8,
+    "elev": 35.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2850,
+    "obs_per_day": 7.8
+  },
+  "319741": {
+    "name": "KNEVICHI",
+    "lat": 43.399,
+    "lon": 132.148,
+    "elev": 14.0,
+    "icao": "UHWW",
+    "wban": "99999",
+    "avg_obs_yr": 17244,
+    "obs_per_day": 47.2
+  },
+  "319810": {
+    "name": "ANUCINO",
+    "lat": 43.967,
+    "lon": 133.067,
+    "elev": 188.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2873,
+    "obs_per_day": 7.9
+  },
+  "319811": {
+    "name": "ALYKEL",
+    "lat": 69.311,
+    "lon": 87.332,
+    "elev": 175.0,
+    "icao": "UOOO",
+    "wban": "99999",
+    "avg_obs_yr": 13965,
+    "obs_per_day": 38.3
+  },
+  "319870": {
+    "name": "PARTIZANSK",
+    "lat": 43.15,
+    "lon": 133.017,
+    "elev": 208.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "319890": {
+    "name": "PREOBRAZHENIE",
+    "lat": 42.9,
+    "lon": 133.9,
+    "elev": 43.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2853,
+    "obs_per_day": 7.8
+  },
+  "320270": {
+    "name": "POGIBI",
+    "lat": 52.217,
+    "lon": 141.633,
+    "elev": 6.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "320530": {
+    "name": "NOGLIKI",
+    "lat": 51.917,
+    "lon": 143.133,
+    "elev": 34.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "320610": {
+    "name": "ALEKSANDROVSK-SAHALINSKIJ",
+    "lat": 50.9,
+    "lon": 142.167,
+    "elev": 31.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "320690": {
+    "name": "PIL'VO",
+    "lat": 50.05,
+    "lon": 142.167,
+    "elev": 4.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2785,
+    "obs_per_day": 7.6
+  },
+  "320760": {
+    "name": "POGRANICHNOE",
+    "lat": 50.4,
+    "lon": 143.767,
+    "elev": 8.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "320980": {
+    "name": "PORONAJSK",
+    "lat": 49.217,
+    "lon": 143.1,
+    "elev": 8.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2874,
+    "obs_per_day": 7.9
+  },
+  "320990": {
+    "name": "MYS TERPENIYA",
+    "lat": 48.65,
+    "lon": 144.733,
+    "elev": 6.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2858,
+    "obs_per_day": 7.8
+  },
+  "321210": {
+    "name": "ILYINSKIY",
+    "lat": 47.983,
+    "lon": 142.2,
+    "elev": 18.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "321500": {
+    "name": "KHOMUTOVO",
+    "lat": 46.889,
+    "lon": 142.718,
+    "elev": 18.0,
+    "icao": "UHSS",
+    "wban": "99999",
+    "avg_obs_yr": 17621,
+    "obs_per_day": 48.3
+  },
+  "321650": {
+    "name": "JUZHNO-KURIL'SK",
+    "lat": 44.017,
+    "lon": 145.867,
+    "elev": 49.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "322130": {
+    "name": "MYS LOPATKA",
+    "lat": 50.867,
+    "lon": 156.683,
+    "elev": 47.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2447,
+    "obs_per_day": 6.7
+  },
+  "322150": {
+    "name": "SEVERO-KURIL'SK",
+    "lat": 50.683,
+    "lon": 156.133,
+    "elev": 23.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "322520": {
+    "name": "UST'-VOYAMPOLKA",
+    "lat": 58.5,
+    "lon": 159.167,
+    "elev": 7.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2688,
+    "obs_per_day": 7.4
+  },
+  "322870": {
+    "name": "UST'- HAJRJUZOVO",
+    "lat": 57.083,
+    "lon": 156.7,
+    "elev": 8.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1923,
+    "obs_per_day": 5.3
+  },
+  "323330": {
+    "name": "OZERNOY (MYS)",
+    "lat": 57.65,
+    "lon": 163.233,
+    "elev": 9.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2863,
+    "obs_per_day": 7.8
+  },
+  "323890": {
+    "name": "KLJUCHI",
+    "lat": 56.317,
+    "lon": 160.833,
+    "elev": 29.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1906,
+    "obs_per_day": 5.2
+  },
+  "324080": {
+    "name": "UST'-KAMCHATSK",
+    "lat": 56.217,
+    "lon": 162.717,
+    "elev": 27.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2847,
+    "obs_per_day": 7.8
+  },
+  "324110": {
+    "name": "ICA",
+    "lat": 55.583,
+    "lon": 155.583,
+    "elev": 6.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2799,
+    "obs_per_day": 7.7
+  },
+  "324770": {
+    "name": "SOBOLEVO",
+    "lat": 54.3,
+    "lon": 155.933,
+    "elev": 14.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1917,
+    "obs_per_day": 5.3
+  },
+  "325090": {
+    "name": "SEMYACHIK",
+    "lat": 54.117,
+    "lon": 159.983,
+    "elev": 27.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2805,
+    "obs_per_day": 7.7
+  },
+  "325400": {
+    "name": "YELIZOVO",
+    "lat": 53.168,
+    "lon": 158.454,
+    "elev": 39.9,
+    "icao": "UHPP",
+    "wban": "99999",
+    "avg_obs_yr": 13556,
+    "obs_per_day": 37.1
+  },
+  "325940": {
+    "name": "OZERNAJA",
+    "lat": 51.483,
+    "lon": 156.483,
+    "elev": 28.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2152,
+    "obs_per_day": 5.9
+  },
+  "340030": {
+    "name": "PONYRI",
+    "lat": 52.317,
+    "lon": 36.3,
+    "elev": 251.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "340090": {
+    "name": "KURSK",
+    "lat": 51.767,
+    "lon": 36.167,
+    "elev": 247.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "340130": {
+    "name": "LIVNY",
+    "lat": 52.433,
+    "lon": 37.6,
+    "elev": 179.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "340470": {
+    "name": "ZERDEVKA",
+    "lat": 51.833,
+    "lon": 41.483,
+    "elev": 147.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "340720": {
+    "name": "KARABULAK",
+    "lat": 52.333,
+    "lon": 46.367,
+    "elev": 302.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1610,
+    "obs_per_day": 4.4
+  },
+  "340830": {
+    "name": "HVALYNSK",
+    "lat": 52.5,
+    "lon": 48.083,
+    "elev": 88.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1537,
+    "obs_per_day": 4.2
+  },
+  "340980": {
+    "name": "PUGACEV",
+    "lat": 52.033,
+    "lon": 48.833,
+    "elev": 38.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1657,
+    "obs_per_day": 4.5
+  },
+  "341090": {
+    "name": "OBOJAN'",
+    "lat": 51.2,
+    "lon": 36.317,
+    "elev": 192.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "341100": {
+    "name": "BOGORODITSKOE-FENINO",
+    "lat": 51.167,
+    "lon": 37.35,
+    "elev": 226.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2861,
+    "obs_per_day": 7.8
+  },
+  "341220": {
+    "name": "CHERTOVITSKOYE",
+    "lat": 51.814,
+    "lon": 39.23,
+    "elev": 156.7,
+    "icao": "UUOO",
+    "wban": "99999",
+    "avg_obs_yr": 17383,
+    "obs_per_day": 47.6
+  },
+  "341230": {
+    "name": "VORONEZ",
+    "lat": 51.7,
+    "lon": 39.217,
+    "elev": 149.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "341390": {
+    "name": "KAMENNAJA STEP'",
+    "lat": 51.05,
+    "lon": 40.7,
+    "elev": 194.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2859,
+    "obs_per_day": 7.8
+  },
+  "341460": {
+    "name": "BORISOGLEBSK",
+    "lat": 51.367,
+    "lon": 42.083,
+    "elev": 106.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "341710": {
+    "name": "GAGARIN",
+    "lat": 51.713,
+    "lon": 46.171,
+    "elev": 31.4,
+    "icao": "UWSG",
+    "wban": "99999",
+    "avg_obs_yr": 17381,
+    "obs_per_day": 47.6
+  },
+  "341990": {
+    "name": "OZINKI",
+    "lat": 51.2,
+    "lon": 49.733,
+    "elev": 104.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1608,
+    "obs_per_day": 4.4
+  },
+  "342020": {
+    "name": "GOTNJA",
+    "lat": 50.8,
+    "lon": 35.767,
+    "elev": 226.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "342310": {
+    "name": "LISKI",
+    "lat": 51.0,
+    "lon": 39.5,
+    "elev": 115.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "342380": {
+    "name": "ANNA",
+    "lat": 51.483,
+    "lon": 40.417,
+    "elev": 154.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2668,
+    "obs_per_day": 7.3
+  },
+  "342470": {
+    "name": "KALAC",
+    "lat": 50.417,
+    "lon": 41.05,
+    "elev": 92.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2379,
+    "obs_per_day": 6.5
+  },
+  "343210": {
+    "name": "VALUJKI",
+    "lat": 50.217,
+    "lon": 38.1,
+    "elev": 112.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2852,
+    "obs_per_day": 7.8
+  },
+  "343360": {
+    "name": "BOGUCAR",
+    "lat": 49.933,
+    "lon": 40.567,
+    "elev": 84.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "345600": {
+    "name": "GUMRAK",
+    "lat": 48.783,
+    "lon": 44.346,
+    "elev": 146.9,
+    "icao": "URWW",
+    "wban": "99999",
+    "avg_obs_yr": 20432,
+    "obs_per_day": 56.0
+  },
+  "348380": {
+    "name": "TIHORECK",
+    "lat": 45.85,
+    "lon": 40.083,
+    "elev": 78.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2538,
+    "obs_per_day": 7.0
+  },
+  "348580": {
+    "name": "DIVNOE",
+    "lat": 45.917,
+    "lon": 43.35,
+    "elev": 87.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "348610": {
+    "name": "ELISTA",
+    "lat": 46.367,
+    "lon": 44.333,
+    "elev": 152.7,
+    "icao": "URWI",
+    "wban": "99999",
+    "avg_obs_yr": 18473,
+    "obs_per_day": 50.6
+  },
+  "349290": {
+    "name": "KRASNODAR",
+    "lat": 45.033,
+    "lon": 39.15,
+    "elev": 34.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 17439,
+    "obs_per_day": 47.8
+  },
+  "349490": {
+    "name": "SHPAKOVSKOYE",
+    "lat": 45.109,
+    "lon": 42.113,
+    "elev": 452.9,
+    "icao": "URMT",
+    "wban": "99999",
+    "avg_obs_yr": 17801,
+    "obs_per_day": 48.8
+  },
+  "349750": {
+    "name": "KOMSOMOL'SKIJ",
+    "lat": 45.35,
+    "lon": 46.033,
+    "elev": -1.7,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2872,
+    "obs_per_day": 7.9
+  },
+  "350260": {
+    "name": "ZILAIR",
+    "lat": 52.217,
+    "lon": 57.452,
+    "elev": 521.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2866,
+    "obs_per_day": 7.9
+  },
+  "350370": {
+    "name": "AK'JAR",
+    "lat": 51.867,
+    "lon": 58.183,
+    "elev": 341.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2361,
+    "obs_per_day": 6.5
+  },
+  "351210": {
+    "name": "ORENBURG",
+    "lat": 51.796,
+    "lon": 55.457,
+    "elev": 118.0,
+    "icao": "UWOO",
+    "wban": "99999",
+    "avg_obs_yr": 18660,
+    "obs_per_day": 51.1
+  },
+  "351270": {
+    "name": "AK-BULAK",
+    "lat": 51.017,
+    "lon": 55.633,
+    "elev": 144.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "351380": {
+    "name": "ORSK",
+    "lat": 51.067,
+    "lon": 58.6,
+    "elev": 285.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "353942": {
+    "name": "ASTRAKHAN",
+    "lat": 46.283,
+    "lon": 48.006,
+    "elev": -20.1,
+    "icao": "URWA",
+    "wban": "99999",
+    "avg_obs_yr": 17373,
+    "obs_per_day": 47.6
+  },
+  "360210": {
+    "name": "KLJUCI",
+    "lat": 52.25,
+    "lon": 79.183,
+    "elev": 142.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "360220": {
+    "name": "VOLCIHA",
+    "lat": 52.017,
+    "lon": 80.367,
+    "elev": 208.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "360340": {
+    "name": "RUBCOVSK",
+    "lat": 51.576,
+    "lon": 81.217,
+    "elev": 219.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "360380": {
+    "name": "ZMEINOGORSK",
+    "lat": 51.15,
+    "lon": 82.2,
+    "elev": 355.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "360580": {
+    "name": "CEMAL",
+    "lat": 51.433,
+    "lon": 86.0,
+    "elev": 420.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2867,
+    "obs_per_day": 7.9
+  },
+  "360610": {
+    "name": "TUROCAK",
+    "lat": 52.25,
+    "lon": 87.117,
+    "elev": 326.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "360640": {
+    "name": "YAJLJU",
+    "lat": 51.767,
+    "lon": 87.6,
+    "elev": 480.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2851,
+    "obs_per_day": 7.8
+  },
+  "360780": {
+    "name": "TELI",
+    "lat": 51.017,
+    "lon": 90.217,
+    "elev": 983.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "360830": {
+    "name": "UST'-USA",
+    "lat": 52.05,
+    "lon": 92.167,
+    "elev": 576.9,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 1958,
+    "obs_per_day": 5.4
+  },
+  "360900": {
+    "name": "HOVU-AKSY",
+    "lat": 51.133,
+    "lon": 93.683,
+    "elev": 1043.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2759,
+    "obs_per_day": 7.6
+  },
+  "360910": {
+    "name": "NIZHNE-USINSKOE",
+    "lat": 52.25,
+    "lon": 93.017,
+    "elev": 662.1,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "360920": {
+    "name": "TURAN",
+    "lat": 52.15,
+    "lon": 93.917,
+    "elev": 852.4,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2869,
+    "obs_per_day": 7.9
+  },
+  "360960": {
+    "name": "KYZYL",
+    "lat": 51.717,
+    "lon": 94.5,
+    "elev": 628.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2858,
+    "obs_per_day": 7.8
+  },
+  "361030": {
+    "name": "TOORA-HEM",
+    "lat": 52.467,
+    "lon": 96.1,
+    "elev": 920.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "361040": {
+    "name": "SARYG-SEP",
+    "lat": 51.483,
+    "lon": 95.583,
+    "elev": 705.8,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2871,
+    "obs_per_day": 7.9
+  },
+  "362290": {
+    "name": "UST'- KOKSA",
+    "lat": 50.283,
+    "lon": 85.617,
+    "elev": 978.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2870,
+    "obs_per_day": 7.9
+  },
+  "362780": {
+    "name": "MUGUR-AKSY",
+    "lat": 50.383,
+    "lon": 90.433,
+    "elev": 1850.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2868,
+    "obs_per_day": 7.9
+  },
+  "363070": {
+    "name": "ERZIN",
+    "lat": 50.25,
+    "lon": 95.167,
+    "elev": 1100.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2864,
+    "obs_per_day": 7.8
+  },
+  "370008": {
+    "name": "DOMODEDOVO",
+    "lat": 55.409,
+    "lon": 37.906,
+    "elev": 179.2,
+    "icao": "UUDD",
+    "wban": "99999",
+    "avg_obs_yr": 17719,
+    "obs_per_day": 48.5
+  },
+  "370010": {
+    "name": "VITYAZEVO",
+    "lat": 45.002,
+    "lon": 37.347,
+    "elev": 53.0,
+    "icao": "URKA",
+    "wban": "99999",
+    "avg_obs_yr": 18580,
+    "obs_per_day": 50.9
+  },
+  "370540": {
+    "name": "MINERALNYYE VODY",
+    "lat": 44.225,
+    "lon": 43.082,
+    "elev": 321.3,
+    "icao": "URMM",
+    "wban": "99999",
+    "avg_obs_yr": 18730,
+    "obs_per_day": 51.3
+  },
+  "371070": {
+    "name": "KRASNAYA POLYANA",
+    "lat": 43.683,
+    "lon": 40.2,
+    "elev": 569.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2873,
+    "obs_per_day": 7.9
+  },
+  "371710": {
+    "name": "SOCHI",
+    "lat": 43.45,
+    "lon": 39.957,
+    "elev": 27.1,
+    "icao": "URSS",
+    "wban": "99999",
+    "avg_obs_yr": 20115,
+    "obs_per_day": 55.1
+  },
+  "372120": {
+    "name": "NALCHIK",
+    "lat": 43.513,
+    "lon": 43.637,
+    "elev": 445.3,
+    "icao": "URMN",
+    "wban": "99999",
+    "avg_obs_yr": 13252,
+    "obs_per_day": 36.3
+  },
+  "377352": {
+    "name": "UYTASH",
+    "lat": 42.817,
+    "lon": 47.652,
+    "elev": 3.7,
+    "icao": "URML",
+    "wban": "99999",
+    "avg_obs_yr": 17456,
+    "obs_per_day": 47.8
+  },
+  "378650": {
+    "name": "ORSK",
+    "lat": 51.073,
+    "lon": 58.596,
+    "elev": 277.1,
+    "icao": "UWOR",
+    "wban": "99999",
+    "avg_obs_yr": 8842,
+    "obs_per_day": 24.2
+  },
+  "382030": {
+    "name": "UJUK",
+    "lat": 43.783,
+    "lon": 70.933,
+    "elev": 366.0,
+    "icao": null,
+    "wban": "99999",
+    "avg_obs_yr": 2810,
+    "obs_per_day": 7.7
+  }
+}

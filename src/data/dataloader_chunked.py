@@ -31,6 +31,33 @@ from torch.utils.data import Dataset
 from src.data.data_configs import DatasetMetadata
 
 
+class _ConcatMemmap:
+    """Concatenates two memmaps along the last (channel) axis on the fly.
+
+    Used when dataset has both `data.npy` (base channels) and `data_extra.npy`
+    (extension channels) — loader sees them as a single (T, ..., n_base+n_extra)
+    array. Only supports first-axis slicing (which is what the dataset uses).
+    """
+
+    def __init__(self, base: np.memmap, extra: np.memmap):
+        assert base.shape[:-1] == extra.shape[:-1], (
+            f"shape mismatch base={base.shape} extra={extra.shape}")
+        self.base = base
+        self.extra = extra
+        self.shape = base.shape[:-1] + (base.shape[-1] + extra.shape[-1],)
+        self.dtype = base.dtype
+        self.ndim = base.ndim
+
+    def __len__(self):
+        return self.shape[0]
+
+    def __getitem__(self, key):
+        # Supports time-axis slicing: chunk[a:b] or chunk[i]
+        b = self.base[key]
+        e = self.extra[key]
+        return np.concatenate([b, e], axis=-1)
+
+
 class TimeseriesChunkDataset(Dataset):
     """
     Dataset that reads raw timeseries chunks and creates sliding windows on the fly.
@@ -84,13 +111,33 @@ class TimeseriesChunkDataset(Dataset):
             with open(info_file) as f:
                 info = json.load(f)
             self.flat_grid = info.get("flat", False)
+
+            n_feat_total = info["n_feat"]
+            n_feat_base = info.get("n_feat_base", n_feat_total)
+            extra_file = info.get("extra_file")
+            n_feat_extra = info.get("n_feat_extra", 0)
+
             if self.flat_grid:
                 # Flat multi-resolution data: (T, N_nodes, C)
-                shape = (info["n_time"], info["n_nodes"], info["n_feat"])
+                base_shape = (info["n_time"], info["n_nodes"], n_feat_base)
+                extra_shape = (info["n_time"], info["n_nodes"], n_feat_extra) if extra_file else None
             else:
                 # Regular grid data: (T, n_lon, n_lat, C)
-                shape = (info["n_time"], info["n_lon"], info["n_lat"], info["n_feat"])
-            mm = np.memmap(single_file, dtype=np.float16, mode="r", shape=shape)
+                base_shape = (info["n_time"], info["n_lon"], info["n_lat"], n_feat_base)
+                extra_shape = (info["n_time"], info["n_lon"], info["n_lat"], n_feat_extra) if extra_file else None
+
+            base_mm = np.memmap(single_file, dtype=np.float16, mode="r", shape=base_shape)
+            if extra_file:
+                extra_path = os.path.join(data_dir, extra_file)
+                if not os.path.exists(extra_path):
+                    raise FileNotFoundError(
+                        f"dataset_info.json указывает extra_file={extra_file}, но {extra_path} не найден")
+                extra_mm = np.memmap(extra_path, dtype=np.float16, mode="r", shape=extra_shape)
+                mm = _ConcatMemmap(base_mm, extra_mm)
+                print(f"[ChunkDataset] склеиваем data.npy ({n_feat_base}ch) + {extra_file} ({n_feat_extra}ch) → {mm.shape[-1]}ch")
+            else:
+                mm = base_mm
+
             chunk_files = [single_file]
             self.chunks = [mm]
             self.chunk_lengths = [mm.shape[0]]

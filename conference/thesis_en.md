@@ -1,0 +1,30 @@
+UDC 519.6 : 551.5
+
+# A HYBRID GRAPH NEURAL NETWORK MODEL FOR REGIONAL WEATHER FORECASTING: DATA ASSIMILATION AND STATISTICAL POST-PROCESSING
+
+A. S. Tabakov, A. V. Penenko
+
+Novosibirsk State University, Novosibirsk, Russia
+Institute of Computational Mathematics and Mathematical Geophysics SB RAS, Novosibirsk, Russia
+
+Graph neural networks have emerged as a leading tool for short- and medium-range weather forecasting: models such as GraphCast outperform classical numerical weather prediction systems at a fraction of their inference cost. In this work we study the application of a GraphCast-style architecture to the problem of regional weather forecasting and its integration with data assimilation and statistical post-processing within a single hybrid pipeline.
+
+The baseline model is an encoder–processor–decoder GNN that follows the Google GraphCast design and is trained on the ERA5 reanalysis for 19 atmospheric and surface meteorological variables. For regional forecasting we build a two-level (multi-resolution) graph: a coarse global mesh is augmented with a refined regional mesh over the area of interest (Krasnoyarsk Krai), and nodes of the two scales are connected by shared edges in the overlap region. This provides a consistent exchange of information between the global and regional levels and suppresses artefacts at the artificial boundaries of the limited-area domain.
+
+When the model is applied autoregressively, two problems persist: error accumulation with increasing forecast horizon, and systematic bias of the predicted fields against station observations. To address both, we investigate a hybrid scheme that combines two families of methods:
+
+1. **Inference-time data assimilation.** Two algorithms are implemented: nudging, which cyclically corrects the forecast state towards available observations, and optimal interpolation, which produces a statistically optimal weighted combination of the forecast and the observations based on the spatial correlation structure of the errors. Both algorithms are applied on top of the pre-trained GNN and do not require retraining.
+2. **Statistical post-processing.** A model output statistics regression is trained on a network of surface stations to correct the systematic bias of the GNN output for near-surface air temperature and other variables. Even a simple station-level MOS substantially reduces the bias in large cities, where local effects (urbanisation, terrain) are poorly resolved in ERA5.
+
+A series of numerical experiments has been carried out on the global grid and for the Krasnoyarsk Krai region. The baseline GNN, the model with data assimilation, the model with MOS post-processing, and the full hybrid scheme are compared quantitatively in terms of standard meteorological skill scores — RMSE, ACC and bias — for lead times up to 72 hours. The results show that the combined use of data assimilation and post-processing yields the largest reduction of the accumulated autoregressive error over the limited-area domain, and that the two components are largely complementary: assimilation constrains the temporal growth of the error, while post-processing removes the local systematic bias.
+
+This research is carried out within the State Assignment of ICMMG SB RAS No. FWNM-2025-0003.
+
+## References
+
+1. Lam R., Sanchez-Gonzalez A., Willson M., et al. Learning skillful medium-range global weather forecasting // Science. 2023. V. 382, № 6677. P. 1416–1421.
+2. Stauffer D. R., Seaman N. L. Use of four-dimensional data assimilation in a limited-area mesoscale model. Part I: Experiments with synoptic-scale data // Monthly Weather Review. 1990. V. 118, № 6. P. 1250–1277.
+3. Davies H. C. A lateral boundary formulation for multi-level prediction models // Quarterly Journal of the Royal Meteorological Society. 1976. V. 102, № 432. P. 405–418.
+4. Glahn H. R., Lowry D. A. The use of Model Output Statistics (MOS) in objective weather forecasting // Journal of Applied Meteorology. 1972. V. 11, № 8. P. 1203–1211.
+
+Scientific advisor: Dr. Sci. (Phys.-Math.), Leading Researcher at ICMMG SB RAS Alexey V. Penenko.

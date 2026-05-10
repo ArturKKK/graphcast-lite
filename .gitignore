@@ -240,3 +240,19 @@ experiments/*/*.pth
 website/static/forecast.json
 website/static/overlays/*.png
 website/yandex_cache.json
+
+# Repo cleanup additions (May 2026)
+/archives/
+/docs/diploma/build/
+*.aux
+*.fdb_latexmk
+*.fls
+*.toc
+*.xdv
+.DS_Store
+
+# Secrets & big binary data dirs (May 2026 cleanup)
+/.ssh-city/
+/data/archives/
+/data/temp_train/
+/data/isd_lite_russia/

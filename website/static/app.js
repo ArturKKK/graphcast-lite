@@ -462,6 +462,7 @@
         } else {
           updateOverlays(currentStep);
         }
+        updateLegend();
       });
     });
   }

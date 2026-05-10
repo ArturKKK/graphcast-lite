@@ -37,6 +37,7 @@ MAP_BBOX = (54.0, 57.0, 90.0, 96.0)
 KRSK_TZ = timezone(timedelta(hours=7))
 
 HPA_TO_MMHG = 0.750062
+KRSK_ELEVATION_M = 150  # Krasnoyarsk city center elevation, meters
 
 WIND_DIRECTIONS = [
     ("С", 0), ("СВ", 45), ("В", 90), ("ЮВ", 135),
@@ -47,6 +48,13 @@ WIND_DIRECTIONS = [
 def wind_dir_text(deg: float) -> str:
     idx = round(deg / 45) % 8
     return WIND_DIRECTIONS[idx][0]
+
+
+def msl_to_station_hpa(msl_hpa: float, t2m_celsius: float,
+                       elevation_m: float = KRSK_ELEVATION_M) -> float:
+    """Convert mean sea-level pressure to station-level pressure."""
+    T_kelvin = t2m_celsius + 273.15
+    return msl_hpa * math.exp(-elevation_m / (29.3 * T_kelvin))
 
 
 def compute_wind(u: float, v: float) -> tuple[float, float]:
@@ -141,7 +149,8 @@ def compute_summary(pred_subset, n_steps, last_cycle, vi):
         wind_gust = max(wind_gust, ws)
 
         pi = precip_info(tp_mm, t2m_c)
-        pressure_mmhg = msl * HPA_TO_MMHG
+        station_hpa = msl_to_station_hpa(msl, t2m_c)
+        pressure_mmhg = station_hpa * HPA_TO_MMHG
 
         # Per-point min/max for temperature and wind
         t2m_all = pred_subset[:, step, idx_t2m].astype(np.float64) - 273.15
@@ -262,7 +271,8 @@ def parse_forecast(input_path: Path) -> dict:
 
             if msl_v > 10000:
                 msl_v /= 100.0
-            pr = round(msl_v * HPA_TO_MMHG, 1)
+            station_v = msl_to_station_hpa(msl_v, t2m_c)
+            pr = round(station_v * HPA_TO_MMHG, 1)
 
             # Wind gust
             u850 = float(map_pred[i, step, idx_u850])

@@ -1,0 +1,119 @@
+{
+  "_comment": "v3 GLOBAL — wb2 512x256, 34 features (30 dynamic + 4 time-forcing) + AR8 + noise. From-scratch training (no pretrained). See README.md.",
+
+  "batch_size": 1,
+  "learning_rate": 3e-4,
+  "num_epochs": 80,
+  "early_stopping_patience": 15,
+  "early_stopping_delta": 1e-5,
+  "wandb_log": false,
+  "random_seed": 42,
+  "use_latitude_weighting": true,
+
+  "max_ar_steps": 8,
+  "use_residual": true,
+  "roi_only_loss": false,
+
+  "noise_sigma": 0.05,
+  "noise_apply_from_ar_step": 1,
+
+  "data_dir": "/data/datasets/wb2_512x256_34f_v3",
+
+  "freeze_processor_epochs": 0,
+  "finetune_processor_lr_factor": 1.0,
+
+  "static_channels": [7, 8],
+  "forcing_channels": [30, 31, 32, 33],
+
+  "channel_loss_weights": {
+    "0":  2.0,
+    "1":  1.5,
+    "2":  1.5,
+    "3":  2.0,
+    "4":  1.5,
+    "5":  0.1,
+    "6":  1.0,
+    "7":  0.0,
+    "8":  0.0,
+    "9":  1.0,
+    "10": 1.0,
+    "11": 1.0,
+    "12": 1.0,
+    "13": 1.0,
+    "14": 1.0,
+    "15": 1.0,
+    "16": 1.0,
+    "17": 2.0,
+    "18": 1.0,
+    "19": 1.5,
+    "20": 1.5,
+    "21": 1.0,
+    "22": 1.0,
+    "23": 1.0,
+    "24": 1.0,
+    "25": 1.0,
+    "26": 1.0,
+    "27": 1.0,
+    "28": 1.0,
+    "29": 1.0,
+    "30": 0.0,
+    "31": 0.0,
+    "32": 0.0,
+    "33": 0.0
+  },
+
+  "graph": {
+    "grid2mesh_edge_creation": "radius",
+    "mesh2grid_edge_creation": "contained",
+    "grid2mesh_radius_query": 0.6,
+    "mesh_levels": [4, 6]
+  },
+
+  "pipeline": {
+    "encoder": {
+      "mlp": {
+        "mlp_hidden_dims": [256, 256],
+        "output_dim": 256,
+        "use_layer_norm": true,
+        "layer_norm_mode": "node"
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [256, 256],
+        "output_dim": 256,
+        "activation": "swish"
+      }
+    },
+    "processor": {
+      "gcn": {
+        "layer_type": "interaction_net",
+        "output_dim": 256,
+        "activation": "swish",
+        "use_layer_norm": true,
+        "num_message_passing_steps": 12,
+        "edge_feature_dim": 4
+      }
+    },
+    "decoder": {
+      "mlp": {
+        "mlp_hidden_dims": [256, 128],
+        "output_dim": 128,
+        "use_layer_norm": false
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [128, 128],
+        "output_dim": 34,
+        "activation": "swish"
+      }
+    }
+  },
+
+  "data": {
+    "dataset_name": "wb2_512x256_34f_v3",
+    "num_features_used": 34,
+    "obs_window_used": 2,
+    "pred_window_used": 8,
+    "want_feats_flattened": true
+  }
+}
