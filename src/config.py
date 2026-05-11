@@ -1,7 +1,7 @@
 """Defines the configuration for an experiment."""
 
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict
 from enum import Enum
 
 
@@ -252,3 +252,9 @@ class ExperimentConfig(BaseModel):
     finetune_processor_lr_factor: float = 0.1  # lr множитель для processor после разморозки
     use_residual: bool = True              # True = модель предсказывает дельту (out = X_last + pred)
                                            # False = модель предсказывает полное поле (out = pred)
+    noise_sigma: float = 0.0               # Std гауссова шума, инжектируемого на выход модели
+                                           # перед использованием как вход следующего AR-шага.
+                                           # GraphCast-style: помогает в длинных rollout'ах (AR>=2).
+    noise_apply_from_ar_step: int = 1      # С какого AR-шага начинать инжектить шум (0-based: 1=со второго шага)
+    channel_loss_weights: Dict[str, float] = {}  # Per-channel weights {"0": 2.0, "3": 2.0, ...}
+                                                 # Применяется поверх static/forcing mask.
