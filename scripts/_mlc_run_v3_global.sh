@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
-# v3 GLOBAL multires pipeline: ставит venv, распаковывает архивы из /data/datasets/,
-# собирает /data/datasets/wb2_512x256_23f_v3/data.npy и запускает обучение.
+# v3 GLOBAL pipeline for wb2_512x256_33f_v3.
 #
-# Сценарии (выбор через переменную SCENARIO):
-#   one_19f          — один архив dataset_512x256.tar.zst (19f) → +time_features → 23f
-#   two_time_chunks  — два архива dataset_512x256_part1.tar.zst + _part2.tar.zst (split по времени)
-#                      склеить time-axis, потом +time_features
-#   two_feat_chunks  — dataset_512x256_19f.tar.zst + dataset_512x256_4f_time.tar.zst
-#                      склеить feat-axis (без вычисления time forcing)
+# На VM ожидается:
+#   /data/datasets/dataset_512x256.tar.zst                              (~79 GB)  base 19f архив
+#   /data/datasets/global_512x256_extra_2010-2021_07deg/data_extra.npy  (~43 GB)  10 plev уже распакованный
+#   /data/datasets/global_512x256_extra_2010-2021_07deg/scalers_extra.npz
+#   /data/datasets/global_512x256_extra_2010-2021_07deg/dataset_info_extra.json
 #
-# Использование:
-#   SCENARIO=one_19f bash /data/run_v3_global.sh
+# Шаги:
+#   1. setup venv (/data/venvs/graphcast) + git clone репо
+#   2. распаковать base 19f tar.zst → /data/datasets/wb2_512x256_19f_ar/ (data.npy)
+#   3. python scripts/build_v3_extra_with_time.py → /data/datasets/wb2_512x256_33f_v3/
+#        (symlink data.npy + новый data_extra.npy 14ch + scalers/coords/variables/info)
+#   4. cleanup tar.zst
+#   5. launch python -m src.main experiments/wb2_512x256_33f_ar_v3
 #
 set -uo pipefail
 
-SCENARIO="${SCENARIO:-one_19f}"
 LOG=/data/logs/v3_global_pipeline.log
 mkdir -p /data/logs /data/venvs /data/datasets
 exec >>"$LOG" 2>&1
@@ -22,52 +24,55 @@ exec >>"$LOG" 2>&1
 trap 'echo "[ERR $(date +%H:%M:%S)] failure at line $LINENO ($BASH_COMMAND)"' ERR
 
 echo "============================================================"
-echo "[start $(date)] v3 GLOBAL pipeline, scenario=$SCENARIO"
+echo "[start $(date)] v3 GLOBAL pipeline (33f = 19 + 10 + 4)"
 echo "============================================================"
 
 REPO=/workdir/graphcast-lite
 VENV=/data/venvs/graphcast
 DATA=/data/datasets
-BASE_19F_DIR=$DATA/wb2_512x256_19f_ar          # промежуточный 19f
-OUT_DIR=$DATA/wb2_512x256_34f_v3               # финальный 34f
-mkdir -p "$OUT_DIR"
+BASE_DIR=$DATA/wb2_512x256_19f_ar
+EXTRA_DIR=$DATA/global_512x256_extra_2010-2021_07deg
+OUT_DIR=$DATA/wb2_512x256_33f_v3
 
-cd "$REPO"
+# ===== 1. Repo + venv =====
+if [[ ! -d "$REPO/.git" ]]; then
+  echo "[1a/5 $(date +%H:%M:%S)] cloning repo to $REPO"
+  mkdir -p /workdir
+  git clone -b main-arthur https://github.com/ArturKKK/graphcast-lite.git "$REPO"
+else
+  echo "[1a/5] repo present; pulling latest"
+  (cd "$REPO" && git pull --rebase --autostash) || echo "  pull failed (continuing)"
+fi
 
-# ===== 1. venv =====
 if [[ ! -x "$VENV/bin/python" ]]; then
-  echo "[1/5 $(date +%H:%M:%S)] creating venv at $VENV"
+  echo "[1b/5 $(date +%H:%M:%S)] creating venv at $VENV"
   python3 -m venv "$VENV"
   "$VENV/bin/pip" install -q --upgrade pip wheel setuptools
   "$VENV/bin/pip" install -q -r "$REPO/requirements.txt"
 else
-  echo "[1/5] venv already present"
+  echo "[1b/5] venv already present"
 fi
 source "$VENV/bin/activate"
 echo "python = $(which python); torch = $(python -c 'import torch;print(torch.__version__, torch.cuda.is_available())')"
 
-# ===== helper: extract + flatten + cleanup =====
-extract_and_flatten() {
-  local archive="$1"
-  local target="$2"
-  echo "  extracting $(basename "$archive") -> $target"
+cd "$REPO"
+
+# ===== 2. Extract base 19f =====
+extract_19f_base() {
+  local archive="$DATA/dataset_512x256.tar.zst"
+  local target="$BASE_DIR"
+  if [[ -f "$target/data.npy" ]]; then
+    echo "[2/5] base 19f already extracted: $target"
+    return 0
+  fi
+  if [[ ! -f "$archive" ]]; then
+    echo "[2/5] ERROR: $archive not found"
+    return 2
+  fi
+  echo "[2/5 $(date +%H:%M:%S)] extracting $(basename "$archive") -> $target"
   mkdir -p "$target"
-  case "$archive" in
-    *.tar.zst)
-      tar --use-compress-program=unzstd -xf "$archive" -C "$target" --strip-components=1
-      ;;
-    *.tar.gz)
-      tar -xzf "$archive" -C "$target" --strip-components=1
-      ;;
-    *.tar)
-      tar -xf "$archive" -C "$target" --strip-components=1
-      ;;
-    *)
-      echo "  unknown archive type: $archive"; return 1
-      ;;
-  esac
+  tar --use-compress-program=unzstd -xf "$archive" -C "$target" --strip-components=1
   find "$target" -name "._*" -delete 2>/dev/null || true
-  # flatten if data.npy nested deeper
   local found=$(find "$target" -maxdepth 4 -name data.npy -type f | head -1)
   if [[ -n "$found" && "$(dirname "$found")" != "$target" ]]; then
     local src=$(dirname "$found")
@@ -78,81 +83,42 @@ extract_and_flatten() {
   ls -lh "$target" | head
   if [[ -f "$target/data.npy" ]]; then
     rm -f "$archive"
-    echo "  archive removed"
+    echo "  archive removed; $(df -h /data | tail -1)"
   else
     echo "  ERROR: data.npy not in $target after extract"
     return 2
   fi
 }
+extract_19f_base
 
-# ===== 2-4: подготовка датасета по сценарию =====
-if [[ ! -f "$OUT_DIR/data.npy" ]]; then
-  case "$SCENARIO" in
+# ===== 3. Sanity check extra dir =====
+if [[ ! -f "$EXTRA_DIR/data_extra.npy" ]]; then
+  echo "[3/5] ERROR: $EXTRA_DIR/data_extra.npy not found"
+  exit 2
+fi
+echo "[3/5] extra dir OK:"
+ls -lh "$EXTRA_DIR"
 
-    one_19f)
-      echo "[2/5 $(date +%H:%M:%S)] scenario=one_19f"
-      if [[ ! -f "$BASE_19F_DIR/data.npy" ]]; then
-        extract_and_flatten "$DATA/dataset_512x256.tar.zst" "$BASE_19F_DIR"
-      else
-        echo "  19f already extracted"
-      fi
-      echo "[3/5 $(date +%H:%M:%S)] adding time features 19f -> 23f (NB: only 19+4 — needs 30+4 for v3-34f path; see README scenario C)"
-      python scripts/add_time_features.py --src "$BASE_19F_DIR" --dst "$OUT_DIR"
-      echo "[4/5] cleanup 19f source"
-      rm -f "$BASE_19F_DIR/data.npy"
-      ;;
-
-    two_time_chunks)
-      echo "[2/5 $(date +%H:%M:%S)] scenario=two_time_chunks"
-      P1=$DATA/wb2_512x256_19f_part1
-      P2=$DATA/wb2_512x256_19f_part2
-      if [[ ! -f "$P1/data.npy" ]]; then
-        extract_and_flatten "$DATA/dataset_512x256_part1.tar.zst" "$P1"
-      fi
-      if [[ ! -f "$P2/data.npy" ]]; then
-        extract_and_flatten "$DATA/dataset_512x256_part2.tar.zst" "$P2"
-      fi
-      echo "[3/5 $(date +%H:%M:%S)] concat time-axis -> $BASE_19F_DIR"
-      python scripts/concat_time_chunks.py --parts "$P1" "$P2" --out "$BASE_19F_DIR"
-      rm -f "$P1/data.npy" "$P2/data.npy"
-      echo "[4/5 $(date +%H:%M:%S)] adding time features 19f -> 23f"
-      python scripts/add_time_features.py --src "$BASE_19F_DIR" --dst "$OUT_DIR"
-      rm -f "$BASE_19F_DIR/data.npy"
-      ;;
-
-    two_feat_chunks)
-      echo "[2/5 $(date +%H:%M:%S)] scenario=two_feat_chunks"
-      FT=$DATA/wb2_512x256_4f_time
-      if [[ ! -f "$BASE_19F_DIR/data.npy" ]]; then
-        extract_and_flatten "$DATA/dataset_512x256_19f.tar.zst" "$BASE_19F_DIR"
-      fi
-      if [[ ! -f "$FT/data.npy" ]]; then
-        extract_and_flatten "$DATA/dataset_512x256_4f_time.tar.zst" "$FT"
-      fi
-      echo "[3/5 $(date +%H:%M:%S)] concat feat-axis -> $OUT_DIR"
-      python scripts/concat_feat_chunks.py --base "$BASE_19F_DIR" --extra "$FT" --out "$OUT_DIR"
-      echo "[4/5] cleanup"
-      rm -f "$BASE_19F_DIR/data.npy" "$FT/data.npy"
-      ;;
-
-    *)
-      echo "Unknown SCENARIO=$SCENARIO"; exit 1
-      ;;
-  esac
+# ===== 4. Build merged 33f dataset =====
+if [[ ! -f "$OUT_DIR/dataset_info.json" ]]; then
+  echo "[4/5 $(date +%H:%M:%S)] building merged 33f dataset -> $OUT_DIR"
+  python scripts/build_v3_extra_with_time.py \
+      --base-dir "$BASE_DIR" \
+      --extra-dir "$EXTRA_DIR" \
+      --out-dir "$OUT_DIR"
 else
-  echo "[2/5..4/5] $OUT_DIR/data.npy already exists, skipping prep"
+  echo "[4/5] $OUT_DIR/dataset_info.json already exists, skip build"
 fi
 
 df -h /data | tail -1
 ls -lh "$OUT_DIR"
 
-# ===== 5. launch training =====
+# ===== 5. Launch training =====
 echo "[5/5 $(date +%H:%M:%S)] launching training"
 export CUDA_VISIBLE_DEVICES=0
 export PYTHONUNBUFFERED=1
-cd "$REPO"
 nvidia-smi | head -20
 
-python -m src.main experiments/wb2_512x256_34f_ar_v3
+python -m src.main experiments/wb2_512x256_33f_ar_v3
 
 echo "[done $(date)]"

@@ -1,5 +1,5 @@
 {
-  "_comment": "v3 GLOBAL — wb2 512x256, 34 features (30 dynamic + 4 time-forcing) + AR8 + noise. From-scratch training (no pretrained). See README.md.",
+  "_comment": "v3 GLOBAL — wb2 512x256, 33 features (19 base + 10 new plev + 4 time-forcing). NB: 2d dewpoint NOT available in this WB2 zarr → 29 dyn instead of 30. From-scratch.",
 
   "batch_size": 1,
   "learning_rate": 3e-4,
@@ -14,53 +14,14 @@
   "use_residual": true,
   "roi_only_loss": false,
 
-  "noise_sigma": 0.05,
-  "noise_apply_from_ar_step": 1,
-
-  "data_dir": "/data/datasets/wb2_512x256_34f_v3",
+  "data_dir": "/data/datasets/wb2_512x256_33f_v3",
 
   "freeze_processor_epochs": 0,
   "finetune_processor_lr_factor": 1.0,
 
   "static_channels": [7, 8],
-  "forcing_channels": [30, 31, 32, 33],
-
-  "channel_loss_weights": {
-    "0":  2.0,
-    "1":  1.5,
-    "2":  1.5,
-    "3":  2.0,
-    "4":  1.5,
-    "5":  0.1,
-    "6":  1.0,
-    "7":  0.0,
-    "8":  0.0,
-    "9":  1.0,
-    "10": 1.0,
-    "11": 1.0,
-    "12": 1.0,
-    "13": 1.0,
-    "14": 1.0,
-    "15": 1.0,
-    "16": 1.0,
-    "17": 2.0,
-    "18": 1.0,
-    "19": 1.5,
-    "20": 1.5,
-    "21": 1.0,
-    "22": 1.0,
-    "23": 1.0,
-    "24": 1.0,
-    "25": 1.0,
-    "26": 1.0,
-    "27": 1.0,
-    "28": 1.0,
-    "29": 1.0,
-    "30": 0.0,
-    "31": 0.0,
-    "32": 0.0,
-    "33": 0.0
-  },
+  "forcing_channels": [29, 30, 31, 32],
+  "_comment_loss": "static + forcing → channel_mask=0 (lat-weighted MSE на остальных 27 каналах). noise_sigma и per-channel weights в src/train.py не реализованы — пропускаем.",
 
   "graph": {
     "grid2mesh_edge_creation": "radius",
@@ -103,15 +64,15 @@
       "gcn": {
         "layer_type": "conv_gcn",
         "hidden_dims": [128, 128],
-        "output_dim": 34,
+        "output_dim": 33,
         "activation": "swish"
       }
     }
   },
 
   "data": {
-    "dataset_name": "wb2_512x256_34f_v3",
-    "num_features_used": 34,
+    "dataset_name": "wb2_512x256_33f_v3",
+    "num_features_used": 33,
     "obs_window_used": 2,
     "pred_window_used": 8,
     "want_feats_flattened": true
