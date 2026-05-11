@@ -151,6 +151,8 @@ def train_epoch(
     static_channels=None,
     forcing_channels=None,
     use_residual=True,
+    noise_sigma=0.0,
+    noise_apply_from_ar_step=1,
 ):
     """Один проход обучения. ТЕПЕРЬ С АВТОРЕГРЕССИЕЙ."""  
     model.train()  
@@ -211,6 +213,13 @@ def train_epoch(
             
             # Считаем лосс (channel_mask обнуляет градиент по static каналам)
             loss_batch += weighted_mse_loss(out, target, lat_weights, channel_mask, spatial_mask)
+            
+            # --- INPUT NOISE INJECTION (GraphCast-style) ---
+            # Добавляем шум на выход ПЕРЕД тем, как он станет входом следующего AR-шага.
+            # Делает модель устойчивой к собственным ошибкам в длинных rollout'ах.
+            # static/forcing каналы перезапишутся carry-forward'ом ниже, так что шум на них не повлияет.
+            if noise_sigma > 0 and (step + 1) < steps_to_run and (step + 1) >= noise_apply_from_ar_step:
+                out = out + torch.randn_like(out) * noise_sigma
             
             # САМОЕ ГЛАВНОЕ: Добавляем наш прогноз в историю для следующего шага
             # [1, 2, 3, 4] -> [2, 3, 4, out]
@@ -356,6 +365,21 @@ def train(
         print(f"[Train] static_channels={static_ch}, forcing_channels={forcing_ch}")
         print(f"[Train] → маска каналов: {n_dynamic}/{C_total} dynamic (no-loss: {no_loss_ch})")
 
+    # --- Per-channel loss weights (GraphCast-style: t2m×2, msl×2, z500×2, tp×1.5, sp×0.1, ...) ---
+    clw = getattr(config, 'channel_loss_weights', None)
+    if clw:
+        C_total = config.data.num_features_used
+        if channel_mask is None:
+            channel_mask = torch.ones(C_total, device=device)
+        applied = {}
+        for k, v in clw.items():
+            ch = int(k)
+            w = float(v)
+            if 0 <= ch < C_total:
+                channel_mask[ch] = channel_mask[ch] * w
+                applied[ch] = w
+        print(f"[Train] channel_loss_weights applied to {len(applied)} channels: {applied}")
+
     # --- Пространственная маска: обнуляем лосс на краях региона ---
     spatial_mask = None
     bmw = getattr(config, 'boundary_mask_width', 0)
@@ -384,6 +408,10 @@ def train(
 
     loss_fn = nn.MSELoss()
     use_residual = getattr(config, 'use_residual', True)
+    noise_sigma = float(getattr(config, 'noise_sigma', 0.0))
+    noise_apply_from = int(getattr(config, 'noise_apply_from_ar_step', 1))
+    if noise_sigma > 0:
+        print(f"[Train] input noise injection: sigma={noise_sigma}, apply_from_ar_step={noise_apply_from}")
 
     train_losses = []  
     val_losses = []  
@@ -478,6 +506,8 @@ def train(
             channel_mask=channel_mask, spatial_mask=spatial_mask,
             static_channels=static_ch, forcing_channels=forcing_ch,
             use_residual=use_residual,
+            noise_sigma=noise_sigma,
+            noise_apply_from_ar_step=noise_apply_from,
         )  
 
         epoch_val_loss, epoch_val_acc, epoch_raw_rmse = test(  
