@@ -81,6 +81,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str,
     if experiment_config.data.dataset_name in (
         DatasetNames.wb2_512x256_19f_ar,
         DatasetNames.wb2_512x256_19f_ar_v2,
+        DatasetNames.wb2_512x256_33f_v3,
         DatasetNames.multires,
         DatasetNames.region_krsk_cds_19f,
         DatasetNames.region_krsk_cds_23f,

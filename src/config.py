@@ -60,6 +60,7 @@ class DatasetNames(str, Enum):
     wb2_64x32_ar_15f_4obs_4pred = "wb2_64x32_ar_15f_4obs_4pred"
     wb2_512x256_19f_ar = "wb2_512x256_19f_ar"
     wb2_512x256_19f_ar_v2 = "wb2_512x256_19f_ar_v2"
+    wb2_512x256_33f_v3 = "wb2_512x256_33f_v3"
     multires = "multires"  # multi-resolution flat grid (any region)
     region_krsk_cds_19f = "region_krsk_cds_19f"  # Krasnoyarsk 61x41, 0.25°, CDS ERA5
     region_krsk_cds_23f = "region_krsk_cds_23f"  # То же + 4 time features (sin/cos hour/doy)
