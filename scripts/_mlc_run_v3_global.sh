@@ -118,6 +118,7 @@ echo "[5/5 $(date +%H:%M:%S)] launching training"
 export CUDA_VISIBLE_DEVICES=0
 export PYTHONUNBUFFERED=1
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 nvidia-smi | head -20
 
 python -m src.main experiments/wb2_512x256_33f_ar_v3 \
