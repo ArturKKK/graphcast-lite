@@ -190,8 +190,11 @@ def train_epoch(
         
         # 3. Крутим цикл (сколько шагов скажет current_ar_steps, но не больше target)
         steps_to_run = min(current_ar_steps, total_target_steps)
-        
-        for step in range(steps_to_run):
+
+        # bf16 autocast: активации идут в bfloat16 (range=fp32, ~40% экономии VRAM),
+        # веса/Adam state остаются fp32. На H100 ещё и быстрее fp32 за счёт tensor cores.
+        with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=(device.type == 'cuda')):
+         for step in range(steps_to_run):
             # Вход в модель (плоский)
             inp = curr_state.view(N, G, -1)
             
