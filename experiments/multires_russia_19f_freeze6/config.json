@@ -7,7 +7,7 @@
   "wandb_log": false,
   "random_seed": 42,
   "use_latitude_weighting": true,
-  "max_ar_steps": 4,
+  "max_ar_steps": 2,
   "use_residual": false,
   "roi_only_loss": true,
   "data_dir": "/data/datasets/multires_russia_19f",

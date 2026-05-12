@@ -119,6 +119,8 @@ export CUDA_VISIBLE_DEVICES=0
 export PYTHONUNBUFFERED=1
 nvidia-smi | head -20
 
-python -m src.main experiments/wb2_512x256_33f_ar_v3
+python -m src.main experiments/wb2_512x256_33f_ar_v3 \
+  --pretrained experiments/wb2_512x256_33f_ar_v3/best_model.pth \
+  --resume
 
 echo "[done $(date)]"

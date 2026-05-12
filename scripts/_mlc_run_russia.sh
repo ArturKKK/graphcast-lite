@@ -127,6 +127,7 @@ cd "$REPO"
 nvidia-smi | head -20
 
 python -m src.main experiments/multires_russia_19f_freeze6 \
-  --pretrained experiments/wb2_512x256_19f_ar_v2/best_model.pth
+  --pretrained experiments/multires_russia_19f_freeze6/best_model.pth \
+  --resume
 
 echo "[done $(date)]"
