@@ -96,8 +96,13 @@ else
   echo "[4] multires_russia_19f already built"
 fi
 
-# ----- 5. ensure global extra (10 plev channels) -----
+# ----- 5. ensure global extra (10 plev channels) + coords.npz -----
 [[ -f "$EXTRA_DIR/data_extra.npy" ]] || { echo "[ERR] $EXTRA_DIR/data_extra.npy missing"; exit 5; }
+# extra-датасет публикуется без coords.npz; решётка 512x256 та же, что у base.
+if [[ ! -f "$EXTRA_DIR/coords.npz" ]]; then
+  echo "[5] copying coords.npz from $BASE_DIR to $EXTRA_DIR"
+  cp "$BASE_DIR/coords.npz" "$EXTRA_DIR/coords.npz"
+fi
 
 # ----- 6. build multires_russia_33f -----
 if [[ ! -f "$MULTI_33F/data_extra.npy" ]]; then
