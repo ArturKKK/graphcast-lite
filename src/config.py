@@ -252,6 +252,9 @@ class ExperimentConfig(BaseModel):
     finetune_processor_lr_factor: float = 0.1  # lr множитель для processor после разморозки
     use_residual: bool = True              # True = модель предсказывает дельту (out = X_last + pred)
                                            # False = модель предсказывает полное поле (out = pred)
+    initial_ar_steps: int = 1              # С какого AR-уровня стартовать curriculum (обычно 1, но
+                                           # для finetune от сильной AR-натренированной базы можно
+                                           # сразу 3, чтобы не тратить эпохи на AR=1/2 warm-up).
     noise_sigma: float = 0.0               # Std гауссова шума, инжектируемого на выход модели
                                            # перед использованием как вход следующего AR-шага.
                                            # GraphCast-style: помогает в длинных rollout'ах (AR>=2).

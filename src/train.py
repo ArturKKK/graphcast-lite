@@ -348,8 +348,11 @@ def train(
         print("[Train] Включен Weighted Loss.")
         
     # --- Инициализация Curriculum (Новое) ---
-    ar_steps = 1
+    initial_ar = max(1, int(getattr(config, 'initial_ar_steps', 1)))
+    ar_steps = initial_ar
     max_ar = config.max_ar_steps # 4
+    if initial_ar > max_ar:
+        max_ar = initial_ar
     epochs_per_stage = num_epochs // max_ar if max_ar > 0 else num_epochs
 
     # --- Маска каналов: 0 для статических и forcing, 1 для динамических ---
@@ -489,7 +492,8 @@ def train(
         # --- Увеличение сложности ---
         # Вычисляем правильный AR-уровень для текущей эпохи
         # (важно при resume: epoch может быть > 0 с первой итерации)
-        correct_ar = min(1 + epoch // epochs_per_stage, max_ar)
+        # initial_ar — нижняя граница: если просили сразу AR=3, не опускаемся ниже.
+        correct_ar = min(max(initial_ar, 1 + epoch // epochs_per_stage), max_ar)
         if correct_ar > ar_steps:
             ar_steps = correct_ar
             print(f"\n>>> УРОВЕНЬ СЛОЖНОСТИ ПОВЫШЕН! Теперь обучаем на {ar_steps} шага(ов) вперед. <<<\n")
