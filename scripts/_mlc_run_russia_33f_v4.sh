@@ -26,8 +26,13 @@ RUS_DIR=$DATA/region_russia_645x165_19f_2010-2021_025deg
 MULTI_19F=$DATA/multires_russia_19f
 MULTI_33F=$DATA/multires_russia_33f
 EXTRA_DIR=$DATA/global_512x256_extra_2010-2021_07deg
+REGION_EXTRA_DIR=$DATA/region_russia_645x165_extra_2010-2021_025deg
 EXP=experiments/multires_russia_33f_v3_noroi
 PRETRAINED=experiments/wb2_512x256_33f_ar_v3/best_model.pth
+
+# Если выставить FORCE_REBUILD_33F=1, старый multires_russia_33f будет удалён
+# (нужно при первом запуске с новым region-extra, иначе переиспользуется старый interp-only).
+FORCE_REBUILD_33F=${FORCE_REBUILD_33F:-0}
 
 cd "$REPO"
 
@@ -104,15 +109,56 @@ if [[ ! -f "$EXTRA_DIR/coords.npz" ]]; then
   cp "$BASE_DIR/coords.npz" "$EXTRA_DIR/coords.npz"
 fi
 
+# ----- 5b. (опц.) ensure region extra (0.25° honest) -----
+REGION_EXTRA_FLAG=""
+if [[ ! -f "$REGION_EXTRA_DIR/data_extra.npy" ]]; then
+  # пробуем распаковать из tar/tar.zst в $DATA/
+  for cand in "$DATA/region_russia_extra_025deg.tar.zst" \
+              "$DATA/region_russia_645x165_extra_2010-2021_025deg.tar.zst" \
+              "$DATA/region_russia_645x165_extra_2010-2021_025deg.tar"; do
+    if [[ -f "$cand" ]]; then
+      echo "[5b $(date +%H:%M:%S)] extracting region-extra archive $cand"
+      mkdir -p "$REGION_EXTRA_DIR"
+      if [[ "$cand" == *.zst ]]; then
+        apt-get install -y -q zstd >/dev/null 2>&1 || true
+        tar --use-compress-program=unzstd -xf "$cand" -C "$REGION_EXTRA_DIR" --strip-components=1 2>/dev/null \
+          || tar --use-compress-program=unzstd -xf "$cand" -C "$REGION_EXTRA_DIR"
+      else
+        tar -xf "$cand" -C "$REGION_EXTRA_DIR" --strip-components=1 2>/dev/null \
+          || tar -xf "$cand" -C "$REGION_EXTRA_DIR"
+      fi
+      find "$REGION_EXTRA_DIR" -name "._*" -delete 2>/dev/null || true
+      found=$(find "$REGION_EXTRA_DIR" -maxdepth 4 -name data_extra.npy -type f | head -1)
+      if [[ -n "$found" && "$(dirname "$found")" != "$REGION_EXTRA_DIR" ]]; then
+        mv "$(dirname "$found")"/* "$REGION_EXTRA_DIR"/ 2>/dev/null || true
+        find "$REGION_EXTRA_DIR" -mindepth 1 -type d -empty -delete 2>/dev/null || true
+      fi
+      [[ -f "$REGION_EXTRA_DIR/data_extra.npy" ]] && rm -f "$cand"
+      break
+    fi
+  done
+fi
+if [[ -f "$REGION_EXTRA_DIR/data_extra.npy" ]]; then
+  echo "[5b] region-extra found: $(du -sh "$REGION_EXTRA_DIR" | cut -f1) — будем использовать для регион-узлов"
+  REGION_EXTRA_FLAG="--region-extra-dir $REGION_EXTRA_DIR"
+else
+  echo "[5b] region-extra NOT found at $REGION_EXTRA_DIR — fallback на global-only (legacy bilinear)"
+fi
+
 # ----- 6. build multires_russia_33f -----
+if [[ "$FORCE_REBUILD_33F" == "1" && -d "$MULTI_33F" ]]; then
+  echo "[6] FORCE_REBUILD_33F=1 — wiping $MULTI_33F"
+  rm -rf "$MULTI_33F"
+fi
 if [[ ! -f "$MULTI_33F/data_extra.npy" ]]; then
-  echo "[6 $(date +%H:%M:%S)] building multires_russia_33f"
+  echo "[6 $(date +%H:%M:%S)] building multires_russia_33f (region_extra=${REGION_EXTRA_FLAG:-none})"
   python scripts/build_multires_russia_33f.py \
     --multires-dir "$MULTI_19F" \
     --extra-dir    "$EXTRA_DIR" \
+    $REGION_EXTRA_FLAG \
     --out-dir      "$MULTI_33F"
 else
-  echo "[6] multires_russia_33f already built"
+  echo "[6] multires_russia_33f already built (skip; выставь FORCE_REBUILD_33F=1 чтобы пересобрать)"
 fi
 ls -lh "$MULTI_33F" | head
 
