@@ -347,13 +347,18 @@ def train(
             lat_weights = get_lat_weights(dataset_metadata.num_latitudes, dataset_metadata.num_longitudes, device)
         print("[Train] Включен Weighted Loss.")
         
-    # --- Инициализация Curriculum (Новое) ---
+    # --- Инициализация Curriculum ---
+    # Curriculum работает по стадиям, начиная с initial_ar и поднимаясь до max_ar
+    # включительно. Количество стадий = max_ar - initial_ar + 1.
+    # epochs_per_stage делит общее число эпох между стадиями (последняя получает
+    # остаток, т.е. чуть дольше остальных).
     initial_ar = max(1, int(getattr(config, 'initial_ar_steps', 1)))
     ar_steps = initial_ar
-    max_ar = config.max_ar_steps # 4
+    max_ar = config.max_ar_steps
     if initial_ar > max_ar:
         max_ar = initial_ar
-    epochs_per_stage = num_epochs // max_ar if max_ar > 0 else num_epochs
+    num_stages = max_ar - initial_ar + 1
+    epochs_per_stage = max(1, num_epochs // num_stages)
 
     # --- Маска каналов: 0 для статических и forcing, 1 для динамических ---
     static_ch = getattr(config, 'static_channels', [])
@@ -490,10 +495,11 @@ def train(
                   f"lr = {optimiser.param_groups[-1]['lr']:.1e} <<<\n")
 
         # --- Увеличение сложности ---
-        # Вычисляем правильный AR-уровень для текущей эпохи
-        # (важно при resume: epoch может быть > 0 с первой итерации)
-        # initial_ar — нижняя граница: если просили сразу AR=3, не опускаемся ниже.
-        correct_ar = min(max(initial_ar, 1 + epoch // epochs_per_stage), max_ar)
+        # Стадия = epoch // epochs_per_stage; AR на стадии = initial_ar + stage_idx.
+        # Кламп сверху на max_ar (последняя стадия может длиться дольше за счёт
+        # остатка эпох).
+        stage_idx = epoch // epochs_per_stage
+        correct_ar = min(initial_ar + stage_idx, max_ar)
         if correct_ar > ar_steps:
             ar_steps = correct_ar
             print(f"\n>>> УРОВЕНЬ СЛОЖНОСТИ ПОВЫШЕН! Теперь обучаем на {ar_steps} шага(ов) вперед. <<<\n")

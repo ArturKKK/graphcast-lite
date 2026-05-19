@@ -89,19 +89,35 @@ ISD-Lite — основной target. Известные проблемы: пр�
 * сохранение в Parquet/HDF5.
 
 ### 2.3. Контекстные признаки (input X-context)
-* **Static per-station:** lat, lon, elevation (m), distance to coast (km), urban_flag, land_cover (бор/степь/тайга), z_surf из ERA5 invariants. Computed once.
-* **Temporal forcing:** sin/cos hour, sin/cos doy, lead-time (часы или дни от init).
+* **Static per-station (физические, безопасно генерализуются):** lat, lon, elevation (m), distance to coast (km), urban_flag, land_cover (бор/степь/тайга), z_surf из ERA5 invariants. Computed once.
+  * **NO one-hot station_id** в основной модели. Иначе модель тупо запоминает per-station bias и проваливает leave-stations-out. Допускается как ablation-эксперимент.
+* **Temporal forcing:** sin/cos hour, sin/cos doy, lead-time (нормированный, в днях от init).
 * **Forecast snapshot (помимо целевой переменной):**
   * **Локальные ERA5/GNN признаки** на той же точке: t850, t500, q850, u/v на 250 и 1000 hPa (это уже в нашем 33-ch GNN!), msl, sp, tp.
   * **Стратификация / lapse rate:** `t850 − t1000` как proxy инверсии — критично для t2m bias зимой.
   * **Wind context:** wind at 850/1000 hPa, в дополнение к 10m.
   * **Solar geometry:** zenith angle (Spencer 1971, уже есть в `build_learned_mos.py`).
-  * **Прошлое наблюдение** (опц.) — если в продакшне обновляем post-processor по последнему наблюдению ⇒ persistence baseline для краткосрочки.
+
+#### 2.3.1. Режимы фич (важно для прод-консистентности)
+| Mode | Признаки | Назначение |
+|---|---|---|
+| **Mode-0 (strict, default для продакшна)** | только GNN snapshot + static + lead + calendar + solar | Гарантирует доступность всех фич в live (нет SYNOP-канала) |
+| **Mode-1 (adaptive, опционально)** | + `obs(t0 − Δ)` для краткосрочки (Δ = последнее доступное наблюдение) | Отдельная модель / feature-flag; не смешивать с Mode-0, чтобы оффлайн-метрики не врали |
+
+В S3 обучаем **только Mode-0**; Mode-1 — отдельный эксперимент, чтобы не получить “супер-метрики оффлайн → провал в проде”.
 
 ### 2.4. Train/Val/Test split
 * **By time (preferred):** 2010-01-01 .. 2019-12-31 train, 2020 val, 2021 test. Гарантирует отсутствие temporal leak.
-* **By station (бонус-сплит):** leave-stations-out — обучаем на 14 из 19, тестируем на 5. Проверяет, обобщается ли модель на новые точки (важно для масштабирования на всю РФ).
+* **By station (обязательный второй бенч если N_stations ≥ 100):** leave-stations-out — обучаем на ~80%, тестируем на ~20% станций. Проверяет, обобщается ли модель на новые точки (важно для масштабирования на всю РФ).
 * **By season (sanity):** холодный сезон / тёплый сезон отдельно — bias-profile сильно различается.
+
+### 2.5. Train-source mix: ERA5-init hindcast vs live GDAS
+Главный риск — distribution shift `ERA5-init → GDAS-init`. Решение:
+* **Train:** 80–90% ERA5-init hindcast (объём) + 10–20% live-GDAS архива (фактическое распределение ошибок).
+* **Val (early stop):** **только** live-GDAS архив — мерим качество в той же distribution, в которой будем работать в проде.
+* **Test:** held-out live-GDAS архив (последние ≥30 дней не виденные).
+
+Иначе постпроцессор будет учиться компенсировать «ERA5-perfect» режим и проиграет в реальной эксплуатации.
 
 ---
 
@@ -109,16 +125,31 @@ ISD-Lite — основной target. Известные проблемы: пр�
 
 > Подход: **сначала простой baseline, потом усложняем только если упираемся**. Жёстко требуем правильный baseline-цикл (предобработка → обучение → ablation → честный test).
 
-### 3.1. Вариант A — Per-variable MLP head **(MUST-HAVE baseline)**
+### 3.1. Вариант A — Per-variable MLP head (legacy baseline)
 * Один маленький MLP на каждую целевую переменную (t2m / u10 / v10).
 * **Вход:** все признаки из §2.3 + сама GNN-prediction той же переменной, конкатенированы в плоский вектор.
 * **Архитектура:** Linear(D, 128) → GELU → LN → Linear(128, 128) → GELU → Dropout(0.1) → Linear(128, output_dim).
 * **Выход:** *residual* — `Δ = MLP(x)`, итог `y_pred = y_gnn + Δ`. Это критически важно: модель учится только КОРРЕКЦИИ, а не предсказанию с нуля; быстрее сходимость и стабильнее на длинных lead-times.
 * **Loss:**
-  * `t2m`: weighted Smooth-L1 (Huber, δ=1.0) на bias, плюс per-station bias-regularization `λ·|mean(y_pred − y_true) per station|` (чтобы не выехать в общий offset).
-  * `(u10, v10)`: единая MLP с output_dim=2, лосс — Euclidean MSE на (u,v) **плюс** `α·circular_mae(angle)` (см. §3.5).
+  * `t2m`: Smooth-L1 (Huber, δ=1.0).
+  * `(u10, v10)`: гибрид Euclidean MSE + `α·ws_true·(1−cos Δθ)` (см. §3.5).
 * **Размер модели:** <50K параметров. На laptop CPU тренируется за минуты.
-* **Зачем нужен:** минимально-жизнеспособный пайплайн, эталон для всех сложных вариантов.
+
+### 3.1a. Вариант A2 — **Multi-task shared-trunk MLP (выбран как MUST-HAVE baseline)**
+Почему именно multi-task, а не три отдельных MLP: t2m bias и wind bias коррелируют через стратификацию/инверсию/адвекцию; общий энкодер ловит этот сигнал почти бесплатно.
+
+* **Архитектура:**
+  ```
+  features (D≈25-30) ──► Linear(D, 128) → GELU → LN
+                       ─► Linear(128, 128) → GELU → Dropout(0.1)        (shared trunk)
+                       ├─► Head_t2m   : Linear(128, K)   (K=1 point, K=3 quantiles, K=2 для μ/σ)
+                       ├─► Head_wind  : Linear(128, 2K') (u, v или μ_u,σ_u,μ_v,σ_v)
+                       └─► Head_(opt) : Linear(128, ...)   зарезервировано (msl, td)
+  ```
+* **Residual everywhere:** `t2m_pred = t2m_gnn + Δ_t2m`, аналогично для (u,v).
+* **Multi-task loss:** `L = w_t·HuberT2m + w_w·HybridWind` (на старте `w_t = 1.0, w_w = 1.0`, потом адаптивно по uncertainty-weighted multi-task scheme Kendall если будет нужно).
+* **Регуляризация bias:** **per-station balanced sampling** вместо явного bias-penalty — реализуется через `WeightedRandomSampler` с весами `1/n_station`. Это проще и стабильнее, чем `λ·|mean error per station|` (которая шумит в маленьких батчах).
+* **Размер:** ≈70K параметров.
 
 ### 3.2. Вариант B — Lead-time-aware Temporal Transformer
 * **Идея:** один прогноз — это последовательность по lead-time (0h, 6h, 12h, ..., 120h). Bias эволюционирует **смыслово непрерывно** (трэнд, autocorrelation). 1-D Transformer по lead-axis может это учесть.
@@ -151,9 +182,12 @@ ISD-Lite — основной target. Известные проблемы: пр�
 |---|---|---|---|
 | (u, v) decoupled | MSE на (u, v) | Простой, дифференцируем, симметричный | Лосс по углу неравномерный (low-wind часы доминируют по углу, но не по магнитуде) |
 | (mag, angle) | mag-MSE + Von-Mises NLL | Прямой контроль над dir error | Singularity при mag→0; нужно clamp |
-| **гибрид (рекомендую)** | `MSE(u,v) + α·mag·(1−cos(Δθ))` | Балансирует, не разваливается при штиле | На 1 гиперпараметр больше |
+| **гибрид (выбран)** | `MSE(u,v) + α·ws_true·(1−cos(Δθ))` | Балансирует, не разваливается при штиле | На 1 гиперпараметр больше |
 
-Выбираем **гибрид** с α=0.5 (подбирается на val).
+* Множитель `ws_true` (магнитуда **истинного** ветра, а не ошибки) — чтобы лосс не раздувался на низком ветре с шумной direction и не получал «weird scaling»; используем `max(ws_true, 0.5 m/s)` как clamp.
+* Угловая разность считается через `cos Δθ = (u_p·u_t + v_p·v_t) / (||p||·||t|| + ε)`, ε=1e-6.
+* Для **метрики** direction MAE применяем маску `ws_obs ≥ 1.5 m/s` (направление при штиле — шум ISD).
+* α=0.5 на старте, тюнится на val.
 
 ### 3.6. Сводная таблица: что когда брать
 | Need | Pick |
@@ -178,15 +212,31 @@ ISD-Lite — основной target. Известные проблемы: пр�
 
 ### 4.2. Stage-1: assemble (station_obs, GNN_forecast) hindcast корпус
 Скрипт `scripts/postproc/build_hindcast_corpus.py`:
-* Параметры: `--start-year 2010 --end-year 2020 --stations all --leads 6h,12h,...,120h --init-hours 00,12`.
+* **Минимальный корпус для S3** (чтобы не зависнуть на 2 недели генерации): `--years 2016-2020 --stations 50 --leads 0,6,12,18,24,36,48,72,96,120 --init-hours 00,12`. ≈3-5M строк, Parquet ≤8 GB.
+* **Полный корпус** (после S3 заработал): `--years 2010-2021 --stations all --leads 0..120 step 6 --init-hours 00,12`.
 * Шаги для каждого `init_time`:
   1. Сформировать input окно (2 obs) из ERA5/multires_russia_33f.
   2. Прогнать модель autoregressive до max lead.
   3. На каждом lead — bilinear-сэмпл в координаты станций.
-  4. Сохранить row `(station_usaf, init_time, lead_time, gnn_t2m, gnn_u10, gnn_v10, contextual_features...)` в **Parquet** (партиционирование по году).
+  4. Сохранить row `(station_usaf, init_time_utc, lead_h, valid_time_utc, gnn_*, contextual_features...)` в **Parquet (zstd)**, партиционирование `year=YYYY/init_hour=HH/`.
 * В параллельном процессе — фетч ISD-Lite obs (`scripts/build_learned_mos.py` уже умеет качать).
-* Join по `(station, valid_time = init_time + lead_time)` → одна большая таблица 10⁶+ строк.
-* **Sanity QC:** удалить пары где `|gnn_t2m − obs_t2m| > 30°C` (видимо broken obs) и где `wind_speed > 60 m/s` без подтверждения фронта в ERA5.
+
+#### 4.2.1. Точное определение valid_time и tolerance матчинга
+* `valid_time_utc = init_time_utc + lead_h * 1h` (всё в UTC, никакого MSK).
+* Join с ISD-Lite: ищем наблюдение в окне `[valid_time − 30min, valid_time + 30min]`, выбираем ближайшее. Если несколько — берём с меньшим `quality_code`.
+* Если в окне нет obs → row помечается `obs_missing=True` и **исключается из train/val/test** (но остаётся в Parquet для будущих фич).
+* Контрольная проверка плотности: гистограмма count(obs) по `hour_utc` должна быть равномерной ±20%; если в 00/06/12/18 систематические провалы → корпус неконсистентен, разбираемся отдельно.
+
+#### 4.2.2. ISD-Lite QC (явный список)
+Используемые поля: `air_temperature` (col 4, °C×10), `wind_direction` (col 7, °), `wind_speed` (col 8, m/s×10), `dew_point_temperature` (col 5), `sea_level_pressure` (col 6), `sky_condition` (col 9), `precip_1h` (col 10).
+
+Missing/quality:
+* `-9999` → NaN.
+* `air_temperature`: оставить если `−60 ≤ t ≤ 50` °C; иначе drop.
+* `wind_speed`: оставить если `0 ≤ ws ≤ 60` m/s; иначе drop.
+* `wind_direction`: `999`/`360` при ws<1.5 m/s → считаем calm, direction маскируется (исключаем из angle-loss и из direction-метрики); при ws≥1.5 и direction=0/360 → drop.
+* Дубликаты `(station, valid_time)`: берём с минимальным `quality_code`.
+* После QC пары `(gnn, obs)` где `|gnn_t2m − obs_t2m| > 30°C` или `|ws_diff| > 30 m/s` → лог в `dropped.parquet`, не входят в train.
 
 ### 4.3. Stage-2: feature engineering
 * Конвертация obs wind direction (degrees, ISD coding) → (u, v) в m/s.
@@ -234,25 +284,39 @@ docs/
 └── postprocessing_rfc.md            # этот файл
 ```
 
-### 5.2. Конфиг (Pydantic, как остальные experiment configs)
+### 5.2. Конфиг (multi-task A2)
 ```jsonc
-// experiments/neural_postproc_t2m_v1/config.json
+// experiments/neural_postproc_v1/config.json
 {
-  "target_var": "t2m",
-  "model_type": "mlp_residual",
-  "model_args": { "hidden": [128, 128], "dropout": 0.1 },
-  "features": {
-    "static": ["lat","lon","elev","urban_flag","dist_to_coast","z_surf","lsm"],
-    "temporal": ["sin_hour","cos_hour","sin_doy","cos_doy","lead_h"],
-    "snapshot": ["gnn_t2m","gnn_u10","gnn_v10","gnn_msl","gnn_sp","gnn_t850","gnn_t500","gnn_q850","gnn_z500","lapse_t","dewpoint_depression","solar_zen"],
-    "history": []  // на будущее
+  "model_type": "multitask_residual_mlp",
+  "targets": ["t2m", "u10", "v10"],
+  "model_args": {
+    "hidden": [128, 128],
+    "dropout": 0.1,
+    "probabilistic": false   // → true для S4 (CRPS head)
   },
-  "loss": { "kind": "huber", "delta": 1.0, "bias_reg_lambda": 0.05 },
+  "feature_mode": "mode0_strict",   // mode1_adaptive — отдельный эксперимент, см. §2.3.1
+  "features": {
+    "snapshot": ["gnn_t2m","gnn_u10","gnn_v10","gnn_msl","gnn_sp",
+                 "gnn_t850","gnn_t500","gnn_q850","gnn_z500",
+                 "gnn_u850","gnn_v850","gnn_u1000","gnn_v1000"],
+    "derived":  ["lapse_t850_1000","dewpoint_depression","solar_zen"],
+    "static":   ["lat","lon","elev","urban_flag","dist_to_coast","z_surf","lsm"],
+    "temporal": ["sin_hour","cos_hour","sin_doy","cos_doy","lead_norm"]
+    // ВНИМАНИЕ: NO one-hot station_id (см. §2.3, защита leave-stations-out)
+  },
+  "loss": {
+    "t2m":  { "kind": "huber", "delta": 1.0 },
+    "wind": { "kind": "hybrid", "alpha": 0.5, "ws_clamp": 0.5 },
+    "w_t2m": 1.0, "w_wind": 1.0
+  },
+  "sampling": { "per_station_balanced": true },
   "optimizer": { "kind": "adamw", "lr": 1e-3, "weight_decay": 1e-4 },
   "scheduler": { "kind": "cosine", "warmup_steps": 1000 },
   "epochs": 30,
   "batch_size": 4096,
-  "split": { "train_years": [2010,2019], "val_year": 2020, "test_year": 2021 }
+  "train_mix": { "hindcast_frac": 0.85, "live_gdas_frac": 0.15 },
+  "split": { "train_years": [2016,2019], "val_year": 2020, "test_year": 2021, "val_source": "live_gdas" }
 }
 ```
 
@@ -277,15 +341,21 @@ docs/
 
 ### 6.1. Per-variable, per-lead-time
 * **t2m:** RMSE (°C), MAE, mean bias, MAPE при `|obs| > 2°C`, CRPS (если probabilistic). Цель: **снизить RMSE@24h на 30% относительно raw GNN, на 15% относительно учебного learned-MOS** на тестовом 2021 году.
-* **wind10m:** vector-RMSE = √((u−û)² + (v−v̂)²), magnitude RMSE, direction MAE (°), CRPS, `hit_rate(|ws−wŝ| ≤ 2 m/s)`. Цель: **снизить vector-RMSE@24h на 25% относительно raw GNN** (baseline-а у нас нет, считаем raw GNN). Direction MAE@24h < 25°.
-* **Skill score** относительно raw GNN и относительно climatology: `SS = 1 − RMSE_model / RMSE_baseline`.
+* **wind10m:** vector-RMSE = √((u−û)² + (v−v̂)²), magnitude RMSE, direction MAE (°, маска `ws_obs≥1.5 m/s`), CRPS, `hit_rate(|ws−wŝ| ≤ 2 m/s)`. Цель: **снизить vector-RMSE@24h на 25% относительно raw GNN**. Direction MAE@24h < 25°.
+* **Skill score** относительно нескольких baseline-ов: `SS = 1 − RMSE_model / RMSE_baseline`.
+
+### 6.1.1. Обязательные baseline-ы
+1. **Raw GNN** — нижняя планка, должны побить везде.
+2. **Persistence** для t2m: `ŷ(t) = obs(t0)` (последнее доступное наблюдение). Особенно сильна на 0-6h, ниже на >24h. Показывает, не выучили ли мы тривиальный persistence.
+3. **Climatology by station** — `mean[station, doy, hour]` на train-периоде. Табличный нижний бенч; научник любит видеть.
+4. **Learned-MOS** (`learned_mos_t2m_19stations.joblib`) — текущий продакшн для t2m.
 
 ### 6.2. Reliability
 * Reliability diagram на квантиль-предикторе (вариант D).
 * PIT histogram для probabilistic — должен быть плоский ±5%.
 
 ### 6.3. Per-station breakdown
-* Heatmap RMSE_post-RMSE_raw по (station × lead) — должно быть **всюду ≤0** (нигде не хуже raw, иначе модель «накосячила» на каком-то типе станции).
+* Heatmap `RMSE_post − RMSE_raw` по (station × lead). Критерий: **≤0 в ≥95% ячеек**, при этом max-ухудшение `< +0.5°C` для t2m / `< +1.0 m/s` vector для wind. «Всюду ≤0» — слишком жёстко, на шумных станциях допустимы редкие микро-ухудшения.
 
 ### 6.4. Generalisation test (leave-stations-out)
 * Обучаем без 5 случайных станций → проверяем на них.
@@ -308,8 +378,12 @@ docs/
 | **Urban vs rural дисбаланс** в loss | Per-station-weighted sampling, чтобы urban stations не доминировали (их больше) |
 | **Long forecast leads статистически реже** в обучающем corpus | Stratified sampling по lead-time, либо weight ∝ 1/n(lead) |
 | **q@250 = 0** в global extra scalers (float16 underflow) | Не критично для post-processor: q@250 не входит в feature-set; если войдёт — clamp σ ≥ 1e-8 |
-| **Computational cost корпуса**: 10 лет × 4 × 20 × 200 станций = 16M примеров | Хранить в Parquet с zstd; ленивый load в DataLoader; на старте делать ablation на ¼ corpus |
-| **Wind direction discontinuity** | См. §3.5 — использовать гибрид MSE+cos-loss |
+| **Computational cost корпуса**: 10 лет × 4 × 20 × 200 станций = 16M примеров | Хранить в Parquet с zstd; ленивый load в DataLoader; начинаем с минимального корпуса (§4.2) |
+| **Wind direction discontinuity** | См. §3.5 — гибрид MSE+`ws_true·(1−cos Δθ)`, маска штиля для метрики |
+| **ERA5-init train → GDAS-init inference distribution shift** | Mix train: 80% hindcast + 20% live-GDAS; val/test строго на live-GDAS (см. §2.5) |
+| **Station-ID memorization** | NO one-hot station_id; только физические static-фичи; обязательный leave-stations-out тест |
+| **Mode-1 (last-observation) leak** в проде нет канала | По умолчанию Mode-0 strict; Mode-1 — отдельная модель с явным feature-flag |
+| **Время и часовые пояса** | Всё в UTC; `valid_time = init + lead`; tolerance ±30min для join |
 
 ---
 
@@ -332,16 +406,21 @@ docs/
 
 ---
 
-## 9. Open questions (нужен ответ научника / самого автора)
+## 9. Решения (бывшие open questions)
 
-1. **Сколько станций реально подтянуть из ISD-Lite RU?** Если >100, имеет ли смысл сразу делать leave-stations-out (S8) на основном бенчмарке, а не как side-check?
-2. **Inits per day:** 00/12 UTC достаточно или нужно 4 inits (00/06/12/18) чтобы покрыть suburban diurnal?
-3. **Хранилище corpus:** Parquet locally или ChMlflow? Объём ~30 GB Parquet ожидаем.
-4. **Lead-time max:** до +5 days хватит, или нужно +10 days (для рассмотрения accumulated bias)?
-5. **Хотим ли вообще probabilistic-output** в дипломе, или достаточно point-estimate с приличными метриками?
-6. **Wind gust (10m max)** — добавляем во вторую итерацию или это уже стрэтч за пределами diploma scope?
-7. **Sequence (LSTM-вариант)** — отбрасываем в пользу Transformer (Variant B)? Я бы отбросил, transformer выигрывает.
-8. **Cross-station weighting:** balance by urban/rural или по N_obs_total? Я бы балансировал по urban-flag.
+По результатам внешнего ревью v1 зафиксировано:
+
+1. **N_stations:** старт на 20-50 (Stage S3); полный корпус 100-200 после S3. Leave-stations-out — **обязательный второй бенч** при N≥100.
+2. **Inits per day:** **00/12 UTC** для всей разработки. 06/18 — добавляем точечно если diurnal bias не закроется.
+3. **Storage:** **Parquet + zstd**, локально, partition `year=/init_hour=/`. ChMlflow не нужен.
+4. **Lead-time max:** **+120 h (5 days)** для S3-S7. +10 days — только если downstream реально показывает.
+5. **Probabilistic-output:** point-estimate в S3 → **CRPS обязательно в S4** (диплом любит EMOS-метрики).
+6. **Wind gust:** **отложено** на вторую итерацию (после защиты).
+7. **Sequence model:** LSTM **отброшен** в пользу Transformer (Variant B), и то только если на дальних лидах baseline проиграет.
+8. **Sampling balance:** **per-station balanced sampler** (каждая станция ~равная частота в батче). Urban/rural weighting — позже как ablation.
+9. **Station-ID:** **NO one-hot** в основной модели; только физические static-фичи. One-hot — только как ablation для проверки upper-bound.
+10. **Train mix:** 80% ERA5-init hindcast + 20% live-GDAS архив; val/test — только live-GDAS.
+11. **Export:** TorchScript-экспорт модели в `apply.py` для стабильной интеграции в `live_gdas_forecast.py`. ONNX — опционально.
 
 ---
 
@@ -349,13 +428,20 @@ docs/
 
 * **Проблема:** GNN-форкаст хорошо репродуцирует ERA5, но не станции. Текущий MOS — табличный, не учитывает динамику, не работает на ветер.
 * **Идея:** обучить compact neural residual post-processor f(GNN-snapshot + station-context + lead-time) → Δ(t2m, u10, v10), на парах GNN↔ISD-Lite, target = реальные obs, baseline = raw GNN.
-* **Архитектура (поэтапно):**
-  1. Per-variable MLP residual (Variant A) — MUST.
-  2. + Probabilistic head (D) — для CRPS и слайдов диплома.
-  3. + Lead-time Transformer (B) — если RMSE на +72/+120 h не падает достаточно.
-  4. + Spatial GNN (C) — для wind, ловить пространственную когерентность.
-* **Данные:** ISD-Lite RU 2010-2024 (target), GNN hindcast от fine-tuned Russia 33f модели (predictor), плюс контекст (lapse, solar, stratification).
-* **Метрики:** RMSE/MAE/CRPS per variable per lead, skill score vs raw GNN и vs табличного MOS, reliability, leave-stations-out.
-* **Acceptance:** −30% RMSE t2m@24h, −25% vector-RMSE wind@24h, leave-stations-out ≤+15%.
-* **План:** S0..S8 по разделу 8, минимум для диплома S0-S4+S7+S8.
+* **Финальное решение по архитектуре — Variant A2 (multi-task shared-trunk residual MLP):**
+  * shared trunk Linear(D,128)→GELU→LN→Linear(128,128)→GELU→Dropout(0.1) (~70K params);
+  * per-target heads: t2m (1 out, Huber δ=1.0), wind (2 out для u/v, hybrid loss `MSE + α·ws_true·(1−cos Δθ)`, α=0.5, ws_clamp=0.5 m/s);
+  * выход — **residual поверх GNN**: `y = y_gnn + Δ`;
+  * Mode-0 strict (default, prod-safe): GNN snapshot + static + lead + calendar + solar, **без one-hot station_id**;
+  * per-station balanced sampling вместо явного bias-reg;
+  * train mix 80-90% ERA5-init hindcast + 10-20% live-GDAS (val/test STRICTLY live-GDAS).
+* **Поэтапный план:**
+  1. **S3 — multi-task A2 baseline** (MUST) — выпуск.
+  2. **S4 — probabilistic head** (μ, σ) + CRPS loss — для диплома и калибровки.
+  3. **S5+ — Lead-time Transformer / Spatial GNN** — только если S3/S4 не закрывают +72/+120 h или wind.
+* **Данные:** ISD-Lite RU 2016-2020 (50 станций, 10 leads, init 00/12) — корпус S3 ≤8GB Parquet+zstd.
+* **Baselines (4):** Raw GNN, Persistence `ŷ=obs(t0)`, Climatology `mean[station,doy,hour]`, табличный Learned-MOS.
+* **Acceptance:** ≥95% (station, lead) cells with RMSE_model ≤ RMSE_baseline; t2m@24h −30% vs raw GNN, wind@24h vec-RMSE −25%; leave-stations-out degradation ≤+15%; max regression <+0.5°C / <+1.0 m/s.
+* **Rejected/deferred:** Variant A per-variable (downgraded до legacy baseline — 3 модели вместо 1 неэффективно); one-hot station_id (ломает leave-stations-out); LSTM с историей наблюдений (не подходит prod-режиму, где истории нет); gusts/precip (отдельная итерация v2).
+* **Реализация:** [src/postprocessing/neural/](../src/postprocessing/neural/) + CLI [scripts/postproc/train_neural_postproc.py](../scripts/postproc/train_neural_postproc.py).
 
