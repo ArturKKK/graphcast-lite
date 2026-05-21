@@ -78,6 +78,14 @@ DEFAULT_FEATURES: Tuple[str, ...] = (
 )
 
 
+COLUMN_ALIASES = {
+    "lat": ("station_lat",),
+    "lon": ("station_lon",),
+    "elev": ("station_elev",),
+    "obs_t2m": ("obs_t2m_K",),
+}
+
+
 class StationCorpusDataset(Dataset):
     """In-memory Parquet dataset (для S3 корпус 3-5M строк помещается в RAM).
 
@@ -99,6 +107,17 @@ class StationCorpusDataset(Dataset):
             df = pd.read_parquet(path)
         else:
             df = pd.read_parquet(path)
+
+        rename_map = {}
+        for canonical, aliases in COLUMN_ALIASES.items():
+            if canonical in df.columns:
+                continue
+            for alias in aliases:
+                if alias in df.columns:
+                    rename_map[alias] = canonical
+                    break
+        if rename_map:
+            df = df.rename(columns=rename_map)
 
         if filter_expr:
             df = df.query(filter_expr).copy()
