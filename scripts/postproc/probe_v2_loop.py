@@ -35,7 +35,9 @@ ds = StationCorpusDataset(train_p, feature_cols=DEFAULT_FEATURES_V2, station_to_
 dev = "cuda" if torch.cuda.is_available() else "cpu"
 torch.manual_seed(42)
 sampler = build_balanced_sampler(ds)
-loader = DataLoader(ds, batch_size=4096, sampler=sampler, num_workers=0, drop_last=True)
+nw = int(sys.argv[3]) if len(sys.argv) > 3 else 0
+print(f"num_workers={nw}")
+loader = DataLoader(ds, batch_size=4096, sampler=sampler, num_workers=nw, drop_last=True, pin_memory=True)
 
 model = StationLeadAwareResidualMLP(
     feature_dim=len(DEFAULT_FEATURES_V2),
