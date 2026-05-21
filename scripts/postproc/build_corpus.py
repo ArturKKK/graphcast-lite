@@ -556,7 +556,9 @@ def main():
     OBS = exp_cfg.data.obs_window_used
     C = exp_cfg.data.num_features_used
     assert C == 33, f"experiment must use 33 features, got {C}"
-    assert OBS == 1, f"this builder assumes OBS=1, got {OBS}"
+    assert OBS in (1, 2), f"this builder supports OBS in (1, 2), got {OBS}"
+    use_residual = bool(getattr(exp_cfg, "use_residual", True))
+    print(f"[cfg] OBS={OBS}  use_residual={use_residual}", flush=True)
 
     coords_pair = (builder.node_lats, builder.node_lons)
     region_bounds = None
@@ -653,20 +655,32 @@ def main():
     with torch.no_grad():
         for i_init, init_dt in enumerate(init_times):
             try:
-                X_norm = builder.build_input(init_dt)  # (N, 33) normalized
+                frames_norm = []
+                # OBS=2: include init_dt - 6h as the first frame, then init_dt
+                for k in range(OBS - 1, -1, -1):
+                    fdt = init_dt - timedelta(hours=6 * k)
+                    frames_norm.append(builder.build_input(fdt))  # (N, 33)
             except (IndexError, ValueError) as e:
                 n_skipped += 1
                 if n_skipped <= 3:
                     print(f"  [skip] {init_dt}: {e}")
                 continue
 
-            X_t = torch.tensor(X_norm, dtype=torch.float32, device=device).unsqueeze(0)  # (1, N, 33)
-            cur_norm = X_t  # input to next forward
+            # cur_state: (1, N, OBS, C)
+            stacked = np.stack(frames_norm, axis=1)  # (N, OBS, 33)
+            cur_state = torch.tensor(stacked, dtype=torch.float32, device=device).unsqueeze(0)
+            # X_t = last input frame (used as static carry-forward source)
+            X_t = cur_state[:, :, -1, :].clone()  # (1, N, 33)
 
             for step in range(1, max_ar + 1):
-                pred_norm = model(cur_norm, attention_threshold=0.0)
-                if pred_norm.dim() == 2:
-                    pred_norm = pred_norm.unsqueeze(0)
+                inp = cur_state.reshape(1, cur_state.shape[1], OBS * C)
+                delta = model(inp, attention_threshold=0.0)
+                if delta.dim() == 2:
+                    delta = delta.unsqueeze(0)
+                if use_residual:
+                    pred_norm = cur_state[:, :, -1, :] + delta
+                else:
+                    pred_norm = delta
 
                 lead_h = step * 6
                 valid_dt = init_dt + timedelta(hours=lead_h)
@@ -704,9 +718,15 @@ def main():
                 if step < max_ar:
                     forc_norm = builder.forcing_normalized(valid_dt)  # (4,)
                     pred_norm[:, :, list(STATIC_CHANNELS)] = X_t[:, :, list(STATIC_CHANNELS)]
-                    for k, ch in enumerate(FORCING_CHANNELS):
-                        pred_norm[:, :, ch] = float(forc_norm[k])
-                    cur_norm = pred_norm
+                    for kk, ch in enumerate(FORCING_CHANNELS):
+                        pred_norm[:, :, ch] = float(forc_norm[kk])
+                    # roll cur_state: drop oldest frame, append pred
+                    if OBS == 1:
+                        cur_state = pred_norm.unsqueeze(2)
+                    else:
+                        cur_state = torch.cat(
+                            [cur_state[:, :, 1:, :], pred_norm.unsqueeze(2)], dim=2
+                        )
 
             if (i_init + 1) % args.log_every == 0 or i_init == 0:
                 elapsed = time.time() - t_start
