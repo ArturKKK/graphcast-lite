@@ -101,6 +101,7 @@ class StationCorpusDataset(Dataset):
         scalers: Optional[Dict[str, Tuple[float, float]]] = None,
         filter_expr: Optional[str] = None,
         drop_obs_missing: bool = True,
+        station_to_idx: Optional[Dict[str, int]] = None,
     ):
         path = Path(parquet_path)
         if path.is_dir():
@@ -158,6 +159,24 @@ class StationCorpusDataset(Dataset):
 
         self.X_norm = (self.X - self.feature_mean) / self.feature_std
 
+        # station→idx (for v2 station embedding); if mapping missing keys, raise.
+        self.station_to_idx = station_to_idx
+        if station_to_idx is not None:
+            try:
+                self.station_idx_arr = np.array(
+                    [station_to_idx[s] for s in self.station_ids], dtype=np.int64
+                )
+            except KeyError as e:
+                raise KeyError(f"station_to_idx missing station_usaf={e}")
+        else:
+            self.station_idx_arr = None
+        # lead_norm column (if present in parquet) for v2 FiLM
+        self.lead_norm_arr = (
+            df["lead_norm"].to_numpy(dtype=np.float32, copy=True)
+            if "lead_norm" in df.columns
+            else None
+        )
+
     def export_scalers(self) -> Dict[str, Tuple[float, float]]:
         return {
             c: (float(self.feature_mean[i]), float(self.feature_std[i]))
@@ -172,7 +191,7 @@ class StationCorpusDataset(Dataset):
         return self.X.shape[0]
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        return {
+        sample = {
             "features": torch.from_numpy(self.X_norm[idx]),
             "gnn_t2m": torch.tensor(self.G[idx, 0], dtype=torch.float32),
             "gnn_u10": torch.tensor(self.G[idx, 1], dtype=torch.float32),
@@ -181,6 +200,15 @@ class StationCorpusDataset(Dataset):
             "u10": torch.tensor(self.Y[idx, 1], dtype=torch.float32),
             "v10": torch.tensor(self.Y[idx, 2], dtype=torch.float32),
         }
+        if self.station_idx_arr is not None:
+            sample["station_idx"] = torch.tensor(
+                int(self.station_idx_arr[idx]), dtype=torch.long
+            )
+        if self.lead_norm_arr is not None:
+            sample["lead_norm"] = torch.tensor(
+                float(self.lead_norm_arr[idx]), dtype=torch.float32
+            )
+        return sample
 
 
 def build_balanced_sampler(dataset: StationCorpusDataset) -> WeightedRandomSampler:
