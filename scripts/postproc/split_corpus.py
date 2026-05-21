@@ -18,10 +18,22 @@ def main() -> None:
     ap.add_argument("--val-years", type=int, nargs="+", default=[2020])
     ap.add_argument("--time-col", default=None,
                     help="time column to use; auto-detected if not given")
+    ap.add_argument("--dropna-cols", nargs="+", default=None,
+                    help="drop rows with NaN in any of these columns (features+targets)")
     args = ap.parse_args()
 
     df = pd.read_parquet(args.inp)
     print(f"loaded {len(df):,} rows, {len(df.columns)} cols")
+
+    if args.dropna_cols:
+        present = [c for c in args.dropna_cols if c in df.columns]
+        missing = [c for c in args.dropna_cols if c not in df.columns]
+        if missing:
+            print(f"WARN: dropna cols not in df, ignoring: {missing}")
+        before = len(df)
+        df = df.dropna(subset=present).reset_index(drop=True)
+        print(f"dropna({len(present)} cols): {before:,} -> {len(df):,} rows "
+              f"(dropped {before - len(df):,})")
 
     tcol = args.time_col
     if tcol is None:
