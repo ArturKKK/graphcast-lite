@@ -104,7 +104,7 @@ def _epoch_pass(
     totals = {"loss": 0.0, "loss_t2m": 0.0, "loss_wind": 0.0, "n": 0}
     sq_err = {"t2m": 0.0, "u10": 0.0, "v10": 0.0}
 
-    for batch in loader:
+    for step, batch in enumerate(loader):
         features = batch["features"].to(cfg.device, non_blocking=True)
         station_idx = batch["station_idx"].to(cfg.device, non_blocking=True)
         lead_norm = batch["lead_norm"].to(cfg.device, non_blocking=True)
@@ -132,6 +132,31 @@ def _epoch_pass(
             huber_delta=cfg.huber_delta,
             wind_alpha=cfg.wind_alpha,
         )
+
+        if train and not torch.isfinite(losses["loss"]):
+            print(f"[NaN-DETECT] step={step} loss={losses['loss'].item()} "
+                  f"loss_t2m={losses['loss_t2m'].item()} loss_wind={losses['loss_wind'].item()}",
+                  flush=True)
+            print(f"  features finite={torch.isfinite(features).all().item()} "
+                  f"min={features.min().item():.4g} max={features.max().item():.4g}", flush=True)
+            print(f"  station_idx range [{station_idx.min().item()},{station_idx.max().item()}]",
+                  flush=True)
+            print(f"  lead_norm finite={torch.isfinite(lead_norm).all().item()} "
+                  f"min={lead_norm.min().item():.4g} max={lead_norm.max().item():.4g}", flush=True)
+            for k in ("t2m","u10","v10"):
+                print(f"  gnn[{k}] finite={torch.isfinite(gnn[k]).all().item()} "
+                      f"min={gnn[k].min().item():.4g} max={gnn[k].max().item():.4g}", flush=True)
+                print(f"  target[{k}] finite={torch.isfinite(targets[k]).all().item()} "
+                      f"min={targets[k].min().item():.4g} max={targets[k].max().item():.4g}",
+                      flush=True)
+                if k in out:
+                    print(f"  out[{k}] finite={torch.isfinite(out[k]).all().item()} "
+                          f"min={out[k].min().item():.4g} max={out[k].max().item():.4g}",
+                          flush=True)
+            for n, p in model.named_parameters():
+                if not torch.isfinite(p).all():
+                    print(f"  WEIGHT NaN/Inf: {n}", flush=True)
+            import sys as _sys; _sys.exit(2)
 
         if train:
             losses["loss"].backward()
