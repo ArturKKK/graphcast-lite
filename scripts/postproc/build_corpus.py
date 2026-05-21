@@ -515,7 +515,8 @@ def main():
     ap.add_argument("--years", type=int, nargs=2, default=[2018, 2020],
                     help="Inclusive [start, end] year range for inits.")
     ap.add_argument("--init-hours", type=int, nargs="+", default=[0, 12])
-    ap.add_argument("--leads-h", type=int, nargs="+", default=[6, 12, 18, 24],
+    ap.add_argument("--leads-h", type=int, nargs="+",
+                    default=[6, 12, 18, 24, 36, 48, 60, 72, 84, 96, 108, 120],
                     help="Forecast leads (hours, must be multiples of 6).")
     ap.add_argument("--out-parquet", required=True)
     ap.add_argument("--device", default="cuda")
@@ -687,6 +688,12 @@ def main():
 
                 if lead_h in leads:
                     pred_phys = pred_norm.squeeze(0).cpu().numpy() * s_std + s_mean  # (N, 33)
+                    # static channels are carried forward verbatim from X_t (idx 7, 8);
+                    # denormalise once → physical units (z_surf m^2/s^2; lsm 0..1)
+                    static_phys = (
+                        X_t.squeeze(0).cpu().numpy()
+                        * s_std[None, :] + s_mean[None, :]
+                    )  # (N, 33)
                     for s in station_meta:
                         gidx = s["grid_idx"]
                         rec = {
@@ -702,6 +709,8 @@ def main():
                             "node_lat": float(builder.node_lats[gidx]),
                             "node_lon": float(builder.node_lons[gidx]),
                             "dist_node_km": s["dist_km"],
+                            "era5_z_surf": float(static_phys[gidx, 7]),
+                            "era5_lsm": float(static_phys[gidx, 8]),
                         }
                         for v in SAMPLE_VARS:
                             rec[RENAME_FOR_PARQUET[v]] = float(
@@ -766,8 +775,9 @@ def main():
     df["obs_u10"] = -df["obs_ws"] * np.sin(np.deg2rad(df["obs_wd"]))
     df["obs_v10"] = -df["obs_ws"] * np.cos(np.deg2rad(df["obs_wd"]))
     df["lapse_t850_1000"] = df["gnn_t850"] - df["gnn_t1000"]
+    # gnn_sp is in hPa (see corpus_v1 stats: min 887, max 1063); formula needs Pa
     df["dewpoint_depression"] = [
-        dewpoint_depression_K(t, q, p)
+        dewpoint_depression_K(t, q, p * 100.0)
         for t, q, p in zip(df["gnn_t2m"], df["gnn_q1000"], df["gnn_sp"])
     ]
     df["solar_zen"] = [
@@ -782,11 +792,13 @@ def main():
     df["sin_doy"] = np.sin(2 * np.pi * doy / 365.25)
     df["cos_doy"] = np.cos(2 * np.pi * doy / 365.25)
     df["lead_norm"] = df["lead_h"] / 120.0
-    # static placeholders (no urban/coast db on v3 yet)
+    # static placeholders (no urban/coast db on v3 yet); lsm + z_surf come from
+    # static channels captured per-row during AR rollout (real ERA5 values).
     df["urban_flag"] = 0.0
     df["dist_to_coast"] = 0.0
-    df["z_surf"] = df["station_elev"]
-    df["lsm"] = 1.0
+    # z_surf in metres (channel was geopotential m^2/s^2 → /9.80665).
+    df["z_surf"] = df["era5_z_surf"] / 9.80665
+    df["lsm"] = df["era5_lsm"].clip(0.0, 1.0)
     # partition keys
     df["year"] = df["init_time_utc"].dt.year
     df["init_hour"] = df["init_time_utc"].dt.hour

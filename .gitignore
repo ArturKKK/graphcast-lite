@@ -256,3 +256,4 @@ website/yandex_cache.json
 /data/archives/
 /data/temp_train/
 /data/isd_lite_russia/
+experiments/*/data/
