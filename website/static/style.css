@@ -279,6 +279,14 @@ body {
 .leaflet-tile-pane {
   filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
 }
+
+/* Keep precip overlay pixels crisp so color boundaries match nearest-cell logic. */
+.leaflet-image-layer.leaflet-precip-nearest {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  image-rendering: -webkit-optimize-contrast;
+}
+
 .map-legend {
   display: flex;
   align-items: center;
