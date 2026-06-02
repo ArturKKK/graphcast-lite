@@ -112,22 +112,80 @@ python -m src.postprocessing.neural.train experiments/neural_postproc_v3
 
 ## Оперативный режим
 
-Развёрнут на сервере ИВМиМГ СО РАН (city.sscc.ru) под cron:
+Цепочка работает на сервере ИВМиМГ СО РАН (`city.sscc.ru`) под cron каждые 6 часов:
 
 ```cron
 0 1,7,13,19 * * * /home/tabakov_2026/graphcast-lite/cron_forecast_russia_v3.sh
 ```
 
-Цепочка работы:
+Скрипт `cron_forecast_russia_v3.sh` (хранится отдельно на сервере, шаблон ниже) делает четыре шага: скачивает свежие анализы NOAA GDAS, прогоняет графовую модель на 5 суток, применяет нейросетевую постобработку по 689 станциям, формирует JSON и тайлы для сайта прогноза.
 
-1. Скачивание свежих анализов NOAA GDAS (6-часовое окно).
-2. Авторегрессионный прогноз графовой моделью на 5 суток.
-3. Нейросетевая постобработка по 689 станциям.
-4. Генерация JSON-прогнозов и тайлов для сайта прогноза.
+### Что нужно для развёртывания на новой VM
 
-Все артефакты, нужные для оперативного режима, хранятся в `live_runtime_bundle_russia_33f/` (статика модели: `coords.npz`, `scalers.npz`, `static_fields.npz`, `variables.json`).
+1. Установить зависимости (см. «Установка»).
+2. Убедиться, что в репозитории есть веса:
+   - `experiments/multires_russia_33f_v3_noroi/best_model.pth` — графовая модель;
+   - `experiments/neural_postproc_v3/best_model.pth` — постобработка;
+   - `live_runtime_bundle_russia_33f/` — статика модели (`coords.npz`, `scalers.npz`, `static_fields.npz`, `variables.json`, `dataset_info.json`).
+3. Создать скрипт `cron_forecast_russia_v3.sh` (см. шаблон ниже), сделать его исполняемым (`chmod +x`).
+4. Добавить в `crontab -e`:
 
-Текущий прогноз публикуется на сайте: `website/static/russia.html` + `russia_forecast.json` + тайлы `overlays_russia/`.
+   ```cron
+   0 1,7,13,19 * * * /path/to/graphcast-lite/cron_forecast_russia_v3.sh >> /var/log/graphcast-russia.log 2>&1
+   ```
+
+5. Поднять веб-приложение (FastAPI + uvicorn) на каком-то локальном порту, прокинуть nginx-ом наружу.
+
+### Шаблон `cron_forecast_russia_v3.sh`
+
+```bash
+#!/bin/bash
+set -euo pipefail
+BASEDIR=/path/to/graphcast-lite
+VENV=$BASEDIR/.venv/bin/python
+OUT=$BASEDIR/results/live_russia_33f_5d
+CACHE=/tmp/gdas_cache
+
+cd "$BASEDIR"
+
+# 1. Прогноз графовой моделью
+$VENV scripts/live_gdas_forecast.py \
+    --experiment-dir experiments/multires_russia_33f_v3_noroi \
+    --runtime-bundle live_runtime_bundle_russia_33f \
+    --ar-steps 20 \
+    --out-dir "$OUT" \
+    --cache-dir "$CACHE"
+
+# 2. Нейросетевая постобработка
+$VENV scripts/postproc_apply_v3_russia.py \
+    --forecast "$OUT/forecast.pt" \
+    --stations data/russia_mos_stations.json \
+    --postproc-dir experiments/neural_postproc_v3 \
+    --out "$OUT/station_postproc_v3.json"
+
+# 3. JSON для сайта
+$VENV scripts/build_russia_forecast_json.py \
+    --forecast "$OUT/forecast.pt" \
+    --postproc-json "$OUT/station_postproc_v3.json" \
+    --out website/static/russia_forecast.json
+
+# 4. Чистка кеша GDAS и старого forecast.pt
+rm -rf "$CACHE"
+rm -f "$OUT/forecast.pt"  # тяжёлый (~1.8 ГБ), JSON уже собран
+```
+
+### Запуск веб-приложения на сервере
+
+```bash
+# В сессии (для отладки)
+uvicorn website.app:app --host 127.0.0.1 --port 18080
+
+# Постоянно — через systemd / supervisor / @reboot crontab.
+# Пример @reboot:
+@reboot cd /path/to/graphcast-lite && .venv/bin/uvicorn website.app:app --host 127.0.0.1 --port 18080 >> /var/log/graphcast-web.log 2>&1
+```
+
+Снаружи прокидывается через nginx (reverse proxy `127.0.0.1:18080` → публичный домен).
 
 ---
 
@@ -241,6 +299,19 @@ python scripts/download_russia_isd_lite.py
 └── README_RU.MD                    # Этот файл
 ```
 
+### Точки входа в код
+
+| Что хотите делать | Где смотреть |
+|---|---|
+| Понять архитектуру графовой модели | [`src/models.py`](src/models.py) — класс `GraphCastLite`, encoder/processor/decoder |
+| Понять цикл обучения | [`src/train.py`](src/train.py) — `train()`, curriculum AR, freeze_processor |
+| Понять, как строятся графы | [`src/create_graphs.py`](src/create_graphs.py), [`src/mesh/`](src/mesh/) |
+| Понять, как читаются данные | [`src/data/dataloader_chunked.py`](src/data/dataloader_chunked.py) — memmap + sliding window |
+| Понять усвоение наблюдений | [`src/assimilation/`](src/assimilation/) — `nudging.py`, `optimal_interpolation.py` |
+| Понять постобработку | [`src/postprocessing/neural/models.py`](src/postprocessing/neural/models.py) — `StationLeadBiasResidualMLP` |
+| Понять, как запускается живой прогноз | [`scripts/live_gdas_forecast.py`](scripts/live_gdas_forecast.py) |
+| Понять, как работает сайт | [`website/app.py`](website/app.py), статика — [`website/static/`](website/static/) |
+
 ---
 
 ## Установка
@@ -253,6 +324,81 @@ pip install -r requirements.txt
 
 Основные зависимости: `torch`, `torch_geometric`, `numpy`, `scipy`, `xarray`, `cfgrib`, `matplotlib`, `cartopy`, `trimesh`, `wandb` (опционально).
 
+Для скачивания свежих анализов GDAS нужен интернет без блокировок NOAA NOMADS. Для скачивания ERA5 (CDS API) нужен бесплатный аккаунт `cdsapi` и файл `~/.cdsapirc` с ключом.
+
+---
+
+## Быстрый старт (для нового разработчика)
+
+После `git clone` и `pip install -r requirements.txt` — четыре сценария, чтобы быстро убедиться, что всё работает:
+
+### 1. Сгенерировать живой прогноз России на 5 суток
+
+Использует обученные веса из репозитория (`experiments/multires_russia_33f_v3_noroi/best_model.pth`). Скачивает свежие анализы NOAA GDAS, прогоняет графовую модель, применяет нейросетевую постобработку, формирует JSON для сайта.
+
+```bash
+# (а) Шаг 1: прогноз графовой моделью
+python scripts/live_gdas_forecast.py \
+    --experiment-dir experiments/multires_russia_33f_v3_noroi \
+    --runtime-bundle live_runtime_bundle_russia_33f \
+    --ar-steps 20 \
+    --out-dir results/live_russia_33f_5d \
+    --cache-dir /tmp/gdas_cache
+
+# (б) Шаг 2: нейросетевая постобработка по 689 станциям
+python scripts/postproc_apply_v3_russia.py \
+    --forecast results/live_russia_33f_5d/forecast.pt \
+    --stations data/russia_mos_stations.json \
+    --postproc-dir experiments/neural_postproc_v3 \
+    --out results/live_russia_33f_5d/station_postproc_v3.json
+
+# (в) Шаг 3: сборка финального JSON для сайта
+python scripts/build_russia_forecast_json.py \
+    --forecast results/live_russia_33f_5d/forecast.pt \
+    --postproc-json results/live_russia_33f_5d/station_postproc_v3.json \
+    --out website/static/russia_forecast.json
+```
+
+После этого `website/static/russia_forecast.json` содержит свежий прогноз.
+
+### 2. Поднять сайт локально
+
+```bash
+uvicorn website.app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Откроется в браузере: <http://localhost:8000/static/russia.html> — карта России с прогнозом по 689 станциям, переключение между лидами, оверлеи температуры/ветра/осадков.
+
+### 3. Запустить инференс старой (Красноярской) цепочки
+
+Если по какой-то причине нужен исходный пайплайн с MOS-постобработкой по 19 станциям Красноярска:
+
+```bash
+python scripts/live_gdas_forecast.py \
+    --experiment-dir experiments/multires_nores_freeze6 \
+    --runtime-bundle live_runtime_bundle \
+    --learned-mos live_runtime_bundle/learned_mos_t2m_wind_19st.joblib \
+    --wind-scale live_runtime_bundle/wind_monthly_scale.json \
+    --spatial-idw --selective \
+    --lapse-target-elevation 287 --ar-steps 12 \
+    --out-dir results/live_krsk_3d --cache-dir /tmp/gdas_cache
+
+python website/forecast_parser.py \
+    --input results/live_krsk_3d/forecast.pt \
+    --output website/static/forecast.json
+```
+
+### 4. Поставить на обучение свою модель
+
+См. раздел «[Эксперименты](#эксперименты)» ниже. Простой случай — повторить файнтюн на Россию от имеющегося чекпойнта v3 GLOBAL:
+
+```bash
+python -m src.main experiments/multires_russia_33f_v3_noroi \
+    --pretrained experiments/wb2_512x256_33f_ar_v3/best_model.pth
+```
+
+Обучение идёт до 50 эпох с curriculum AR=3→4→5; чекпойнт сохраняется в `experiments/multires_russia_33f_v3_noroi/best_model.pth` каждый раз, когда улучшается валидационный лосс. Лог пишется в `training_log.txt`, его можно смотреть в реальном времени через `tail -f`.
+
 ---
 
 ## Связанные документы
@@ -260,6 +406,19 @@ pip install -r requirements.txt
 - Текст ВКР: [`docs/diploma/diploma.tex`](docs/diploma/diploma.tex), [`docs/diploma/diploma.pdf`](docs/diploma/diploma.pdf).
 - RFC по нейросетевой постобработке: [`docs/postprocessing_rfc.md`](docs/postprocessing_rfc.md).
 - Тезисы доклада на МНСК 2026 и Марчуковских чтениях 2026.
+
+---
+
+## Возможные направления развития
+
+Гипотезы, которые в рамках ВКР проверить не успели — могут пригодиться следующему студенту:
+
+- **Накопительная статистика по оперативному режиму.** Сейчас итоговая верификация сделана на одном-двух прогонах. Имеет смысл собрать журнал предсказаний за несколько недель / месяцев и сравнивать с независимым ground truth (например, по архиву ISD-Lite после факта). Базовая идея — построить простую таблицу «дата → MAE/RMSE по T2m, U10, V10 на каждой станции» и смотреть на тренд.
+- **Перенос гиперпараметров усвоения между регионами и сезонами.** Гиперпараметры $L = 100$ км и $\sigma_o = 0.5$ подбирались на Сибири, ERA5 2018–2020. Проверить, что они работают на других регионах (Европейская часть РФ, Дальний Восток) и в других сезонах.
+- **Усвоение по другим переменным.** Сейчас в OI/Nudging «усваиваются» все 19/33 канала. Возможно, для разрежённой реальной сети станций имеет смысл усваивать только T2m и MSL, а остальное достраивать через корреляции — это упростит конфигурацию для оперативного режима.
+- **Сравнение с независимыми системами.** В качестве референсной серии в работе использовались ретроспективные данные Open-Meteo (агрегация ERA5 + станций). Полноценная независимая верификация — отдельная задача: например, прямое сравнение с прогнозами Гидрометцентра или с сетями автоматических станций.
+- **Расширение нейросетевой постобработки.** Сейчас постобработка предсказывает поправку только в точках станций. Можно попробовать применять её как пространственное поле (через интерполяцию поправок) или ввести обучаемый IDW.
+- **Дополнительные горизонты прогноза.** Модель устойчиво работает до 3–4 суток. Имеет смысл систематически измерить деградацию навыка после 5 суток и понять, что ограничивает горизонт — накопление ошибки в графовой модели или ошибка постобработки.
 
 ---
 
