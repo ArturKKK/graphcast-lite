@@ -49,6 +49,10 @@ SELECTIVE_FIELDS = [
     ("HGT",   "850 mb"), ("SPFH", "850 mb"),
     ("TMP",   "500 mb"), ("UGRD", "500 mb"), ("VGRD", "500 mb"),
     ("HGT",   "500 mb"), ("SPFH", "500 mb"),
+    ("TMP",   "250 mb"), ("UGRD", "250 mb"), ("VGRD", "250 mb"),
+    ("HGT",   "250 mb"), ("SPFH", "250 mb"),
+    ("TMP",   "1000 mb"), ("UGRD", "1000 mb"), ("VGRD", "1000 mb"),
+    ("HGT",   "1000 mb"), ("SPFH", "1000 mb"),
     ("HGT",   "surface"),
 ]
 
@@ -578,12 +582,31 @@ def select_field(payload: dict[str, xr.Dataset], group_name: str, candidates: li
     return None
 
 
+def compute_time_forcings(cycle_dt: datetime) -> dict[str, float]:
+    """Compute sin/cos of hour-of-day and day-of-year for a given UTC cycle."""
+    dt = cycle_dt.astimezone(timezone.utc)
+    hour = dt.hour + dt.minute / 60.0
+    h_ang = 2 * np.pi * hour / 24.0
+    doy = dt.timetuple().tm_yday
+    d_ang = 2 * np.pi * (doy - 1) / 365.25
+    return {
+        "sin_hour": float(np.sin(h_ang)),
+        "cos_hour": float(np.cos(h_ang)),
+        "sin_doy": float(np.sin(d_ang)),
+        "cos_doy": float(np.cos(d_ang)),
+    }
+
+
+FORCING_NAMES = ("sin_hour", "cos_hour", "sin_doy", "cos_doy")
+
+
 def extract_live_channels(
     payload: dict[str, xr.Dataset],
     node_lats: np.ndarray,
     node_lons: np.ndarray,
     var_order: list[str],
     template_static: dict[str, np.ndarray],
+    cycle_dt: datetime | None = None,
 ) -> tuple[dict[str, np.ndarray], list[str]]:
     extracted: dict[str, np.ndarray] = {}
     warnings: list[str] = []
@@ -605,12 +628,27 @@ def extract_live_channels(
         "v@500": ("isobaric_v", ["v"], 500),
         "z@500": ("isobaric_z", ["gh", "z"], 500),
         "q@500": ("isobaric_q", ["q"], 500),
+        "t@250": ("isobaric_t", ["t"], 250),
+        "u@250": ("isobaric_u", ["u"], 250),
+        "v@250": ("isobaric_v", ["v"], 250),
+        "z@250": ("isobaric_z", ["gh", "z"], 250),
+        "q@250": ("isobaric_q", ["q"], 250),
+        "t@1000": ("isobaric_t", ["t"], 1000),
+        "u@1000": ("isobaric_u", ["u"], 1000),
+        "v@1000": ("isobaric_v", ["v"], 1000),
+        "z@1000": ("isobaric_z", ["gh", "z"], 1000),
+        "q@1000": ("isobaric_q", ["q"], 1000),
         "tp": ("tp", ["tp", "acpcp", "prate"], None),
     }
+
+    forcings = compute_time_forcings(cycle_dt) if cycle_dt is not None else None
 
     for name in var_order:
         if name in template_static:
             extracted[name] = template_static[name].astype(np.float32)
+            continue
+        if forcings is not None and name in forcings:
+            extracted[name] = np.full_like(node_lats, forcings[name], dtype=np.float32)
             continue
         spec = var_specs.get(name)
         if spec is None:
@@ -764,7 +802,7 @@ def main() -> None:
     warnings: list[str] = []
     obs_frames = []
     for cycle_dt, _, payload in cycle_payloads:
-        extracted, cycle_warnings = extract_live_channels(payload, latitudes, longitudes, var_order, template_static)
+        extracted, cycle_warnings = extract_live_channels(payload, latitudes, longitudes, var_order, template_static, cycle_dt=cycle_dt)
         warnings.extend([f"{cycle_dt.isoformat()}: {line}" for line in cycle_warnings])
         frame = np.stack([extracted[name] for name in var_order], axis=-1).astype(np.float32)
 
@@ -797,9 +835,22 @@ def main() -> None:
     G = len(latitudes)
     C = len(var_order)
     curr_state = torch.from_numpy(input_tensor).unsqueeze(0).to(device).view(1, G, obs_window, C)
+
+    # Pre-compute indices and normalized constants for static + forcing channels,
+    # so we can pin them after each AR step (the GNN otherwise drifts on these).
+    static_overrides: list[tuple[int, torch.Tensor]] = []
+    for name in ("z_surf", "lsm"):
+        if name in var_order and name in template_static:
+            idx = var_order.index(name)
+            val = (template_static[name].astype(np.float32) - x_mean[idx]) / x_std[idx]
+            static_overrides.append((idx, torch.from_numpy(val).to(device)))
+
+    last_obs_dt = cycles[-1]
+    forcing_idx = {name: var_order.index(name) for name in FORCING_NAMES if name in var_order}
+
     ar_outs = []
     with torch.no_grad():
-        for _ in range(args.ar_steps):
+        for step_i in range(args.ar_steps):
             inp = curr_state.view(1, G, -1)
             pred = model(inp, attention_threshold=0.0)
             if pred.dim() == 2:
@@ -808,6 +859,19 @@ def main() -> None:
                 step_out = pred
             else:
                 step_out = curr_state[:, :, -1, :] + pred
+
+            # Pin static channels back to their truth
+            for idx, val in static_overrides:
+                step_out[..., idx] = val
+
+            # Overwrite time forcing channels for the +6h future step
+            if forcing_idx:
+                future_dt = last_obs_dt + timedelta(hours=6 * (step_i + 1))
+                f_vals = compute_time_forcings(future_dt)
+                for name, idx in forcing_idx.items():
+                    norm_val = (f_vals[name] - x_mean[idx]) / x_std[idx]
+                    step_out[..., idx] = float(norm_val)
+
             ar_outs.append(step_out.cpu())
             curr_state = torch.cat([curr_state[:, :, 1:, :], step_out.unsqueeze(2).to(device)], dim=2)
 

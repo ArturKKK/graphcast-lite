@@ -64,7 +64,16 @@ def compute_wind(u: float, v: float) -> tuple[float, float]:
 
 
 def precip_info(tp_mm: float, t2m_c: float) -> dict:
-    """Precipitation type and intensity from 6h accumulation."""
+    """Precipitation type and intensity from 6h accumulation (mm).
+
+    Intensity thresholds aligned with classifier in `build_russia_forecast_json`:
+      <0.1   — none
+      0.1-0.5 — trace / drizzle
+      0.5-2   — light
+      2-6     — moderate
+      6-15    — heavy
+      >15     — downpour
+    """
     if tp_mm < 0.1:
         return {"type": "none", "icon": "", "intensity": "",
                 "intensity_text": ""}
@@ -78,29 +87,47 @@ def precip_info(tp_mm: float, t2m_c: float) -> dict:
         ptype = "rain"
 
     # Intensity by accumulation (mm / 6h)
-    if tp_mm < 1.0:
+    if tp_mm < 0.5:
+        intensity = "trace"
+    elif tp_mm < 2.0:
         intensity = "light"
-    elif tp_mm < 4.0:
+    elif tp_mm < 6.0:
         intensity = "moderate"
-    else:
+    elif tp_mm < 15.0:
         intensity = "heavy"
+    else:
+        intensity = "downpour"
 
     type_names = {"snow": "снег", "sleet": "мокр. снег", "rain": "дождь"}
     intensity_names = {
+        "trace": "следы",
         "light": "слабый",
         "moderate": "умеренный",
         "heavy": "сильный",
+        "downpour": "ливневый" if ptype == "rain" else "обильный",
     }
 
     # Icons
-    if ptype == "snow":
-        icon = "🌨️" if intensity != "light" else "❄️"
+    if intensity == "trace":
+        icon = "🌫️" if ptype != "rain" else "🌦️"
+    elif ptype == "snow":
+        icon = "❄️" if intensity == "light" else "🌨️"
     elif ptype == "sleet":
         icon = "🌨️"
-    else:
-        icon = "🌧️" if intensity != "light" else "🌦️"
+    else:  # rain
+        if intensity == "light":
+            icon = "🌦️"
+        elif intensity == "downpour":
+            icon = "⛈️"
+        else:
+            icon = "🌧️"
 
-    intensity_text = f"{intensity_names[intensity]} {type_names[ptype]}"
+    if intensity == "trace" and ptype == "rain":
+        intensity_text = "морось"
+    elif intensity == "trace":
+        intensity_text = f"следы {type_names[ptype]}а" if ptype == "snow" else f"следы осадков"
+    else:
+        intensity_text = f"{intensity_names[intensity]} {type_names[ptype]}"
     return {"type": ptype, "icon": icon, "intensity": intensity,
             "intensity_text": intensity_text}
 

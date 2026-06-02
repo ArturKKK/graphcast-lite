@@ -1,0 +1,352 @@
+[
+ {
+  "usaf": "218230",
+  "name": "YAKUTSK",
+  "lat": 62.093,
+  "lon": 129.771,
+  "elev": 99.1
+ },
+ {
+  "usaf": "221130",
+  "name": "MURMANSK",
+  "lat": 68.782,
+  "lon": 32.751,
+  "elev": 81.1
+ },
+ {
+  "usaf": "225500",
+  "name": "TALAGI",
+  "lat": 64.6,
+  "lon": 40.717,
+  "elev": 18.9
+ },
+ {
+  "usaf": "228200",
+  "name": "PETROZAVODSK",
+  "lat": 61.817,
+  "lon": 34.267,
+  "elev": 110.0
+ },
+ {
+  "usaf": "232215",
+  "name": "MAGNITOGORSK",
+  "lat": 53.393,
+  "lon": 58.756,
+  "elev": 435.9
+ },
+ {
+  "usaf": "234710",
+  "name": "NIZHNEVARTOVSK",
+  "lat": 60.949,
+  "lon": 76.484,
+  "elev": 53.9
+ },
+ {
+  "usaf": "238040",
+  "name": "SYKTYVKAR",
+  "lat": 61.647,
+  "lon": 50.845,
+  "elev": 98.8
+ },
+ {
+  "usaf": "238490",
+  "name": "SURGUT",
+  "lat": 61.344,
+  "lon": 73.402,
+  "elev": 61.0
+ },
+ {
+  "usaf": "239330",
+  "name": "KHANTY MANSIYSK",
+  "lat": 61.028,
+  "lon": 69.086,
+  "elev": 23.2
+ },
+ {
+  "usaf": "255630",
+  "name": "UGOLNY",
+  "lat": 64.735,
+  "lon": 177.741,
+  "elev": 59.1
+ },
+ {
+  "usaf": "259130",
+  "name": "SOKOL",
+  "lat": 59.911,
+  "lon": 150.72,
+  "elev": 175.0
+ },
+ {
+  "usaf": "260630",
+  "name": "PULKOVO",
+  "lat": 59.8,
+  "lon": 30.263,
+  "elev": 24.1
+ },
+ {
+  "usaf": "262580",
+  "name": "PSKOV",
+  "lat": 57.784,
+  "lon": 28.396,
+  "elev": 46.9
+ },
+ {
+  "usaf": "267020",
+  "name": "KHRABROVO",
+  "lat": 54.89,
+  "lon": 20.593,
+  "elev": 13.1
+ },
+ {
+  "usaf": "272255",
+  "name": "TUNOSHNA",
+  "lat": 57.561,
+  "lon": 40.157,
+  "elev": 87.5
+ },
+ {
+  "usaf": "274590",
+  "name": "STRIGINO",
+  "lat": 56.23,
+  "lon": 43.784,
+  "elev": 78.0
+ },
+ {
+  "usaf": "275155",
+  "name": "SHEREMETYEVO",
+  "lat": 55.973,
+  "lon": 37.415,
+  "elev": 189.6
+ },
+ {
+  "usaf": "275185",
+  "name": "VNUKOVO",
+  "lat": 55.592,
+  "lon": 37.261,
+  "elev": 208.8
+ },
+ {
+  "usaf": "275950",
+  "name": "KAZAN",
+  "lat": 55.606,
+  "lon": 49.279,
+  "elev": 126.2
+ },
+ {
+  "usaf": "276070",
+  "name": "BEGISHEVO",
+  "lat": 55.565,
+  "lon": 52.093,
+  "elev": 196.0
+ },
+ {
+  "usaf": "277030",
+  "name": "KALUGA",
+  "lat": 54.55,
+  "lon": 36.367,
+  "elev": 198.8
+ },
+ {
+  "usaf": "279622",
+  "name": "CHEBOKSARY",
+  "lat": 56.09,
+  "lon": 47.347,
+  "elev": 170.1
+ },
+ {
+  "usaf": "284400",
+  "name": "KOLTSOVO",
+  "lat": 56.743,
+  "lon": 60.803,
+  "elev": 232.9
+ },
+ {
+  "usaf": "286420",
+  "name": "BALANDINO",
+  "lat": 55.306,
+  "lon": 61.503,
+  "elev": 234.4
+ },
+ {
+  "usaf": "287220",
+  "name": "UFA",
+  "lat": 54.558,
+  "lon": 55.874,
+  "elev": 136.9
+ },
+ {
+  "usaf": "287854",
+  "name": "ABAKAN",
+  "lat": 53.74,
+  "lon": 91.385,
+  "elev": 253.3
+ },
+ {
+  "usaf": "289000",
+  "name": "KURUMOCH",
+  "lat": 53.505,
+  "lon": 50.164,
+  "elev": 145.4
+ },
+ {
+  "usaf": "296340",
+  "name": "TOLMACHEVO",
+  "lat": 55.013,
+  "lon": 82.651,
+  "elev": 111.3
+ },
+ {
+  "usaf": "303090",
+  "name": "BRATSK",
+  "lat": 56.371,
+  "lon": 101.698,
+  "elev": 490.7
+ },
+ {
+  "usaf": "307100",
+  "name": "IRKUTSK",
+  "lat": 52.268,
+  "lon": 104.389,
+  "elev": 510.5
+ },
+ {
+  "usaf": "307580",
+  "name": "KADALA",
+  "lat": 52.026,
+  "lon": 113.306,
+  "elev": 692.5
+ },
+ {
+  "usaf": "308230",
+  "name": "MUKHINO",
+  "lat": 51.808,
+  "lon": 107.438,
+  "elev": 515.1
+ },
+ {
+  "usaf": "313289",
+  "name": "IGNATYEVO",
+  "lat": 50.425,
+  "lon": 127.412,
+  "elev": 194.5
+ },
+ {
+  "usaf": "319741",
+  "name": "KNEVICHI",
+  "lat": 43.399,
+  "lon": 132.148,
+  "elev": 14.0
+ },
+ {
+  "usaf": "321500",
+  "name": "KHOMUTOVO",
+  "lat": 46.889,
+  "lon": 142.718,
+  "elev": 18.0
+ },
+ {
+  "usaf": "325400",
+  "name": "YELIZOVO",
+  "lat": 53.168,
+  "lon": 158.454,
+  "elev": 39.9
+ },
+ {
+  "usaf": "341220",
+  "name": "CHERTOVITSKOYE",
+  "lat": 51.814,
+  "lon": 39.23,
+  "elev": 156.7
+ },
+ {
+  "usaf": "345600",
+  "name": "GUMRAK",
+  "lat": 48.783,
+  "lon": 44.346,
+  "elev": 146.9
+ },
+ {
+  "usaf": "348610",
+  "name": "ELISTA",
+  "lat": 46.367,
+  "lon": 44.333,
+  "elev": 152.7
+ },
+ {
+  "usaf": "349290",
+  "name": "KRASNODAR",
+  "lat": 45.033,
+  "lon": 39.15,
+  "elev": 34.0
+ },
+ {
+  "usaf": "349490",
+  "name": "SHPAKOVSKOYE",
+  "lat": 45.109,
+  "lon": 42.113,
+  "elev": 452.9
+ },
+ {
+  "usaf": "351210",
+  "name": "ORENBURG",
+  "lat": 51.796,
+  "lon": 55.457,
+  "elev": 118.0
+ },
+ {
+  "usaf": "353942",
+  "name": "ASTRAKHAN",
+  "lat": 46.283,
+  "lon": 48.006,
+  "elev": -20.1
+ },
+ {
+  "usaf": "370008",
+  "name": "DOMODEDOVO",
+  "lat": 55.409,
+  "lon": 37.906,
+  "elev": 179.2
+ },
+ {
+  "usaf": "370010",
+  "name": "VITYAZEVO",
+  "lat": 45.002,
+  "lon": 37.347,
+  "elev": 53.0
+ },
+ {
+  "usaf": "370540",
+  "name": "MINERALNYYE VODY",
+  "lat": 44.225,
+  "lon": 43.082,
+  "elev": 321.3
+ },
+ {
+  "usaf": "371710",
+  "name": "SOCHI",
+  "lat": 43.45,
+  "lon": 39.957,
+  "elev": 27.1
+ },
+ {
+  "usaf": "372120",
+  "name": "NALCHIK",
+  "lat": 43.513,
+  "lon": 43.637,
+  "elev": 445.3
+ },
+ {
+  "usaf": "377352",
+  "name": "UYTASH",
+  "lat": 42.817,
+  "lon": 47.652,
+  "elev": 3.7
+ },
+ {
+  "usaf": "378650",
+  "name": "ORSK",
+  "lat": 51.073,
+  "lon": 58.596,
+  "elev": 277.1
+ }
+]

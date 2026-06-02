@@ -186,7 +186,7 @@
     document.getElementById("current-precip").textContent = s.precip_mm + " мм";
 
     var gustEl = document.getElementById("current-gust");
-    gustEl.textContent = (s.wind_gust_ms && s.wind_gust_ms > s.wind_speed_ms + 0.5)
+    gustEl.textContent = (s.wind_gust_ms !== undefined && s.wind_gust_ms !== null)
       ? "порывы " + s.wind_gust_ms + " м/с" : "";
     document.getElementById("current-precip-type").textContent = s.precip_intensity_text || "";
   }
@@ -211,7 +211,7 @@
       var tSign = s.t2m_celsius > 0 ? "+" : "";
 
       var windCell = "" + s.wind_speed_ms;
-      if (s.wind_gust_ms && s.wind_gust_ms > s.wind_speed_ms + 0.5) {
+      if (s.wind_gust_ms !== undefined && s.wind_gust_ms !== null) {
         windCell += '<span class="gust-table"> (пор. ' + s.wind_gust_ms + ')</span>';
       }
       var precipCell = "" + s.precip_mm;
@@ -344,10 +344,10 @@
     // it directly. NB: precip is reported as the NEAREST grid-point value to
     // stay consistent with the precip overlay (Voronoi nearest-neighbour).
     if (best[0].d2 < 1e-10) {
-      showHoverTip(e, sd_first.t, sd_first.ws, sd_first.wd, sd_first.p, sd_first.pr, best[0].idx, pts);
+      showHoverTip(e, sd_first.t, sd_first.ws, sd_first.wd, sd_first.wg, sd_first.p, sd_first.pr, best[0].idx, pts);
       return;
     }
-    var sumW = 0, t = 0, u = 0, v = 0, pr = 0;
+    var sumW = 0, t = 0, u = 0, v = 0, pr = 0, wg = 0;
     for (var k = 0; k < best.length; k++) {
       var sd = pts[best[k].idx].steps[currentStep];
       if (!sd) continue;
@@ -360,23 +360,25 @@
       u += w * uk;
       v += w * vk;
       pr += w * sd.pr;
+      wg += w * (sd.wg !== undefined && sd.wg !== null ? sd.wg : sd.ws);
     }
     if (sumW <= 0) return;
-    t /= sumW; u /= sumW; v /= sumW; pr /= sumW;
+    t /= sumW; u /= sumW; v /= sumW; pr /= sumW; wg /= sumW;
     var ws = Math.sqrt(u*u + v*v);
     var wd = (Math.atan2(-u, -v) * 180 / Math.PI + 360) % 360;
     // Precip: nearest-neighbour (matches overlay).
     var p = sd_first.p;
-    showHoverTip(e, t, ws, wd, p, pr, best[0].idx, pts);
+    showHoverTip(e, t, ws, wd, wg, p, pr, best[0].idx, pts);
   }
 
-  function showHoverTip(e, t, ws, wd, p, pr, nearestIdx, pts) {
+  function showHoverTip(e, t, ws, wd, wg, p, pr, nearestIdx, pts) {
     if (!hoverTooltipEl) return;
     var tSign = t > 0 ? "+" : "";
     var dirArrow = '<span style="display:inline-block;transform:rotate(' + wd + 'deg)">↑</span>';
     var html =
       '<div style="font-weight:600;font-size:13px">' + tSign + t.toFixed(1) + '°C</div>' +
       '<div>Ветер: ' + ws.toFixed(1) + ' м/с ' + dirArrow + ' ' + wind_dir_text(wd) + '</div>' +
+      '<div>Порывы: ' + (wg !== undefined && wg !== null ? wg.toFixed(1) : ws.toFixed(1)) + ' м/с</div>' +
       '<div>Давл: ' + pr.toFixed(1) + ' мм рт.ст.</div>';
     if (p > 0.05) html += '<div>Осадки: ' + p.toFixed(2) + ' мм/6ч</div>';
     var d = pts[nearestIdx];
@@ -551,6 +553,7 @@
         color: "#4fc3f7", weight: 0.6, opacity: 0.6,
       });
       var tip = "<b>" + tSign + sd.t + "°C</b> &nbsp; " + sd.ws + " м/с " + arrow;
+      if (sd.wg !== undefined && sd.wg !== null) tip += " (пор. " + sd.wg + ")";
       tip += " &nbsp; " + sd.pr + " мм рт.ст.";
       if (sd.p > 0.05) { tip += "<br>" + sd.p + " мм осадки"; if (sd.pi) tip += " " + sd.pi; }
       marker.bindTooltip(tip, { className: "forecast-tip", direction: "top", offset: [0, -4] });
@@ -576,7 +579,7 @@
         color: "#0a1018", weight: 1.4, opacity: 1,
       });
       var tip = "<b>" + pt.name + "</b><br><b>" + tSign + sd.t + "°C</b> &nbsp; " + sd.ws + " м/с " + arrow;
-      if (sd.wg > sd.ws + 0.5) tip += " (пор. " + sd.wg + ")";
+      if (sd.wg !== undefined && sd.wg !== null) tip += " (пор. " + sd.wg + ")";
       tip += " &nbsp; " + sd.pr + " мм рт.ст.";
       if (sd.p > 0.05) { tip += "<br>" + sd.p + " мм осадки"; if (sd.pi) tip += " " + sd.pi; if (sd.pt) tip += " " + sd.pt; }
       marker.bindTooltip(tip, { className: "forecast-tip", direction: "top", offset: [0, -6] });

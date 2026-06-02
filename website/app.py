@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 FORECAST_JSON = STATIC_DIR / "forecast.json"
+RUSSIA_FORECAST_JSON = STATIC_DIR / "russia_forecast.json"
 YANDEX_CACHE = STATIC_DIR / "yandex_cache.json"
 YANDEX_CACHE_TTL = 1800  # 30 min
 
@@ -33,6 +34,26 @@ async def index():
 @app.get("/compare")
 async def compare():
     return FileResponse(STATIC_DIR / "compare.html", media_type="text/html")
+
+
+@app.get("/russia")
+async def russia_page():
+    return FileResponse(STATIC_DIR / "russia.html", media_type="text/html")
+
+
+@app.get("/api/russia_forecast")
+async def russia_forecast():
+    """All-Russia forecast over 50 ISD stations (multires_russia_19f_noroi
+    + neural_postproc_v2). Returns a placeholder JSON until real inference
+    artefacts are uploaded — swap the file in-place to enable live data."""
+    if not RUSSIA_FORECAST_JSON.exists():
+        return JSONResponse(
+            {"error": "Прогноз по России недоступен", "forecast": None},
+            status_code=503,
+        )
+    with open(RUSSIA_FORECAST_JSON, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return JSONResponse(data)
 
 
 @app.get("/api/forecast")
@@ -73,7 +94,25 @@ async def status():
         "n_summary_steps": len(data.get("summary", [])),
         "n_map_points": data.get("n_map_points", 0),
         "warnings": data.get("warnings", []),
+        "russia": _russia_status(),
     })
+
+
+def _russia_status():
+    if not RUSSIA_FORECAST_JSON.exists():
+        return {"available": False, "placeholder": True}
+    try:
+        with open(RUSSIA_FORECAST_JSON, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        return {
+            "available": True,
+            "placeholder": bool(d.get("placeholder")),
+            "last_cycle": d.get("last_cycle"),
+            "n_stations": d.get("n_stations"),
+            "model_name": d.get("model_name"),
+        }
+    except Exception as e:
+        return {"available": False, "error": str(e)}
 
 
 @app.get("/api/yandex")
