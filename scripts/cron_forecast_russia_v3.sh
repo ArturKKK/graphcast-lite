@@ -24,17 +24,38 @@ df -h "$BASEDIR" | tail -1
 free -h | head -2
 
 # ── Stage 1: inference (5-day, 20 AR steps)
+# Retry the GDAS download up to 3 times — NOAA NOMADS occasionally times out.
+# `--max-lookback-cycles 4` lets the script fall back to a 24h-older cycle if the
+# very latest one is missing on the server (common during the 3-4h posting lag).
 echo "[2/4] GDAS → forecast.pt (v3 33f, 5 days)..."
-$VENV scripts/live_gdas_forecast.py \
-    --experiment-dir experiments/multires_russia_33f_v3_noroi \
-    --runtime-bundle live_runtime_bundle_russia_33f \
-    --ar-steps 20 \
-    --selective \
-    --out-dir "$RESULTS" \
-    --cache-dir "$CACHE"
+INFER_OK=0
+for attempt in 1 2 3; do
+    if $VENV scripts/live_gdas_forecast.py \
+            --experiment-dir experiments/multires_russia_33f_v3_noroi \
+            --runtime-bundle live_runtime_bundle_russia_33f \
+            --ar-steps 20 \
+            --selective \
+            --timeout 300 \
+            --max-lookback-cycles 4 \
+            --out-dir "$RESULTS" \
+            --cache-dir "$CACHE"; then
+        INFER_OK=1
+        echo "  inference succeeded on attempt $attempt"
+        break
+    else
+        echo "  inference attempt $attempt failed; cleaning cache and waiting before retry..."
+        rm -rf "$CACHE"
+        sleep 180
+    fi
+done
 
 # Cleanup GDAS cache after inference (large grib2 files)
 rm -rf "$CACHE"
+
+if [ "$INFER_OK" -ne 1 ]; then
+    echo "[ABORT] All inference attempts failed — keeping the previous russia_forecast.json on the site."
+    exit 1
+fi
 
 # ── Stage 2: neural_postproc_v3 (689 stations)
 echo "[3/4] neural_postproc_v3 (689 stations)..."
