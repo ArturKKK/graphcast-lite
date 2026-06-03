@@ -42,10 +42,16 @@ rm -rf "$CACHE"
 rm -rf "$RESULTS/live_old"
 
 # ── Parse forecast.pt → forecast.json ──
-echo "[5/5] Generating forecast.json..."
+echo "[5/6] Generating forecast.json..."
 $VENV "$BASEDIR/website/forecast_parser.py" \
   --input "$OUT/forecast.pt" \
   --output "$BASEDIR/website/static/forecast.json"
+
+# ── Spatial overlays for the map (temp, wind, precip, pressure tiles) ──
+echo "[6/6] Generating overlays..."
+$VENV "$BASEDIR/scripts/gen_overlays.py" \
+  --input "$BASEDIR/website/static/forecast.json" \
+  --output-dir "$BASEDIR/website/static/overlays"
 
 echo "[DONE] Pipeline complete at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 df -h / | tail -1
