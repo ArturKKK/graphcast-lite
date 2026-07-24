@@ -22,17 +22,35 @@ MERGE_DIR=$DATA/multires_krsk_19f_merge
 cd "$REPO"
 
 # ----- 1. venv -----
-if [[ ! -x "$VENV/bin/python" ]]; then
+# Проверяем по pip (сломанный venv без ensurepip имеет python, но не pip)
+if [[ ! -x "$VENV/bin/pip" ]]; then
   echo "[1/4 $(date +%H:%M:%S)] creating venv at $VENV"
-  python3 -m venv "$VENV"
+  rm -rf "$VENV"
+  if ! python3 -m venv "$VENV" 2>/dev/null; then
+    echo "[1/4] системный python3 без ensurepip; пробую conda-python"
+    rm -rf "$VENV"
+    CONDA_PY=$(ls /home/mlcore/conda/bin/python3* 2>/dev/null | head -1)
+    if [[ -n "$CONDA_PY" ]] && "$CONDA_PY" -m venv "$VENV" 2>/dev/null; then
+      echo "[1/4] venv создан conda-python ($CONDA_PY)"
+    else
+      echo "[1/4] пробую apt install python3.10-venv"
+      rm -rf "$VENV"
+      apt-get update -q >/dev/null 2>&1 || true
+      apt-get install -y -q python3.10-venv >/dev/null 2>&1 \
+        || sudo apt-get install -y -q python3.10-venv >/dev/null 2>&1 || true
+      python3 -m venv "$VENV"
+    fi
+  fi
   "$VENV/bin/pip" install -q --upgrade pip wheel setuptools
-  "$VENV/bin/pip" install -q -r "$REPO/requirements.txt"
+  "$VENV/bin/pip" install -q -r "$REPO/requirements.txt" \
+    || "$VENV/bin/pip" install -q -r "$REPO/requirements.txt" \
+         --extra-index-url https://artifactory.tcsbank.ru/artifactory/api/pypi/python-all/simple
   echo "[1/4] venv ready"
 else
   echo "[1/4] venv already present"
 fi
 source "$VENV/bin/activate"
-echo "python=$(which python); torch=$(python -c 'import torch;print(torch.__version__, torch.cuda.is_available())')"
+echo "python=$(which python); torch=$(python -c 'import torch;print(torch.__version__, torch.cuda.is_available())' 2>&1)"
 
 # ----- 2. extract global 512x256 (tar.zst) -----
 if [[ ! -f "$BASE_DIR/data.npy" ]]; then
