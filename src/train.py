@@ -50,11 +50,13 @@ def load_checkpoint(path, model, optimiser, device):
 
 
 # --- НОВЫЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-def get_lat_weights(lat_dim, lon_dim, device, flat_lats=None):
+def get_lat_weights(lat_dim, lon_dim, device, flat_lats=None, lats_axis=None):
     """Создает веса (cos(lat)) чтобы не переобучаться на полюсах.
-    
+
     flat_lats: если задан (np.ndarray shape (N,)), используются реальные широты
                каждого узла вместо linspace. Для мультирезолюционных сеток.
+    lats_axis: реальная широтная ось регулярной сетки (np.ndarray shape (lat_dim,));
+               если задана, используется вместо linspace(-90, 90).
     """
     if flat_lats is not None:
         # Flat grid: веса по реальным координатам каждого узла
@@ -62,23 +64,28 @@ def get_lat_weights(lat_dim, lon_dim, device, flat_lats=None):
         w = w / w.mean()
         return w.view(1, -1, 1).to(device)
     
-    lats = torch.linspace(-90, 90, lat_dim)
+    if lats_axis is not None:
+        # Реальная широтная ось датасета (важно для региональных сеток:
+        # linspace(-90,90) дал бы неверные широты для полосы 50-60°N)
+        lats = torch.from_numpy(np.asarray(lats_axis).copy()).float()
+    else:
+        lats = torch.linspace(-90, 90, lat_dim)
     w = torch.cos(torch.deg2rad(lats))
     w = w / w.mean()
-    # Размножаем веса на всю сетку [1, G, 1]
-    # Порядок flatten в датасете: сначала Lon, потом Lat (меняется реже) или наоборот?
-    # Обычно (Lon, Lat). Расширяем w [Lat] -> [Lon, Lat] -> Flatten
-    w_expanded = w.view(1, -1).expand(lon_dim, lat_dim).reshape(-1)
+    # Данные flatten в порядке (lat, lon): lat меняется медленно, lon быстро (lat-major) —
+    # см. dataloader_chunked (transpose → (lat, lon, ...)) и meshgrid в create_graphs.
+    w_expanded = w.view(-1, 1).expand(lats.shape[0], lon_dim).reshape(-1)
     return w_expanded.view(1, -1, 1).to(device)
 
 def build_boundary_mask(n_lon, n_lat, width, device):
     """Создаёт пространственную маску: 0 на краях (буферная зона), 1 внутри.
-    
-    Сетка flattened в порядке (lon, lat): индекс = lon_idx * n_lat + lat_idx.
+
+    Сетка flattened в порядке (lat, lon): индекс = lat_idx * n_lon + lon_idx (lat-major),
+    как в dataloader_chunked и create_graphs.
     Возвращает тензор shape (1, G, 1) для broadcast с (N, G, C).
     """
-    mask_2d = torch.zeros(n_lon, n_lat)
-    mask_2d[width:n_lon-width, width:n_lat-width] = 1.0
+    mask_2d = torch.zeros(n_lat, n_lon)
+    mask_2d[width:n_lat-width, width:n_lon-width] = 1.0
     return mask_2d.reshape(1, -1, 1).to(device)
 
 
@@ -344,7 +351,11 @@ def train(
             flat_lats = dataset_metadata.cordinates[0]
             lat_weights = get_lat_weights(0, 0, device, flat_lats=flat_lats)
         else:
-            lat_weights = get_lat_weights(dataset_metadata.num_latitudes, dataset_metadata.num_longitudes, device)
+            _lats_axis = None
+            if getattr(dataset_metadata, 'cordinates', None) is not None:
+                _lats_axis = dataset_metadata.cordinates[0]
+            lat_weights = get_lat_weights(dataset_metadata.num_latitudes, dataset_metadata.num_longitudes, device,
+                                          lats_axis=_lats_axis)
         print("[Train] Включен Weighted Loss.")
         
     # --- Инициализация Curriculum ---

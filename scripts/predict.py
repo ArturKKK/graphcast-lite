@@ -160,6 +160,8 @@ def main():
     ap.add_argument("--oi-sigma-b", type=float, default=0.8)
     ap.add_argument("--oi-sigma-o", type=float, default=0.5)
     ap.add_argument("--oi-corr-len", type=float, default=10000.0)
+    ap.add_argument("--oi-first-k", type=int, default=None,
+                    help="Применять ОИ только на первых K AR-шагах (default: на всех)")
     ap.add_argument("--boundary-blending", action="store_true")
     ap.add_argument("--background-path", type=str, default=None)
     ap.add_argument("--taper-width", type=int, default=5)
@@ -445,6 +447,23 @@ def main():
     save_gt_list = [] if (args.save and not args.no_save) else None
     save_sample_offsets = [] if (args.save and not args.no_save) else None
 
+    # --- Пошаговое усвоение в основном AR-цикле (для residual-моделей) ---
+    # Legacy-ветки (sequential_nudged_rollout / OI-loop выше по коду) не делают
+    # residual/static/forcing и оставлены только для no-residual моделей.
+    _ar_assim = None
+    _ar_first_k = None
+    if not args.no_residual and args.assim_method == "oi":
+        _ar_assim = oi_solver
+        _ar_first_k = args.oi_first_k
+        print(f"[assim] Residual-модель: ОИ применяется пошагово в AR-цикле"
+              f"{f' (первые {_ar_first_k} шагов)' if _ar_first_k else ''}")
+    elif (not args.no_residual and args.assim_method == "nudging"
+          and args.nudging_mode == "sequential"):
+        _ar_assim = NudgingAssimilator(alpha=args.nudging_alpha, device='cpu')
+        _ar_first_k = args.nudge_first_k
+        print(f"[assim] Residual-модель: нуджинг (α={args.nudging_alpha}) пошагово в AR-цикле"
+              f"{f' (первые {_ar_first_k} шагов)' if _ar_first_k else ''}")
+
     # --- inference loop ---
     print(f"[Main] Инференс ({max_samples} samples, DA={args.assim_method})...")
 
@@ -485,14 +504,19 @@ def main():
             X = X.to(device)
 
             # === PREDICTION ===
-            if args.assim_method == "nudging" and args.nudging_mode == "sequential":
+            # ВАЖНО: ветки sequential_nudged_rollout и legacy-OI ниже НЕ делают
+            # residual-сложение / carry-forward статических / подстановку forcing —
+            # они корректны только для no-residual моделей (19f nores).
+            # Для residual-моделей (напр. multires_merge_freeze6_v2) усвоение
+            # выполняется пошагово внутри основного AR-цикла (см. хук ниже).
+            if args.assim_method == "nudging" and args.nudging_mode == "sequential" and args.no_residual:
                 x0 = X.view(1, X.shape[1], exp_cfg.data.obs_window_used, C)
                 out = sequential_nudged_rollout(
                     model=model, x0=x0, y_obs=obs_i.unsqueeze(0), p=P,
                     alpha=args.nudging_alpha, k=args.nudge_first_k, device=device
                 ).squeeze(0)
 
-            elif args.assim_method == "oi":
+            elif args.assim_method == "oi" and args.no_residual:
                 x0 = X.view(1, X.shape[1], exp_cfg.data.obs_window_used, C)
                 curr_state = x0.to(device)
                 y_obs_steps = obs_i.view(y.shape[0], P, C)
@@ -500,14 +524,16 @@ def main():
                 if test_out.shape[-1] == P*C:
                     out_steps = test_out.view(1, G, P, C)
                     for t in range(P):
-                        out_steps[0,:,t,:] = oi_solver.apply(out_steps[0,:,t,:], y_obs_steps[:,t,:])
+                        if args.oi_first_k is None or t < args.oi_first_k:
+                            out_steps[0,:,t,:] = oi_solver.apply(out_steps[0,:,t,:], y_obs_steps[:,t,:])
                     out = out_steps.view(1, G, P*C).squeeze(0)
                 else:
                     batch_steps = []
                     for step in range(P):
                         out_step = model(curr_state.view(1, G, -1), attention_threshold=0.0).cpu()
                         if out_step.dim() == 2: out_step = out_step.unsqueeze(0)
-                        out_step[0] = oi_solver.apply(out_step[0], y_obs_steps[:, step, :])
+                        if args.oi_first_k is None or step < args.oi_first_k:
+                            out_step[0] = oi_solver.apply(out_step[0], y_obs_steps[:, step, :])
                         batch_steps.append(out_step)
                         curr_state = torch.cat([curr_state[:, :, 1:, :], out_step.to(device).unsqueeze(2)], dim=2)
                     out = torch.stack(batch_steps, dim=2).view(1, G, -1).squeeze(0)
@@ -555,6 +581,18 @@ def main():
                         if forcing_ch and y_for_forcing is not None and ar_step < y_for_forcing.shape[1]:
                             for ch in forcing_ch:
                                 step_out[:, :, ch] = y_for_forcing[:, ar_step, ch].unsqueeze(0)
+                        # Пошаговое усвоение для residual-моделей (ПОСЛЕ residual/static/forcing):
+                        # ОИ или последовательный нуджинг корректируют состояние шага,
+                        # исправленное состояние идёт и в метрики, и в следующий AR-шаг.
+                        if _ar_assim is not None and (
+                            _ar_first_k is None or ar_step < _ar_first_k
+                        ):
+                            _obs_steps = obs_i.view(obs_i.shape[0], -1, C)
+                            if ar_step < _obs_steps.shape[1]:
+                                _corr = _ar_assim.apply(
+                                    step_out[0].detach().cpu(), _obs_steps[:, ar_step, :]
+                                )
+                                step_out = _corr.unsqueeze(0).to(step_out.device)
                         # Сохраняем предсказание (ПОСЛЕ carry-forward, чтобы метрики были честными)
                         ar_outs.append(step_out.cpu())
                         # Сдвигаем окно: [obs0, obs1] → [obs1, pred]
@@ -662,14 +700,21 @@ def main():
             scl = np.load(scalers_path)
             std = scl["std"].astype(np.float64)[:C]
 
+        # Единицы ПОСЛЕ конверсий на этапе сборки датасета (см. UNIT_CONVERT в
+        # scripts/build_dataset_512x256_19f.py и др.): msl/sp хранятся в гПа,
+        # z-каналы — в геопотенциальных метрах (уже поделены на g).
         UNITS = {
-            "t2m": "K", "10u": "m/s", "10v": "m/s", "msl": "Pa",
-            "tp": "m", "sp": "Pa", "tcwv": "kg/m²",
-            "z_surf": "m²/s²", "lsm": "-",
+            "t2m": "K", "10u": "m/s", "10v": "m/s", "msl": "hPa",
+            "tp": "m", "sp": "hPa", "tcwv": "kg/m²",
+            "z_surf": "gpm", "lsm": "-",
             "t@850": "K", "u@850": "m/s", "v@850": "m/s",
-            "z@850": "m²/s²", "q@850": "kg/kg",
+            "z@850": "gpm", "q@850": "kg/kg",
             "t@500": "K", "u@500": "m/s", "v@500": "m/s",
-            "z@500": "m²/s²", "q@500": "kg/kg",
+            "z@500": "gpm", "q@500": "kg/kg",
+            "z@250": "gpm", "q@250": "kg/kg",
+            "t@250": "K", "u@250": "m/s", "v@250": "m/s",
+            "z@1000": "gpm", "q@1000": "kg/kg",
+            "t@1000": "K", "u@1000": "m/s", "v@1000": "m/s",
         }
 
         # --- Per-horizon per-channel (ключевая таблица) ---
@@ -691,7 +736,8 @@ def main():
                 for p in range(len(sm_pred_h)):
                     phys_rmse = sm_pred_h[p].rmse_per_channel[c] * std[c]
                     if "z@" in name or name == "z_surf":
-                        row += f" {phys_rmse/9.81:8.1f}m"
+                        # z-каналы уже в гп-метрах (поделены на g при сборке датасета)
+                        row += f" {phys_rmse:8.1f}"
                     elif name == "t2m" or name.startswith("t@"):
                         row += f" {phys_rmse:7.2f}°C"
                     else:
@@ -709,9 +755,7 @@ def main():
                 unit = UNITS.get(name, "?")
                 phys_rmse = rmse_pc[c] * std[c]
                 extra = ""
-                if "z@" in name or name == "z_surf":
-                    extra = f"  (≈{phys_rmse/9.81:.1f} gpm)"
-                elif name == "t2m" or name.startswith("t@"):
+                if name == "t2m" or name.startswith("t@"):
                     extra = f"  (≈{phys_rmse:.2f} °C)"
                 print(f"  {c:3d} {name:>10s} {acc_pc[c]:8.4f} {rmse_pc[c]:10.4f} {phys_rmse:12.4f} {unit:>8s}{extra}")
         else:
