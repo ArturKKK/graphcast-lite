@@ -41,13 +41,19 @@ if [[ ! -x "$VENV/bin/pip" ]]; then
       python3 -m venv "$VENV"
     fi
   fi
+  echo "[1/4] venv created"
+else
+  echo "[1/4] venv already present"
+fi
+# Требования ставим/доставляем по факту: проверка именно import torch,
+# а не наличие pip (venv мог остаться полуготовым после прерванной установки)
+if ! "$VENV/bin/python" -c "import torch" >/dev/null 2>&1; then
+  echo "[1/4 $(date +%H:%M:%S)] installing requirements (torch отсутствует)"
   "$VENV/bin/pip" install -q --upgrade pip wheel setuptools
   "$VENV/bin/pip" install -q -r "$REPO/requirements.txt" \
     || "$VENV/bin/pip" install -q -r "$REPO/requirements.txt" \
          --extra-index-url https://artifactory.tcsbank.ru/artifactory/api/pypi/python-all/simple
-  echo "[1/4] venv ready"
-else
-  echo "[1/4] venv already present"
+  echo "[1/4] requirements installed"
 fi
 source "$VENV/bin/activate"
 echo "python=$(which python); torch=$(python -c 'import torch;print(torch.__version__, torch.cuda.is_available())' 2>&1)"
