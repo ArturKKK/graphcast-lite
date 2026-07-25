@@ -24,14 +24,44 @@ log() { echo "[$(date '+%H:%M:%S')] $*"; }
 log "=== M2 START (полный test_only, N<=$NMAX) ==="
 nvidia-smi --query-gpu=name,memory.used --format=csv,noheader || true
 
+GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "?")
+GIT_DIRTY=$(git status --porcelain 2>/dev/null | head -5)
+
 run() {  # run <tag> <exp> <extra-flags...>
   local tag="$1" exp="$2"; shift 2
   local lf="$OUT/${tag}.log"
+  local cmd="python -u scripts/predict.py experiments/$exp --data-dir $DATA --split test_only --ar-steps 4 --max-samples $NMAX --per-channel --no-save $*"
+  # --- ПРОВЕНАНС: всё нужное, чтобы прогон был воспроизводим и проверяем ---
+  {
+    echo "### PROVENANCE ###############################################"
+    echo "# tag:        $tag"
+    echo "# started:    $(date -Iseconds)"
+    echo "# host:       $(hostname)"
+    echo "# git commit: $GIT_COMMIT"
+    [[ -n "$GIT_DIRTY" ]] && echo "# git dirty:  $(echo "$GIT_DIRTY" | tr '\n' ';')"
+    echo "# gpu:        $(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)"
+    echo "# dataset:    $DATA"
+    echo "#   info:     $(tr -d '\n ' < "$DATA/dataset_info.json" 2>/dev/null | cut -c1-300)"
+    echo "# experiment: experiments/$exp"
+    echo "#   config:   $(md5sum "experiments/$exp/config.json" 2>/dev/null | cut -d' ' -f1)  (md5 config.json)"
+    for _ck in "experiments/$exp"/best_model.pth "experiments/$exp"/*.pth; do
+      [[ -f "$_ck" ]] && echo "#   ckpt:     $(md5sum "$_ck" | cut -d' ' -f1)  $(du -h "$_ck" | cut -f1)  $_ck"
+    done
+    # если чекпойнт передан явно через --ckpt
+    for _a in "$@"; do
+      [[ -f "$_a" && "$_a" == *.pth ]] && echo "#   ckpt(--ckpt): $(md5sum "$_a" | cut -d' ' -f1)  $_a"
+    done
+    echo "# COMMAND:"
+    echo "#   $cmd"
+    echo "##############################################################"
+    echo
+  } > "$lf"
   log "START $tag ($exp) → $lf"
   python -u scripts/predict.py "experiments/$exp" \
       --data-dir "$DATA" --split test_only --ar-steps 4 \
-      --max-samples "$NMAX" --per-channel --no-save "$@" > "$lf" 2>&1
+      --max-samples "$NMAX" --per-channel --no-save "$@" >> "$lf" 2>&1
   local rc=$?
+  echo -e "\n### finished: $(date -Iseconds), exit=$rc ###" >> "$lf"
   local skill=$(grep -oE "skill=[0-9.]+%" "$lf" | tail -1)
   local t2m=$(grep -E "^\s+t2m" "$lf" | tail -1 | tr -s ' ')
   log "DONE  $tag rc=$rc | $skill | $t2m"
