@@ -1,6 +1,19 @@
 # Команды для VM: расчёты под статью (M1–M5) — ДВЕ VM (H100)
 
+## ⚠️ ЛИМИТ ДИСКА — читать первым
+
+Платформа **убивает job при ~240 ГБ** локального диска (`reason=MLCoreBigNodeDiskUsage`).
+Так была потеряна VM4 (242 ГБ: архив 74 ГБ лежал рядом со своей распаковкой 82 ГБ).
+
+Бюджет на VM линии статьи: глобальный 82 + merge 81 + Krsk 2.3 ≈ **165 ГБ**. Правила:
+
+- архивы удалять **сразу** после распаковки (в скрипте уже так);
+- лишнее из `/data/datasets` (российские датасеты, `invest`, `global_512x256_extra`) удалять — **восстановится из S3** при перезапуске VM;
+- на VM с 33f-линией (там +43 ГБ global_extra +60 ГБ 33f) запускать setup с `SLIM_AFTER_MERGE=1` — удалит глобальный 82 ГБ после сборки merge. На VM статьи НЕ включать: глобальный нужен для M4.
+- контроль: `du -sh /data/datasets`.
+
 Раскладка: **VM-A** = «ядро» (все AR-4: M2, M3, M5) ≈ 11–15 ч GPU; **VM-B** = «длинные горизонты» (M1 AR-28, M4) ≈ 9–13 ч GPU. Зависимостей между VM нет.
+33f-линия (сборка 33f-merge → обучение `multires_krsk_33f` → инференсы → сравнение v2/v3) — на отдельной VM, см. конец файла.
 
 Всё через MLC CLI. Длинные команды — ТОЛЬКО в tmux (mlc exec рвёт длинные bash -c).
 `--oi-corr-len` В МЕТРАХ (100 км = 100000). Residual: `multires_merge_freeze6_v2` — БЕЗ `--no-residual`; `multires_nores_*` — С `--no-residual` (иначе AR взрывается).
@@ -147,4 +160,31 @@ cd ~/Developer/graphcast-lite/vm_backup/paper_results && tar xzf paper_logs.tgz
 mlc job exec $VM -- tmux list-sessions
 mlc job exec $VM -- bash -lc 'tail -5 /data/paper_results/*.log | head -60'
 mlc job exec $VM -- nvidia-smi --query-gpu=memory.used,utilization.gpu --format=csv
+```
+
+---
+
+## Этап 7. 33f-линия Красноярска (отдельная VM, `SLIM_AFTER_MERGE=1`)
+
+Цель: усилить работу реальными уровнями @250/@1000 гПа + сравнить 19f vs 33f и глобальные v2 vs v3.
+
+```bash
+export VM33=<имя-vm>
+
+# 7.0. P0 со slim (после сборки merge удалит глобальный 82 ГБ)
+mlc job exec $VM33 -- bash -lc 'cd /workdir/graphcast-lite && SLIM_AFTER_MERGE=1 nohup setsid bash scripts/_paper_setup_vm.sh </dev/null >/dev/null 2>&1 & echo launched'
+
+# 7.1. Сборка 33f-merge: 19 базовых + 10 plev (в ROI — РЕАЛЬНЫЕ 0.25°, вне — билинейные) + 4 time
+#      ~60 ГБ, часы CPU. Скрипт сам обрежет global_extra (2010-2021) до окна merge (2010-2020).
+mlc job exec $VM33 -- tmux new-session -d -s b33 'cd /workdir/graphcast-lite && source /data/venvs/graphcast/bin/activate && python scripts/build_multires_russia_33f.py --multires-dir /data/datasets/multires_krsk_19f_merge --extra-dir /data/datasets/global_512x256_extra_2010-2021_07deg --region-extra-dir /data/datasets/region_krsk_61x41_extra_2010-2020_025deg --out-dir /data/datasets/multires_krsk_33f > /data/paper_results/build33f.log 2>&1'
+
+# 7.2. Обучение (финетюн от глобальной v3, схема как в дипломной 19f-линии: max_ar=4, 32 эпохи, freeze6)
+#      ~36-42 ч H100
+mlc job exec $VM33 -- tmux new-session -d -s t33 'cd /workdir/graphcast-lite && source /data/venvs/graphcast/bin/activate && python -u -m src.main experiments/multires_krsk_33f --pretrained experiments/wb2_512x256_33f_ar_v3/best_model.pth > /data/paper_results/train33f.log 2>&1'
+
+# 7.3. Сравнение глобальных v2 vs v3 (после сборки 33f-extra для глобального датасета — отдельный шаг,
+#      скрипт scripts/build_v3_extra_with_time.py; команды добавлю после проверки места на диске)
+
+# 7.4. Бонус: Russia-33f на ROI Красноярска (чекпойнт есть, датасет России нужен — восстановится из S3)
+#      ⚠️ сначала проверить, не входил ли 2020 в train Russia-модели (иначе сравнение нечестное)
 ```
