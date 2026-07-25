@@ -81,23 +81,49 @@ else
   echo "[2/4] global already extracted"
 fi
 
-# ----- 3. extract Krsk regional 0.25 (tar/tar.gz) -----
+# ----- 3. extract Krsk regional (19f + extra) из paper-архива -----
+# paper_krsk_datasets.tar.zst содержит обе папки:
+#   region_krsk_61x41_19f_2010-2020_025deg/  (19 каналов, для merge)
+#   region_krsk_61x41_extra_2010-2020_025deg/ (10 каналов @250/@1000, для 33f)
 if [[ ! -f "$KRSK_DIR/data.npy" ]]; then
-  echo "[3/4 $(date +%H:%M:%S)] extracting Krsk regional"
-  mkdir -p "$KRSK_DIR"
-  ARC=$(ls "$DATA"/region_krsk_61x41*.tar.gz "$DATA"/region_krsk_61x41*.tar "$KRSK_DIR"/region_krsk_61x41*.tar* 2>/dev/null | head -1)
-  [[ -z "$ARC" ]] && { echo "[3/4] ERROR: архив Krsk 61x41 не найден"; ls -la "$DATA"; exit 3; }
-  tar -xf "$ARC" -C "$KRSK_DIR" --strip-components=1 2>/dev/null || tar -xf "$ARC" -C "$KRSK_DIR"
-  find "$KRSK_DIR" -name "._*" -delete 2>/dev/null || true
-  found=$(find "$KRSK_DIR" -maxdepth 4 -name data.npy -type f | head -1)
-  if [[ -n "$found" && "$(dirname "$found")" != "$KRSK_DIR" ]]; then
-    mv "$(dirname "$found")"/* "$KRSK_DIR"/ 2>/dev/null || true
-    find "$KRSK_DIR" -mindepth 1 -type d -empty -delete 2>/dev/null || true
+  echo "[3/4 $(date +%H:%M:%S)] extracting Krsk datasets from paper archive"
+  PAPER_ARC=$(ls "$DATA"/paper_krsk_datasets.tar.zst 2>/dev/null | head -1)
+  if [[ -n "$PAPER_ARC" ]]; then
+    command -v zstd >/dev/null 2>&1 || { apt-get install -y -q zstd >/dev/null 2>&1 || true; }
+    tar --use-compress-program=unzstd -xf "$PAPER_ARC" -C "$DATA"
+    find "$DATA/region_krsk_61x41_19f_2010-2020_025deg" "$DATA/region_krsk_61x41_extra_2010-2020_025deg" \
+         -name "._*" -delete 2>/dev/null || true
+  else
+    # fallback: отдельный tar/tar.gz регионального 19f
+    mkdir -p "$KRSK_DIR"
+    ARC=$(ls "$DATA"/region_krsk_61x41*.tar.gz "$DATA"/region_krsk_61x41*.tar 2>/dev/null | head -1)
+    [[ -z "$ARC" ]] && { echo "[3/4] ERROR: ни paper_krsk_datasets.tar.zst, ни архив Krsk 61x41 не найдены"; ls -la "$DATA"; exit 3; }
+    tar -xf "$ARC" -C "$KRSK_DIR" --strip-components=1 2>/dev/null || tar -xf "$ARC" -C "$KRSK_DIR"
+    found=$(find "$KRSK_DIR" -maxdepth 4 -name data.npy -type f | head -1)
+    if [[ -n "$found" && "$(dirname "$found")" != "$KRSK_DIR" ]]; then
+      mv "$(dirname "$found")"/* "$KRSK_DIR"/ 2>/dev/null || true
+    fi
   fi
-  [[ -f "$KRSK_DIR/data.npy" ]] || { echo "[3/4] ERROR: data.npy не найден после распаковки"; exit 3; }
-  echo "[3/4] Krsk regional extracted"
+  [[ -f "$KRSK_DIR/data.npy" ]] || { echo "[3/4] ERROR: $KRSK_DIR/data.npy не найден после распаковки"; ls -la "$DATA" | head -20; exit 3; }
+  echo "[3/4] Krsk datasets extracted: 19f=$(du -sh "$KRSK_DIR" | cut -f1), extra=$(du -sh "$DATA/region_krsk_61x41_extra_2010-2020_025deg" 2>/dev/null | cut -f1)"
 else
   echo "[3/4] Krsk regional already extracted"
+fi
+
+# ----- 3b. распаковка чекпойнтов в репозиторий -----
+if [[ ! -f "$REPO/experiments/multires_merge_freeze6_v2/best_model.pth" ]]; then
+  CKPT_ARC=$(ls "$DATA"/paper_ckpts.tar.zst 2>/dev/null | head -1)
+  if [[ -n "$CKPT_ARC" ]]; then
+    echo "[3b $(date +%H:%M:%S)] extracting checkpoints -> $REPO"
+    tar --use-compress-program=unzstd -xf "$CKPT_ARC" -C "$REPO"
+    find "$REPO/experiments" -name "._*" -delete 2>/dev/null || true
+    echo "[3b] checkpoints:"
+    find "$REPO/experiments" -name "*.pth" -newermt "-2 hours" -printf "     %s  %p\n" 2>/dev/null | head -10
+  else
+    echo "[3b] WARN: paper_ckpts.tar.zst не найден — инференс не запустится без чекпойнтов"
+  fi
+else
+  echo "[3b] checkpoints already present"
 fi
 
 # ----- 4. build merge dataset (ROI Красноярск 50-60N 83-98E) -----
