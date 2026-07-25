@@ -12,6 +12,12 @@ trap 'echo "[ERR $(date +%H:%M:%S)] failure at line $LINENO ($BASH_COMMAND)"' ER
 echo "============================================================"
 echo "[start $(date)] paper P0 setup"
 echo "============================================================"
+# ЛИМИТ ДИСКА: платформа убивает job при ~240+ ГБ на локальном диске
+# (reason=MLCoreBigNodeDiskUsage). Бюджет: глобальный 82 ГБ + merge 81 ГБ +
+# Krsk 2.3 ГБ ≈ 165 ГБ. Всё лишнее в /data/datasets удаляем — восстановится из S3.
+# Для 33f-линии дополнительно нужны global_extra (43 ГБ) и multires_krsk_33f (~60 ГБ):
+# на такой VM ПОСЛЕ сборки merge удалить wb2_512x256_19f_ar (SLIM_AFTER_MERGE=1).
+echo "[disk] /data занято: $(du -sh /data/datasets 2>/dev/null | cut -f1) (лимит платформы ~240 ГБ)"
 
 REPO=/workdir/graphcast-lite
 VENV=/data/venvs/graphcast
@@ -76,7 +82,10 @@ if [[ ! -f "$BASE_DIR/data.npy" ]]; then
     find "$BASE_DIR" -mindepth 1 -type d -empty -delete 2>/dev/null || true
   fi
   [[ -f "$BASE_DIR/data.npy" ]] || { echo "[2/4] ERROR: data.npy не найден после распаковки"; exit 2; }
-  echo "[2/4] global extracted (архив НЕ удаляю — место есть)"
+  # ВАЖНО: архив (~74 ГБ) удаляем сразу — платформа убивает job при >~240 ГБ
+  # локального диска (reason=MLCoreBigNodeDiskUsage). Восстановится из S3 при перезапуске.
+  rm -f "$ARC"
+  echo "[2/4] global extracted; архив удалён ($(du -sh "$BASE_DIR" | cut -f1) в $BASE_DIR)"
 else
   echo "[2/4] global already extracted"
 fi
@@ -105,6 +114,7 @@ if [[ ! -f "$KRSK_DIR/data.npy" ]]; then
     fi
   fi
   [[ -f "$KRSK_DIR/data.npy" ]] || { echo "[3/4] ERROR: $KRSK_DIR/data.npy не найден после распаковки"; ls -la "$DATA" | head -20; exit 3; }
+  rm -f "$PAPER_ARC" 2>/dev/null || true
   echo "[3/4] Krsk datasets extracted: 19f=$(du -sh "$KRSK_DIR" | cut -f1), extra=$(du -sh "$DATA/region_krsk_61x41_extra_2010-2020_025deg" 2>/dev/null | cut -f1)"
 else
   echo "[3/4] Krsk regional already extracted"
@@ -117,6 +127,7 @@ if [[ ! -f "$REPO/experiments/multires_merge_freeze6_v2/best_model.pth" ]]; then
     echo "[3b $(date +%H:%M:%S)] extracting checkpoints -> $REPO"
     tar --use-compress-program=unzstd -xf "$CKPT_ARC" -C "$REPO"
     find "$REPO/experiments" -name "._*" -delete 2>/dev/null || true
+    rm -f "$CKPT_ARC" 2>/dev/null || true
     echo "[3b] checkpoints:"
     find "$REPO/experiments" -name "*.pth" -newermt "-2 hours" -printf "     %s  %p\n" 2>/dev/null | head -10
   else
@@ -140,6 +151,17 @@ if [[ ! -f "$MERGE_DIR/data.npy" ]]; then
 else
   echo "[4/4] merge already present"
 fi
+
+# ----- 5. (опция) slim: освободить глобальный датасет после сборки merge -----
+# Нужно на VM, где дополнительно собирается 33f (global_extra 43 ГБ + 33f 60 ГБ).
+# Внимание: wb2_512x256_19f_ar требуется для эксперимента M4 (глобальный инференс v2),
+# поэтому на VM линии статьи SLIM_AFTER_MERGE НЕ включать.
+if [[ "${SLIM_AFTER_MERGE:-0}" == "1" && -f "$MERGE_DIR/data.npy" ]]; then
+  echo "[5] SLIM: удаляю $BASE_DIR (глобальный 19f больше не нужен, merge собран)"
+  rm -rf "$BASE_DIR"
+  echo "[5] /data теперь: $(du -sh "$DATA" 2>/dev/null | cut -f1)"
+fi
+echo "[disk] итог: $(du -sh /data/datasets 2>/dev/null | cut -f1)"
 
 echo "============================================================"
 echo "[done $(date)] P0 complete. Чекпойнты моделей переносит пользователь:"
