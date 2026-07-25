@@ -162,6 +162,9 @@ def main():
     ap.add_argument("--oi-corr-len", type=float, default=10000.0)
     ap.add_argument("--oi-first-k", type=int, default=None,
                     help="Применять ОИ только на первых K AR-шагах (default: на всех)")
+    ap.add_argument("--save-sample-metrics", type=str, default=None,
+                    help="Путь к .npz для per-sample MSE (для бутстреп-ДИ). Компактно (~1 МБ), "
+                         "в отличие от --save, который пишет полные поля (десятки ГБ)")
     ap.add_argument("--boundary-blending", action="store_true")
     ap.add_argument("--background-path", type=str, default=None)
     ap.add_argument("--taper-width", type=int, default=5)
@@ -442,6 +445,20 @@ def main():
     if no_loss_ch:
         print(f"[metrics] Исключены из aggregate метрик: каналы {no_loss_ch} (static+forcing)")
 
+    # --- per-sample метрики (для бутстреп-ДИ): компактные MSE по сэмплам ---
+    sample_metrics = None
+    if args.save_sample_metrics:
+        _n_samples = len(test_ds)
+        sample_metrics = {
+            "mse_pred_global": np.zeros((_n_samples, AR_STEPS, C), dtype=np.float64),
+            "mse_base_global": np.zeros((_n_samples, AR_STEPS, C), dtype=np.float64),
+            "t_offset": np.full(_n_samples, -1, dtype=np.int64),
+        }
+        if region_idxs is not None:
+            sample_metrics["mse_pred_region"] = np.zeros((_n_samples, AR_STEPS, C), dtype=np.float64)
+            sample_metrics["mse_base_region"] = np.zeros((_n_samples, AR_STEPS, C), dtype=np.float64)
+        print(f"[metrics] per-sample MSE будут сохранены в {args.save_sample_metrics}")
+
     # --- accumulate predictions (if --save) ---
     save_preds_list = [] if (args.save and not args.no_save) else None
     save_gt_list = [] if (args.save and not args.no_save) else None
@@ -637,6 +654,22 @@ def main():
                         sm_pred_rh[p].update(y_cpu[region_idxs][:, sl], out_cpu[region_idxs][:, sl])
                         sm_base_rh[p].update(y_cpu[region_idxs][:, sl], bl_cpu[region_idxs][:, sl])
 
+            # --- per-sample метрики для бутстрепа доверительных интервалов ---
+            # Компактно (~1 МБ на прогон) в отличие от --save (десятки ГБ полей).
+            if sample_metrics is not None:
+                for p in range(effective_P):
+                    sl = slice(p * C, (p + 1) * C)
+                    se_g = (out_cpu[:, sl] - y_cpu[:, sl]).pow(2).mean(dim=0)   # [C]
+                    sb_g = (bl_cpu[:, sl] - y_cpu[:, sl]).pow(2).mean(dim=0)
+                    sample_metrics["mse_pred_global"][i, p, :] = se_g.numpy()
+                    sample_metrics["mse_base_global"][i, p, :] = sb_g.numpy()
+                    if region_idxs is not None:
+                        yr, orr, br = y_cpu[region_idxs], out_cpu[region_idxs], bl_cpu[region_idxs]
+                        sample_metrics["mse_pred_region"][i, p, :] = (orr[:, sl] - yr[:, sl]).pow(2).mean(dim=0).numpy()
+                        sample_metrics["mse_base_region"][i, p, :] = (br[:, sl] - yr[:, sl]).pow(2).mean(dim=0).numpy()
+                if hasattr(test_ds, "_sample_indices") and i < len(test_ds._sample_indices):
+                    sample_metrics["t_offset"][i] = test_ds._sample_indices[i][1]
+
             # --- save raw predictions ---
             if save_preds_list is not None:
                 save_preds_list.append(out_cpu.clone())
@@ -668,6 +701,25 @@ def main():
         }
         torch.save(save_dict, save_path)
         print(f"\n[Save] predictions → {save_path} (pred={preds_tensor.shape}, gt={gt_tensor.shape})")
+
+    # --- persist per-sample metrics (bootstrap CI) ---
+    if sample_metrics is not None:
+        n_done = sm_pred.n
+        dump = {k: (v[:n_done] if getattr(v, "ndim", 0) >= 1 else v)
+                for k, v in sample_metrics.items()}
+        dump["n_samples"] = np.array(n_done)
+        dump["ar_steps"] = np.array(AR_STEPS)
+        dump["variables"] = np.array(
+            json.loads((Path(data_dir) / "variables.json").read_text())
+            if (Path(data_dir) / "variables.json").exists() else [f"ch{c}" for c in range(C)],
+            dtype=object)
+        scl_p = Path(data_dir) / "scalers.npz"
+        if scl_p.exists():
+            dump["std"] = np.load(scl_p)["std"].astype(np.float64)[:C]
+        if region_idxs is not None:
+            dump["n_region_nodes"] = np.array(len(region_idxs))
+        np.savez_compressed(args.save_sample_metrics, **dump)
+        print(f"[Save] per-sample metrics → {args.save_sample_metrics} (N={n_done}, AR={AR_STEPS}, C={C})")
 
     # === RESULTS ===
     N = sm_pred.n
