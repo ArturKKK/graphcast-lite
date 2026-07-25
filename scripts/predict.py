@@ -793,15 +793,9 @@ def main():
                 scl_r = np.load(scalers_path_r)
                 std_r = scl_r["std"].astype(np.float64)[:C]
 
-            UNITS_R = {
-                "t2m": "K", "10u": "m/s", "10v": "m/s", "msl": "Pa",
-                "tp": "m", "sp": "Pa", "tcwv": "kg/m²",
-                "z_surf": "m²/s²", "lsm": "-",
-                "t@850": "K", "u@850": "m/s", "v@850": "m/s",
-                "z@850": "m²/s²", "q@850": "kg/kg",
-                "t@500": "K", "u@500": "m/s", "v@500": "m/s",
-                "z@500": "m²/s²", "q@500": "kg/kg",
-            }
+            # Единицы после конверсий на этапе сборки датасета: msl/sp — гПа,
+            # z-каналы — геопотенциальные метры (уже поделены на g). См. UNITS выше.
+            UNITS_R = dict(UNITS)
 
             # Per-horizon per-channel region table
             if AR_STEPS > 1 and sm_pred_rh and std_r is not None:
@@ -821,7 +815,8 @@ def main():
                     for p in range(len(sm_pred_rh)):
                         phys_rmse = sm_pred_rh[p].rmse_per_channel[c] * std_r[c]
                         if "z@" in name or name == "z_surf":
-                            row += f" {phys_rmse/9.81:8.1f}m"
+                            # уже в гп-метрах
+                            row += f" {phys_rmse:8.1f}"
                         elif name == "t2m" or name.startswith("t@"):
                             row += f" {phys_rmse:7.2f}°C"
                         else:
@@ -838,9 +833,7 @@ def main():
                     unit = UNITS_R.get(name, "?")
                     phys_rmse = rmse_pc_r[c] * std_r[c]
                     extra = ""
-                    if "z@" in name or name == "z_surf":
-                        extra = f"  (≈{phys_rmse/9.81:.1f} gpm)"
-                    elif name == "t2m" or name.startswith("t@"):
+                    if name == "t2m" or name.startswith("t@"):
                         extra = f"  (≈{phys_rmse:.2f} °C)"
                     print(f"    {c:3d} {name:>10s} {acc_pc_r[c]:8.4f} {rmse_pc_r[c]:10.4f} {phys_rmse:12.4f} {unit:>8s}{extra}")
 
