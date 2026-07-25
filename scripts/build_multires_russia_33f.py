@@ -178,10 +178,18 @@ def main():
     ext_time_start = ext_info["time_start"]
     print(f"[INFO] extra: T={T_ext}, lon={n_lon_ext}, lat={n_lat_ext}, time_start={ext_time_start}")
 
-    # Время должно совпадать (multires Russia собран из тех же 2010-2021 что и extra)
+    # Время: multires — источник истины. Если extra покрывает более длинный период
+    # (напр. глобальный extra 2010-2021 против Krsk-merge 2010-2020), берём первые T
+    # шагов — допустимо только при совпадающем time_start.
     if time_start != ext_time_start:
         print(f"[WARN] time_start mismatch multires={time_start} extra={ext_time_start}")
-    assert T == T_ext, f"T mismatch multires={T} extra={T_ext} — времена должны совпадать"
+    if T_ext != T:
+        assert time_start == ext_time_start, (
+            f"T mismatch (multires={T}, extra={T_ext}) при разных time_start "
+            f"({time_start} vs {ext_time_start}) — обрезка небезопасна")
+        assert T_ext > T, f"extra короче multires: T={T} > T_ext={T_ext}"
+        print(f"[INFO] extra длиннее ({T_ext} > {T}) → используем первые {T} шагов "
+              f"(time_start совпадает: {time_start})")
 
     ext_coords = np.load(extra / "coords.npz")
     g_lats = ext_coords["latitude"].astype(np.float64)
@@ -224,7 +232,11 @@ def main():
         print(f"[INFO] region-extra: T={T_rex}, lon={n_lon_rex}, lat={n_lat_rex}, time_start={rex_time_start}")
         if rex_time_start and rex_time_start != time_start:
             print(f"[WARN] region-extra time_start mismatch {rex_time_start} vs multires {time_start}")
-        assert T_rex == T, f"region-extra T mismatch: T={T_rex} vs multires T={T}"
+        if T_rex != T:
+            assert not rex_time_start or rex_time_start == time_start, (
+                f"region-extra T mismatch ({T_rex} vs {T}) при разных time_start — обрезка небезопасна")
+            assert T_rex > T, f"region-extra короче multires: T={T} > T_rex={T_rex}"
+            print(f"[INFO] region-extra длиннее ({T_rex} > {T}) → используем первые {T} шагов")
 
         rex_coords = np.load(rex / "coords.npz")
         rg_lats = rex_coords["latitude"].astype(np.float64)
