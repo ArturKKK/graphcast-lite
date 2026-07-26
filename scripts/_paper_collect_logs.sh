@@ -2,13 +2,13 @@
 # Собирает ВСЕ логи расчётов статьи + манифест провенанса в один архив.
 # Манифест отвечает на вопросы «что запускали, на каком коммите, какими весами».
 # Запуск на VM: bash scripts/_paper_collect_logs.sh [имя-архива]
-# Результат:    /data/paper_logs_<host>_<дата>.tar.zst  (забирается через base64)
+# Результат:    /workdir/paper_logs_<host>_<дата>.tar.zst  (забирается через base64)
 set -uo pipefail
 REPO=/workdir/graphcast-lite
-OUT=/data/paper_results
+OUT=/workdir/paper_results
 HOST=$(hostname | sed 's/.*graphcast/graphcast/;s/-task-0//')
 STAMP=$(date +%Y%m%d_%H%M)
-ARC="${1:-/data/paper_logs_${HOST}_${STAMP}.tar.zst}"
+ARC="${1:-/workdir/paper_logs_${HOST}_${STAMP}.tar.zst}"
 MAN="$OUT/MANIFEST.md"
 
 cd "$REPO"

@@ -3,12 +3,12 @@
 # Последовательно (одна GPU): флагман → freeze6 → nofreeze, ROI + внутренняя зона,
 # затем M3 (контроль равных эпох ep16 из checkpoint.pth).
 # Запуск: nohup setsid bash scripts/_paper_run_m2.sh </dev/null >/dev/null 2>&1 &
-# Лог:    /data/paper_results/m2_master.log
+# Лог:    /workdir/paper_results/m2_master.log
 set -uo pipefail
 REPO=/workdir/graphcast-lite
 VENV=/data/venvs/graphcast
 DATA=/data/datasets/multires_krsk_19f_merge
-OUT=/data/paper_results
+OUT=/workdir/paper_results
 ROI="50 60 83 98"          # ROI Красноярска (как в дипломе)
 INNER="55.5 56.5 92 94"    # внутренняя зона (город)
 NMAX=2000                  # > размера test_only → берётся весь сплит
@@ -81,7 +81,7 @@ run m2_nofreeze_inner multires_nores_nofreeze   --no-residual  --region $INNER
 log "=== M3: распаковка model_state_dict из checkpoint.pth ==="
 python - <<'PY'
 import torch, pathlib
-out = pathlib.Path("/data/paper_results")
+out = pathlib.Path("/workdir/paper_results")
 for exp in ["multires_nores_freeze6", "multires_nores_nofreeze"]:
     p = pathlib.Path(f"/workdir/graphcast-lite/experiments/{exp}/checkpoint.pth")
     if not p.exists():

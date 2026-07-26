@@ -4,12 +4,12 @@
 # из глобального extra. Схема обучения совпадает с дипломной 19f (max_ar=4, 32 эпохи, freeze6),
 # чтобы сравнение 19f vs 33f отличалось только набором каналов.
 # Запуск: nohup setsid bash scripts/_paper_run_33f.sh </dev/null >/dev/null 2>&1 &
-# Лог:    /data/paper_results/m33_master.log
+# Лог:    /workdir/paper_results/m33_master.log
 set -uo pipefail
 REPO=/workdir/graphcast-lite
 VENV=/data/venvs/graphcast
 DATA=/data/datasets
-OUT=/data/paper_results
+OUT=/workdir/paper_results
 MERGE=$DATA/multires_krsk_19f_merge
 GEXTRA=$DATA/global_512x256_extra_2010-2021_07deg
 REXTRA=$DATA/region_krsk_61x41_extra_2010-2020_025deg

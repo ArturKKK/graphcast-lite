@@ -2,10 +2,10 @@
 # P0 для статьи: подготовка VM (venv + датасеты + merge) БЕЗ обучения.
 # Одинаков для обеих VM (A — «ядро AR-4», B — «AR-28 + абляции»).
 # Запуск на VM:  setsid nohup bash scripts/_paper_setup_vm.sh </dev/null >/dev/null 2>&1 &
-# Лог:           /data/logs/paper_setup.log
+# Лог:           /workdir/paper_logs/paper_setup.log
 set -uo pipefail
-LOG=/data/logs/paper_setup.log
-mkdir -p /data/logs /data/venvs /data/datasets /data/paper_results
+LOG=/workdir/paper_logs/paper_setup.log
+mkdir -p /workdir/paper_logs /data/venvs /data/datasets /workdir/paper_results
 exec >>"$LOG" 2>&1
 trap 'echo "[ERR $(date +%H:%M:%S)] failure at line $LINENO ($BASH_COMMAND)"' ERR
 

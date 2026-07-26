@@ -4,12 +4,12 @@
 # M5: честный протокол ОИ — подбор (L, sigma_o) на VAL, отчёт на TEST, 3 сида наблюдений,
 #     плюс нуджинг для сравнения. Везде --save-sample-metrics для бутстреп-ДИ.
 # Запуск: nohup setsid bash scripts/_paper_run_m1m5.sh </dev/null >/dev/null 2>&1 &
-# Лог:    /data/paper_results/m1m5_master.log
+# Лог:    /workdir/paper_results/m1m5_master.log
 set -uo pipefail
 REPO=/workdir/graphcast-lite
 VENV=/data/venvs/graphcast
 DATA=/data/datasets/multires_krsk_19f_merge
-OUT=/data/paper_results
+OUT=/workdir/paper_results
 ROI="50 60 83 98"
 FLAG=multires_merge_freeze6_v2      # флагман (residual → без --no-residual)
 DIPL=multires_nores_freeze6         # дипломная (no-residual)
