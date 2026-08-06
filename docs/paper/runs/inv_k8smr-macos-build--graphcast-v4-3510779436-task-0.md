@@ -1,18 +1,17 @@
-# k8smr-macos-build--graphcast-v4-3510779436-task-0  —  2026-08-06T11:01:48+00:00
+# k8smr-macos-build--graphcast-v4-3510779436-task-0  —  2026-08-06T11:09:33+00:00
 
 ## Железо и диски
 ```
 NVIDIA H100 80GB HBM3, 81559 MiB
 Filesystem                                                                                        Size  Used Avail Use% Mounted on
-a802a1-ml-m5-vs0.storage.tcsbank.ru:/jupyter_persistent_storage_m5_sm12/macos-build-infra/452042  1.0T  498G  527G  49% /workdir
+a802a1-ml-m5-vs0.storage.tcsbank.ru:/jupyter_persistent_storage_m5_sm12/macos-build-infra/452042  1.0T  502G  523G  49% /workdir
 overlay                                                                                           8.7T  5.4T  2.9T  65% /
 227G	/data/datasets
 ```
 
 ## Git
 ```
-290ea46 add v2 vs v3 global comparison runner (venv+unpack+build 33f dataset+both runs, disk-safe)
-?? experiments/multires_krsk_33f/training_log.txt
+2e47ec7 krsk 33f: лог обучения
 ?? experiments/wb2_512x256_33f_ar_v3/config.json.bak
 ```
 
