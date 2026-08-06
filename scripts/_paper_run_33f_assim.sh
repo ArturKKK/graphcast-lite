@@ -56,6 +56,14 @@ if [[ ! -f "$D33/data.npy" ]]; then
   for d in "$MERGE" "$GEXTRA" "$REXTRA"; do
     [[ -d "$d" ]] || { log "НЕТ ИСХОДНИКА: $d — сборка невозможна"; exit 1; }
   done
+  # Оси глобальной сетки сборщик берёт отсюда; их кладёт setup_vm, копируя из
+  # основного глобального датасета. Если тот удалён ради места — восстанавливаем
+  # оси из merge-сетки (её глобальные узлы образуют ту же решётку 512x256).
+  if [[ ! -f "$GEXTRA/coords.npz" ]]; then
+    log "в global_extra нет coords.npz — восстанавливаю из merge"
+    python -u scripts/fix_global_extra_coords.py --merge-dir "$MERGE" --extra-dir "$GEXTRA" >> "$OUT/a33_build.log" 2>&1 \
+      || { log "восстановить оси не удалось — см. a33_build.log"; exit 1; }
+  fi
   python -u scripts/build_multires_russia_33f.py \
       --multires-dir "$MERGE" --extra-dir "$GEXTRA" \
       --region-extra-dir "$REXTRA" --out-dir "$D33" \
