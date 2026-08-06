@@ -1,0 +1,107 @@
+### PROVENANCE ###############################################
+# tag: m4_interp_to_roi | started: 2026-08-06T12:03:59+00:00 | host: k8smr-macos-build--graphcast-v4-3510779436-task-0
+# git commit: 5e5758b | gpu: NVIDIA H100 80GB HBM3
+# COMMAND:
+#   python -u scripts/interpolate_to_region.py --predictions /data/paper_heavy/m4_global_preds.pt --global-data /data/datasets/wb2_512x256_19f_ar --region-data /data/datasets/region_krsk_61x41_19f_2010-2020_025deg --per-channel
+##############################################################
+
+Loaded 100 predictions: grid=512×256, C=19, P=4
+Global: 2010-01-01–2021-12-31  lon=[0.00..359.30]  lat=[-89.65..89.65]
+Region: 2010-01-01–2020-12-31  lon=[83.00..98.00]  lat=[50.00..60.00]  grid=61×41=2501
+Temporal offset: global starts 0 steps after regional
+Regional data loaded: (16072, 61, 41, 19)
+
+======================================================================
+Interpolating 100 global samples → 61×41 regional grid
+======================================================================
+
+Matched samples: 100/100
+
+  +06h: RMSE=1.205744 | base=0.488123 | skill=-147.02% | MAE=0.955491 | ACC=0.0866
+     0:      t2m  RMSE=0.8240 base=0.0563 skill=-1362.4% ACC=-0.1748
+     1:      10u  RMSE=1.3734 base=0.8567 skill=-60.3% ACC=0.1913
+     2:      10v  RMSE=1.5954 base=0.7167 skill=-122.6% ACC=-0.0559
+     3:      msl  RMSE=0.9732 base=0.0221 skill=-4297.2% ACC=-0.0182
+     4:       tp  RMSE=0.9284 base=0.8960 skill=-3.6% ACC=-0.0159
+     5:       sp  RMSE=0.6098 base=0.0067 skill=-8937.8% ACC=-0.1878
+     6:     tcwv  RMSE=0.5826 base=0.2552 skill=-128.3% ACC=-0.1531
+     7:   z_surf  RMSE=1.2385 base=0.0000 skill=-123849032071488.7% ACC=-0.1534
+     8:      lsm  RMSE=1.9178 base=0.0000 skill=-191781373773913.4% ACC=0.0242
+     9:    t@850  RMSE=1.0098 base=0.0440 skill=-2192.4% ACC=-0.0780
+    10:    u@850  RMSE=1.2969 base=0.5893 skill=-120.1% ACC=0.1156
+    11:    v@850  RMSE=1.6885 base=0.8797 skill=-91.9% ACC=-0.1335
+    12:    z@850  RMSE=0.9846 base=0.0468 skill=-2003.9% ACC=0.0281
+    13:    q@850  RMSE=0.5289 base=0.2612 skill=-102.5% ACC=-0.1267
+    14:    t@500  RMSE=1.2668 base=0.0387 skill=-3175.0% ACC=-0.1722
+    15:    u@500  RMSE=1.1216 base=0.5160 skill=-117.4% ACC=0.0006
+    16:    v@500  RMSE=1.8761 base=0.7787 skill=-140.9% ACC=-0.1368
+    17:    z@500  RMSE=0.9816 base=0.0168 skill=-5730.8% ACC=0.0023
+    18:    q@500  RMSE=0.7950 base=0.5831 skill=-36.4% ACC=-0.1179
+
+  +12h: RMSE=1.203542 | base=0.668290 | skill=-80.09% | MAE=0.953561 | ACC=0.0854
+     0:      t2m  RMSE=0.8251 base=0.0736 skill=-1021.5% ACC=-0.1782
+     1:      10u  RMSE=1.3795 base=1.2232 skill=-12.8% ACC=0.1798
+     2:      10v  RMSE=1.5932 base=1.0313 skill=-54.5% ACC=-0.0603
+     3:      msl  RMSE=0.9549 base=0.0386 skill=-2375.9% ACC=-0.0174
+     4:       tp  RMSE=0.9047 base=1.0166 skill=+11.0% ACC=-0.0158
+     5:       sp  RMSE=0.6073 base=0.0119 skill=-5018.5% ACC=-0.1865
+     6:     tcwv  RMSE=0.5847 base=0.3746 skill=-56.1% ACC=-0.1620
+     7:   z_surf  RMSE=1.2386 base=0.0000 skill=-123857983723738.6% ACC=-0.1519
+     8:      lsm  RMSE=1.9184 base=0.0000 skill=-191841474617506.1% ACC=0.0241
+     9:    t@850  RMSE=1.0161 base=0.0728 skill=-1295.7% ACC=-0.0818
+    10:    u@850  RMSE=1.2948 base=0.8465 skill=-53.0% ACC=0.1075
+    11:    v@850  RMSE=1.6689 base=1.2476 skill=-33.8% ACC=-0.1344
+    12:    z@850  RMSE=0.9745 base=0.0823 skill=-1084.4% ACC=0.0278
+    13:    q@850  RMSE=0.5291 base=0.3546 skill=-49.2% ACC=-0.1304
+    14:    t@500  RMSE=1.2718 base=0.0615 skill=-1968.6% ACC=-0.1718
+    15:    u@500  RMSE=1.1306 base=0.7184 skill=-57.4% ACC=-0.0064
+    16:    v@500  RMSE=1.8801 base=1.1291 skill=-66.5% ACC=-0.1291
+    17:    z@500  RMSE=0.9774 base=0.0298 skill=-3185.1% ACC=-0.0023
+    18:    q@500  RMSE=0.7964 base=0.7338 skill=-8.5% ACC=-0.1196
+
+  +18h: RMSE=1.199936 | base=0.755025 | skill=-58.93% | MAE=0.949803 | ACC=0.0856
+     0:      t2m  RMSE=0.8266 base=0.0762 skill=-984.2% ACC=-0.1840
+     1:      10u  RMSE=1.3811 base=1.3698 skill=-0.8% ACC=0.1602
+     2:      10v  RMSE=1.5855 base=1.1986 skill=-32.3% ACC=-0.0649
+     3:      msl  RMSE=0.9280 base=0.0496 skill=-1772.8% ACC=-0.0188
+     4:       tp  RMSE=0.9018 base=1.0728 skill=+15.9% ACC=-0.0090
+     5:       sp  RMSE=0.6034 base=0.0153 skill=-3855.8% ACC=-0.1849
+     6:     tcwv  RMSE=0.5860 base=0.4431 skill=-32.2% ACC=-0.1652
+     7:   z_surf  RMSE=1.2387 base=0.0000 skill=-123873389875810.4% ACC=-0.1511
+     8:      lsm  RMSE=1.9185 base=0.0000 skill=-191845121731469.4% ACC=0.0238
+     9:    t@850  RMSE=1.0224 base=0.0940 skill=-987.3% ACC=-0.0811
+    10:    u@850  RMSE=1.2905 base=0.9611 skill=-34.3% ACC=0.1028
+    11:    v@850  RMSE=1.6531 base=1.4271 skill=-15.8% ACC=-0.1294
+    12:    z@850  RMSE=0.9578 base=0.1056 skill=-807.3% ACC=0.0263
+    13:    q@850  RMSE=0.5286 base=0.4079 skill=-29.6% ACC=-0.1292
+    14:    t@500  RMSE=1.2764 base=0.0768 skill=-1562.7% ACC=-0.1756
+    15:    u@500  RMSE=1.1436 base=0.7997 skill=-43.0% ACC=-0.0134
+    16:    v@500  RMSE=1.8718 base=1.3162 skill=-42.2% ACC=-0.1245
+    17:    z@500  RMSE=0.9704 base=0.0395 skill=-2357.7% ACC=-0.0083
+    18:    q@500  RMSE=0.7957 base=0.7980 skill=+0.3% ACC=-0.1106
+
+  +24h: RMSE=1.195097 | base=0.784317 | skill=-52.37% | MAE=0.944549 | ACC=0.0868
+     0:      t2m  RMSE=0.8273 base=0.0719 skill=-1051.1% ACC=-0.1961
+     1:      10u  RMSE=1.3766 base=1.3481 skill=-2.1% ACC=0.1479
+     2:      10v  RMSE=1.5727 base=1.2607 skill=-24.8% ACC=-0.0619
+     3:      msl  RMSE=0.9012 base=0.0566 skill=-1491.1% ACC=-0.0202
+     4:       tp  RMSE=0.9052 base=1.0850 skill=+16.6% ACC=-0.0065
+     5:       sp  RMSE=0.6000 base=0.0174 skill=-3350.4% ACC=-0.1840
+     6:     tcwv  RMSE=0.5866 base=0.4872 skill=-20.4% ACC=-0.1650
+     7:   z_surf  RMSE=1.2387 base=0.0000 skill=-123867609614841.9% ACC=-0.1500
+     8:      lsm  RMSE=1.9185 base=0.0000 skill=-191849744587403.6% ACC=0.0237
+     9:    t@850  RMSE=1.0262 base=0.1116 skill=-820.0% ACC=-0.0860
+    10:    u@850  RMSE=1.2873 base=0.9933 skill=-29.6% ACC=0.0954
+    11:    v@850  RMSE=1.6420 base=1.4697 skill=-11.7% ACC=-0.1321
+    12:    z@850  RMSE=0.9398 base=0.1202 skill=-681.6% ACC=0.0233
+    13:    q@850  RMSE=0.5295 base=0.4419 skill=-19.8% ACC=-0.1318
+    14:    t@500  RMSE=1.2786 base=0.0870 skill=-1369.9% ACC=-0.1773
+    15:    u@500  RMSE=1.1503 base=0.8458 skill=-36.0% ACC=-0.0160
+    16:    v@500  RMSE=1.8597 base=1.4427 skill=-28.9% ACC=-0.1202
+    17:    z@500  RMSE=0.9618 base=0.0473 skill=-1935.2% ACC=-0.0154
+    18:    q@500  RMSE=0.7883 base=0.8261 skill=+4.6% ACC=-0.0950
+
+======================================================================
+Overall (100×4 horizons × 2501 nodes × 19 ch):
+  RMSE=1.201086 | base=0.683757 | skill=-75.66% | ACC=0.0861
+======================================================================
