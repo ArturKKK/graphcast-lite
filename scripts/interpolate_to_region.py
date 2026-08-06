@@ -128,6 +128,7 @@ def main():
 
     # ── global grid ──────────────────────────────────────────────────
     g_lats, g_lons = load_coords(global_dir)
+    g_mean, g_std  = load_scalers(global_dir)   # нужны, чтобы снять глобальную нормировку
     g_info = load_dataset_info(global_dir)
     g_start = datetime.strptime(g_info["time_start"], "%Y-%m-%d")
     print(f"Global: {g_info['time_start']}–{g_info['time_end']}  "
@@ -194,6 +195,17 @@ def main():
                 field_2d = flat_to_2d(pred_flat[:, col], n_lon_g, n_lat_g)
                 interp_steps[p, :, :, c] = interpolate_field_2d(
                     field_2d, g_lons, g_lats, r_lons, r_lats)
+
+        # Приведение шкал. Предсказания приходят в нормировке ГЛОБАЛЬНОГО
+        # датасета, а истина ниже нормируется РЕГИОНАЛЬНЫМИ скейлерами: у одного
+        # и того же физического поля средние и разбросы по миру и по югу Сибири
+        # разные. Поэтому возвращаем предсказание в физические единицы
+        # глобальными скейлерами и заново нормируем региональными.
+        #
+        # Без этого шага каналы с большим смещением (температура, давление,
+        # геопотенциал, рельеф) давали огромную ошибку при корреляции 0.97,
+        # тогда как ветер с почти нулевым средним выглядел правдоподобно.
+        interp_steps = (interp_steps * g_std[:C] + g_mean[:C] - r_mean[:C]) / r_std[:C]
 
         gt_region   = r_norm[pred_start_r: pred_start_r + P, :, :, :C]
         base_region = r_norm[base_t_r, :, :, :C]
