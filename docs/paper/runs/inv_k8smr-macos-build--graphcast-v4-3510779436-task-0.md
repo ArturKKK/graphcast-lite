@@ -1,4 +1,4 @@
-# k8smr-macos-build--graphcast-v4-3510779436-task-0  —  2026-08-06T11:09:33+00:00
+# k8smr-macos-build--graphcast-v4-3510779436-task-0  —  2026-08-06T11:10:14+00:00
 
 ## Железо и диски
 ```
@@ -11,7 +11,7 @@ overlay                                                                         
 
 ## Git
 ```
-2e47ec7 krsk 33f: лог обучения
+dab3483 inventory k8smr-macos-build--graphcast-v4-3510779436-task-0
 ?? experiments/wb2_512x256_33f_ar_v3/config.json.bak
 ```
 
