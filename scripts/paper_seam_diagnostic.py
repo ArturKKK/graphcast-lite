@@ -16,11 +16,8 @@
 Отрицательный результат тоже публикуем: всплеск у границы означает, что
 формулировку надо смягчить до «контролируемый переходный слой».
 
-Запуск на VM (там лежат предсказания):
-    python3 scripts/paper_seam_diagnostic.py \
-        --predictions /data/paper_heavy/seam_flagship_preds.pt \
-        --data-dir /data/datasets/multires_krsk_19f_merge \
-        --out docs/paper/runs/vm4_seam
+Запуск на VM (пути по умолчанию уже указывают куда надо):
+    python3 scripts/paper_seam_diagnostic.py
 """
 import argparse
 import json
@@ -58,8 +55,8 @@ def dist_to_roi_edge_km(lat, lon):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--predictions", required=True)
-    ap.add_argument("--data-dir", required=True)
+    ap.add_argument("--predictions", default="/data/paper_heavy/seam_flagship_preds.pt")
+    ap.add_argument("--data-dir", default="/data/datasets/multires_krsk_19f_merge")
     ap.add_argument("--out", default="docs/paper/runs/vm4_seam")
     ap.add_argument("--var", default="t2m")
     a = ap.parse_args()
