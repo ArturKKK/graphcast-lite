@@ -23,7 +23,8 @@ set -uo pipefail
 
 REPO=/workdir/graphcast-lite
 VENV=/data/venvs/graphcast
-OUT=/workdir/paper_results
+OUT=/workdir/paper_results          # логи и метрики — лёгкое, сюда можно
+HEAVY=/data/paper_heavy             # тяжёлые .pt — ТОЛЬКО сюда (см. предупреждение ниже)
 GLOBAL=/data/datasets/wb2_512x256_19f_ar
 MERGE=/data/datasets/multires_krsk_19f_merge
 REGION=/data/datasets/region_krsk_61x41_19f_2010-2020_025deg
@@ -35,11 +36,14 @@ ROI="50 60 83 98"
 # Поэтому вся матрица M4 считается на подвыборке MAXN сроков (первые MAXN
 # сроков тестового окна, одни и те же для всех строк — сравнение остаётся
 # корректным). 200 сроков ≈ 16 ГБ, помещается с запасом.
-# Предсказания пишутся в /workdir (сетевой диск, 500+ ГБ свободно), а НЕ в /data,
-# где действует лимит платформы ~240 ГБ.
-MAXN=200
+# ⚠️ ДИСКИ: /workdir переживает перезапуск, но квота всего ~8 ГБ (df врёт про
+# терабайт!) — при превышении платформа ГАСИТ виртуалку. Поэтому тяжёлый .pt
+# идёт в /data, где места много, но всё стирается при рестарте и действует
+# лимит ~240 ГБ. В /workdir остаются только логи и .npz.
+# 100 сроков → .pt около 8 ГБ. Больше не ставить не подумав.
+MAXN=100
 
-mkdir -p "$OUT"
+mkdir -p "$OUT" "$HEAVY"
 MASTER="$OUT/m4_master.log"
 exec >>"$MASTER" 2>&1
 cd "$REPO" || exit 1
@@ -74,7 +78,7 @@ python -u scripts/predict.py experiments/wb2_512x256_19f_ar_v2 \
 
 # ---- 1. Глобальная v2 на полном тесте, с сохранением предсказаний ----
 TAG=m4_global_v2
-LF="$OUT/$TAG.log"; PRED="$OUT/m4_global_preds.pt"
+LF="$OUT/$TAG.log"; PRED="$HEAVY/m4_global_preds.pt"
 CMD="python -u scripts/predict.py experiments/wb2_512x256_19f_ar_v2 --data-dir $GLOBAL --split test_only --ar-steps 4 --max-samples $MAXN --per-channel --no-residual --save $PRED"
 header "$LF" "$TAG" "$CMD"
 log "START $TAG"
