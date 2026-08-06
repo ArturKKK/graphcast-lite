@@ -257,3 +257,6 @@ website/yandex_cache.json
 /data/temp_train/
 /data/isd_lite_russia/
 experiments/*/data/
+
+# Выгрузки диалогов с ассистентом — могут содержать токены и ключи из переписки
+docs/paper/dialog_*.md
