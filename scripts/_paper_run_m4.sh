@@ -29,6 +29,16 @@ MERGE=/data/datasets/multires_krsk_19f_merge
 REGION=/data/datasets/region_krsk_61x41_19f_2010-2020_025deg
 ROI="50 60 83 98"
 
+# ⚠️ ОГРАНИЧЕНИЕ ПАМЯТИ: predict.py --save копит предсказания И истину по всей
+# глобальной сетке 512x256 в оперативке до самого конца прогона. На полном тесте
+# это 1607 x 4 x 19 x 131072 x 4 байта x2 ≈ 128 ГБ — гарантированный OOM.
+# Поэтому вся матрица M4 считается на подвыборке MAXN сроков (первые MAXN
+# сроков тестового окна, одни и те же для всех строк — сравнение остаётся
+# корректным). 200 сроков ≈ 16 ГБ, помещается с запасом.
+# Предсказания пишутся в /workdir (сетевой диск, 500+ ГБ свободно), а НЕ в /data,
+# где действует лимит платформы ~240 ГБ.
+MAXN=200
+
 mkdir -p "$OUT"
 MASTER="$OUT/m4_master.log"
 exec >>"$MASTER" 2>&1
@@ -48,7 +58,9 @@ header() {  # header <logfile> <tag> <command>
   } > "$1"
 }
 
-log "=== M4 START (commit $GIT_COMMIT) ==="
+log "=== M4 START (commit $GIT_COMMIT), MAXN=$MAXN ==="
+log "диск /data: $(df -h /data | tail -1 | awk '{print $3" занято, "$4" свободно"}')"
+log "диск /workdir: $(df -h /workdir | tail -1 | awk '{print $4" свободно"}')"
 
 for d in "$GLOBAL" "$MERGE" "$REGION"; do
   [[ -d "$d" ]] || { log "НЕТ ДАТАСЕТА: $d — сначала scripts/_paper_setup_vm.sh"; exit 1; }
@@ -63,7 +75,7 @@ python -u scripts/predict.py experiments/wb2_512x256_19f_ar_v2 \
 # ---- 1. Глобальная v2 на полном тесте, с сохранением предсказаний ----
 TAG=m4_global_v2
 LF="$OUT/$TAG.log"; PRED="$OUT/m4_global_preds.pt"
-CMD="python -u scripts/predict.py experiments/wb2_512x256_19f_ar_v2 --data-dir $GLOBAL --split test_only --ar-steps 4 --max-samples 2000 --per-channel --no-residual --save $PRED"
+CMD="python -u scripts/predict.py experiments/wb2_512x256_19f_ar_v2 --data-dir $GLOBAL --split test_only --ar-steps 4 --max-samples $MAXN --per-channel --no-residual --save $PRED"
 header "$LF" "$TAG" "$CMD"
 log "START $TAG"
 eval "$CMD" >> "$LF" 2>&1
@@ -83,17 +95,19 @@ log "DONE  $TAG rc=$? | $(grep -oE 'skill=[-0-9.]+%' "$LF" | tail -1)"
 TAG=m4_regional_standalone
 LF="$OUT/$TAG.log"
 CKPT="experiments/region_krsk_cds_19f/best_model (18).pth"
-CMD="python -u scripts/predict.py experiments/region_krsk_cds_19f --ckpt \"$CKPT\" --data-dir $REGION --split test_only --ar-steps 4 --max-samples 2000 --per-channel --no-save --save-sample-metrics $OUT/${TAG}_samples.npz"
+CMD="python -u scripts/predict.py experiments/region_krsk_cds_19f --ckpt \"$CKPT\" --data-dir $REGION --split test_only --ar-steps 4 --max-samples $MAXN --per-channel --no-save --save-sample-metrics $OUT/${TAG}_samples.npz"
 header "$LF" "$TAG" "$CMD"
 log "START $TAG"
 eval "$CMD" >> "$LF" 2>&1
 log "DONE  $TAG rc=$? | $(grep -oE 'skill=[-0-9.]+%' "$LF" | tail -1)"
 
 # ---- 4. Флагман на том же окне — контроль, что окно совпало с прошлым прогоном ----
-# Ожидаем воспроизвести Skill 70.26 % и t2m 1.39/1.66/1.74/1.84.
+# На MAXN сроках числа будут отличаться от полнотестовых (Skill 70.26 %,
+# t2m 1.39/1.66/1.74/1.84) — это нормально, окно другое. Строка нужна как
+# внутренний эталон матрицы M4, все строки которой считаются на одних сроках.
 TAG=m4_multires_control
 LF="$OUT/$TAG.log"
-CMD="python -u scripts/predict.py experiments/multires_merge_freeze6_v2 --data-dir $MERGE --split test_only --ar-steps 4 --max-samples 2000 --per-channel --no-save --region $ROI"
+CMD="python -u scripts/predict.py experiments/multires_merge_freeze6_v2 --data-dir $MERGE --split test_only --ar-steps 4 --max-samples $MAXN --per-channel --no-save --region $ROI"
 header "$LF" "$TAG" "$CMD"
 log "START $TAG"
 eval "$CMD" >> "$LF" 2>&1
