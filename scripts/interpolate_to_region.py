@@ -55,10 +55,20 @@ def load_dataset_info(data_dir: Path):
 
 def flat_to_2d(flat, n_lon, n_lat):
     """
-    Dataloader flattens as lon-major: node k  →  lon_idx = k // n_lat,
-    lat_idx = k % n_lat.  Reshape (G,) → (n_lon, n_lat).
+    Разворачивает плоский вектор узлов в поле [lon, lat].
+
+    Даталоадер укладывает узлы LAT-major: в dataloader_chunked.py делается
+    transpose(2, 1, 0, 3) с последующим reshape, то есть широта — внешняя ось
+    (см. там же комментарий «порядок (lat, lon) должен совпадать с
+    np.meshgrid(lons, lats).reshape(-1)»). Значит node k → lat_idx = k // n_lon,
+    lon_idx = k % n_lon, и разворачивать надо в (n_lat, n_lon).
+
+    Прежняя версия предполагала обратное (lon-major) и возвращала
+    транспонированное поле. Симптом: статические каналы z_surf и lsm давали
+    ненулевую ошибку против самих себя, а пространственная корреляция падала
+    до нуля. Возвращаем [lon, lat] — в таком виде поле ждёт interpolate_field_2d.
     """
-    return flat.reshape(n_lon, n_lat)
+    return flat.reshape(n_lat, n_lon).T
 
 
 def interpolate_field_2d(field_2d, src_lons, src_lats, dst_lons, dst_lats):
@@ -230,6 +240,16 @@ def main():
                 ca = compute_acc(hg[:, :, :, c], hp[:, :, :, c])
                 print(f"    {c:2d}: {vars_[c]:>8s}  RMSE={cr:.4f} base={cb:.4f} "
                       f"skill={cs*100:+.1f}% ACC={ca:.4f}")
+
+                # Страховка от рассогласования развёртки узлов: z_surf и lsm —
+                # статические поля, инерционный прогноз воспроизводит их точно
+                # (base = 0). Если и у нас ошибка близка к нулю — сопоставление
+                # сеток корректно. Заметная ошибка означает, что поле пришло
+                # транспонированным или сдвинутым, и остальные числа бессмысленны.
+                if vars_[c] in ("z_surf", "lsm") and cr > 1e-3:
+                    print(f"        ⚠️  СТАТИЧЕСКИЙ канал {vars_[c]} даёт RMSE={cr:.4f} "
+                          f"при эталоне {cb:.4f} — развёртка узлов рассогласована, "
+                          f"метрикам этого прогона верить нельзя")
 
         all_pred.append(hp);  all_gt.append(hg);  all_base.append(hb)
 
