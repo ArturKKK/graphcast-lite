@@ -180,7 +180,22 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str,
     if pretrained_ckpt and os.path.exists(pretrained_ckpt):
         print(f"\n>>> Загружаю pretrained веса: {pretrained_ckpt}")
         state = torch.load(pretrained_ckpt, map_location=device)
-        # strict=False — пропустить буферы, чьи размеры не совпадут
+
+        # strict=False пропускает лишние и недостающие ключи, но НЕ спасает от
+        # несовпадения размеров — на этом падает загрузка при смене геометрии
+        # графа. Отбрасываем такие записи явно: это геометрические буферы
+        # (признаки рёбер, индексы), которые пересчитываются конструктором из
+        # самой сетки, а не обучаемые веса. Отбросить их безопасно, а вот
+        # молча уронить обучение — нет.
+        own = model.state_dict()
+        dropped = [k for k, v in state.items()
+                   if k in own and hasattr(v, "shape") and own[k].shape != v.shape]
+        if dropped:
+            print(f"  Отброшены записи с иным размером ({len(dropped)}): {dropped}")
+            print(f"  Это ожидаемо при смене mesh_levels — буферы геометрии "
+                  f"пересчитаны под новую сетку.")
+            state = {k: v for k, v in state.items() if k not in dropped}
+
         missing, unexpected = model.load_state_dict(state, strict=False)
         if missing:
             print(f"  Missing keys ({len(missing)}): {missing[:5]}...")
