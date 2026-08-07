@@ -466,6 +466,40 @@ def train(
         with open(log_path, "a") as f:
             f.write(msg + "\n")
     _log(f"=== Training started: {datetime.now().isoformat()} ===")
+
+    # Провенанс: без него через месяц невозможно понять, каким кодом и на каких
+    # данных обучена модель. Уже теряли эту связь для ранних версий.
+    def _provenance():
+        import hashlib
+        import json as _json
+        import subprocess
+        out = []
+        try:
+            head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=os.path.dirname(os.path.dirname(__file__)),
+                                  capture_output=True, text=True, timeout=10).stdout.strip()
+            dirty = subprocess.run(["git", "status", "--porcelain"], cwd=os.path.dirname(os.path.dirname(__file__)),
+                                   capture_output=True, text=True, timeout=10).stdout.strip()
+            out.append(f"commit: {head}{'  (есть незакоммиченные изменения!)' if dirty else ''}")
+        except Exception as e:
+            out.append(f"commit: не определён ({e})")
+        cfg = os.path.join(results_save_dir, "config.json")
+        if os.path.exists(cfg):
+            out.append(f"config md5: {hashlib.md5(open(cfg, 'rb').read()).hexdigest()}")
+        try:
+            ddir = getattr(config, "data_dir", None)
+            if ddir:
+                out.append(f"dataset: {ddir}")
+                info = os.path.join(str(ddir), "dataset_info.json")
+                if os.path.exists(info):
+                    j = _json.load(open(info))
+                    nodes = j.get("n_nodes") or f"{j.get('n_lon')}x{j.get('n_lat')}"
+                    out.append(f"  n_time={j.get('n_time')} n_feat={j.get('n_feat')} nodes={nodes}")
+        except Exception:
+            pass
+        return out
+
+    for line in _provenance():
+        _log(f"# {line}")
     _log(f"epochs={num_epochs}  max_ar={max_ar}  epochs_per_stage={epochs_per_stage}")
     if resume_checkpoint and os.path.exists(resume_checkpoint):
         _log(f">>> Resumed from epoch {start_epoch}, AR={ar_steps}, best_vl={best_val_loss:.5f}")
