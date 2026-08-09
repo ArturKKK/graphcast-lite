@@ -1,0 +1,111 @@
+{
+  "_comment": "ГЛОБАЛЬНАЯ v4: копия v3 с ЕДИНСТВЕННЫМ отличием — полный многоуровневый меш (mesh_levels 0..6 вместо [4, 6]). Обучение с нуля, без предобученных весов: именно это снимает проблему, из-за которой сорвалась региональная попытка — там процессор, обученный на рёбрах до 440 км, получал рёбра до 7000 км и стартовал с ошибкой 0.21 против 0.02. Здесь он с самого начала видит все масштабы. Всё остальное совпадает с v3 до параметра: сид 42, 80 эпох, max_ar=8, lr 3e-4, инъекция шума, веса каналов, остаточная формулировка, — чтобы разницу можно было отнести к мешу. Ожидание: выигрыш прежде всего на дальних горизонтах и на полях крупного масштаба (геопотенциал, давление), где важны дальние связи.",
+  "batch_size": 1,
+  "learning_rate": 0.0003,
+  "num_epochs": 80,
+  "early_stopping_patience": 15,
+  "early_stopping_delta": 1e-05,
+  "wandb_log": false,
+  "random_seed": 42,
+  "use_latitude_weighting": true,
+  "max_ar_steps": 8,
+  "use_residual": true,
+  "roi_only_loss": false,
+  "noise_sigma": 0.05,
+  "noise_apply_from_ar_step": 1,
+  "data_dir": "/data/datasets/wb2_512x256_33f_v3",
+  "freeze_processor_epochs": 0,
+  "finetune_processor_lr_factor": 1.0,
+  "static_channels": [
+    7,
+    8
+  ],
+  "forcing_channels": [
+    29,
+    30,
+    31,
+    32
+  ],
+  "channel_loss_weights": {
+    "0": 2.0,
+    "1": 1.5,
+    "2": 1.5,
+    "3": 2.0,
+    "4": 1.5,
+    "5": 0.1,
+    "17": 2.0,
+    "19": 1.2
+  },
+  "graph": {
+    "grid2mesh_edge_creation": "radius",
+    "mesh2grid_edge_creation": "contained",
+    "grid2mesh_radius_query": 0.6,
+    "mesh_levels": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ]
+  },
+  "pipeline": {
+    "encoder": {
+      "mlp": {
+        "mlp_hidden_dims": [
+          256,
+          256
+        ],
+        "output_dim": 256,
+        "use_layer_norm": true,
+        "layer_norm_mode": "node"
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [
+          256,
+          256
+        ],
+        "output_dim": 256,
+        "activation": "swish"
+      }
+    },
+    "processor": {
+      "gcn": {
+        "layer_type": "interaction_net",
+        "output_dim": 256,
+        "activation": "swish",
+        "use_layer_norm": true,
+        "num_message_passing_steps": 12,
+        "edge_feature_dim": 4
+      }
+    },
+    "decoder": {
+      "mlp": {
+        "mlp_hidden_dims": [
+          256,
+          128
+        ],
+        "output_dim": 128,
+        "use_layer_norm": false
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [
+          128,
+          128
+        ],
+        "output_dim": 33,
+        "activation": "swish"
+      }
+    }
+  },
+  "data": {
+    "dataset_name": "wb2_512x256_33f_v3",
+    "num_features_used": 33,
+    "obs_window_used": 2,
+    "pred_window_used": 8,
+    "want_feats_flattened": true
+  }
+}
