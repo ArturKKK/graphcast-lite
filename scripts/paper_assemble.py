@@ -27,7 +27,6 @@ SECTIONS_ORDER = [
     "03_model.md",
     "04_results.md",
     "05_assim.md",
-    "06_operational.md",
     "07_discussion.md",
 ]
 SERVICE_HEADINGS = ("Рисунки", "Таблицы", "Литература", "Замечания автору")
