@@ -34,11 +34,21 @@ mkdir -p "$OUT"
 MASTER="$OUT/v4_master.log"
 exec >>"$MASTER" 2>&1
 cd "$REPO" || exit 1
-source "$VENV/bin/activate" 2>/dev/null
-export PYTHONPATH="$REPO"
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
 
 log "=== V4 GLOBAL MULTIMESH START ==="
+
+# ── 0. Окружение и базовые датасеты ───────────────────────────────────
+# После перезапуска виртуалки /data стирается целиком: ни venv, ни датасетов.
+# Подготовку делает _paper_setup_vm.sh (venv + распаковка глобального и
+# красноярских датасетов + сборка merge), она же нужна и здесь.
+if [[ ! -x "$VENV/bin/python" || ! -d "$BASE" ]]; then
+  log "нет окружения или базового датасета — запускаю подготовку (1-2 ч)"
+  bash scripts/_paper_setup_vm.sh >> "$OUT/v4_setup.log" 2>&1
+  log "подготовка завершена rc=$?"
+fi
+source "$VENV/bin/activate" 2>/dev/null || { log "venv так и не поднялся — стоп"; exit 1; }
+export PYTHONPATH="$REPO"
 
 # ── 1. Освободить карту ───────────────────────────────────────────────
 if pgrep -f "src.main" > /dev/null; then
