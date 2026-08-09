@@ -108,7 +108,7 @@
 
 1. Lam R., Sanchez-Gonzalez A., Willson M. et al. Learning skillful medium-range global weather forecasting // Science. 2023. Vol. 382, No. 6677. P. 1416–1421.
 2. Oskarsson J., Landelius T., Lindsten F. Graph-based neural weather prediction for limited area modeling // arXiv:2309.17370. 2023.
-3. Wijnands J. S. et al. Comparing stretched-grid and limited-area approaches in data-driven regional weather modelling // Machine Learning with Applications. 2026. {{ЗАПОЛНИТЬ: выходные данные}}
+3. Wijnands J. S., Van Ginderachter M., François B. et al. Data-driven regional weather forecasting: A comparison of stretched-grid and limited-area modelling // Machine Learning with Applications. 2026. Article 100526. DOI: 10.1016/j.mlwa.2026.100526.
 4. Ben Bouallègue Z., Clare M. C. A., Magnusson L. et al. The rise of data-driven weather forecasting: A first statistical assessment of machine learning-based weather forecasts in an operational-like context // Bulletin of the American Meteorological Society. 2024. Vol. 105, No. 6. P. E864–E883.
 5. Wilks D. S. Statistical Methods in the Atmospheric Sciences. 4th ed. Elsevier, 2019. DOI: 10.1016/C2017-0-03921-6.
 

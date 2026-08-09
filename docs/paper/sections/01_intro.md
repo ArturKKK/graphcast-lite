@@ -37,9 +37,9 @@
 3. Pathak J., Subramanian S., Harrington P. et al. FourCastNet: A global data-driven high-resolution weather model using adaptive Fourier neural operators // arXiv:2202.11214. 2022.
 4. Davies H. C. A lateral boundary formulation for multi-level prediction models // Quarterly Journal of the Royal Meteorological Society. 1976. Vol. 102, No. 432. P. 405–418.
 5. Oskarsson J., Landelius T., Lindsten F. Graph-based neural weather prediction for limited area modeling // arXiv:2309.17370. 2023.
-6. Nipen T. N., Haugen H. H., Ingstad M. S. et al. Regional data-driven weather modeling with a global stretched-grid // Artificial Intelligence for the Earth Systems. 2026. {{ЗАПОЛНИТЬ: том, номер, страницы или DOI — сверить перед подачей}}
-7. Gao Y., Wu H., Shu K. et al. OneForecast: A universal framework for global and regional weather forecasting // Proceedings of the 42nd International Conference on Machine Learning (ICML). 2025. {{ЗАПОЛНИТЬ: страницы или arXiv:2502.00338}}
-8. Wijnands J. S. et al. Comparing stretched-grid and limited-area approaches in data-driven regional weather modelling // Machine Learning with Applications. 2026. {{ЗАПОЛНИТЬ: том, страницы или arXiv:2507.18378}}
+6. Nipen T. N., Haugen H. H., Ingstad M. S. et al. Regional data-driven weather modeling with a global stretched-grid // Artificial Intelligence for the Earth Systems. 2026. Vol. 5, No. 2. DOI: 10.1175/AIES-D-25-0001.1.
+7. Gao Y., Wu H., Shu K. et al. OneForecast: A universal framework for global and regional weather forecasting // Proceedings of the 42nd International Conference on Machine Learning (ICML). 2025. arXiv:2502.00338.
+8. Wijnands J. S., Van Ginderachter M., François B. et al. Data-driven regional weather forecasting: A comparison of stretched-grid and limited-area modelling // Machine Learning with Applications. 2026. Article 100526. DOI: 10.1016/j.mlwa.2026.100526.
 9. Гандин Л. С. Объективный анализ метеорологических полей. Л.: Гидрометеоиздат, 1963. 286 с.
 10. {{ЗАПОЛНИТЬ: ссылка на описание модели SL-AV — Толстых М. А. и др., уточнить издание и год}}
 

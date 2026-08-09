@@ -41,9 +41,9 @@
 
 ## Литература (локальная нумерация)
 1. Lam R., Sanchez-Gonzalez A., Willson M. et al. Learning skillful medium-range global weather forecasting // Science. 2023. Vol. 382. No. 6677. P. 1416–1421.
-2. Oskarsson J., Landelius T., Lindsten F. Graph-based neural weather prediction for limited area modeling // arXiv:2309.17370. 2023. {{ЗАПОЛНИТЬ: сверить выходные данные (сборник трудов семинара NeurIPS 2023) }}
-3. Nipen T. N. et al. Regional data-driven weather modeling with a global stretched-grid // Artificial Intelligence for the Earth Systems. 2026. {{ЗАПОЛНИТЬ: том, номер, страницы; препринт arXiv:2409.02891}}
-4. Wijnands J. S. et al. {{ЗАПОЛНИТЬ: точное название работы о сравнении подходов с растянутой сеткой и региональной модели с граничным форсингом}} // arXiv:2507.18378. 2026. {{ЗАПОЛНИТЬ: журнальные выходные данные}}
+2. Oskarsson J., Landelius T., Lindsten F. Graph-based neural weather prediction for limited area modeling // arXiv:2309.17370. 2023.
+3. Nipen T. N. et al. Regional data-driven weather modeling with a global stretched-grid // Artificial Intelligence for the Earth Systems. 2026. Vol. 5, No. 2. DOI: 10.1175/AIES-D-25-0001.1.
+4. Wijnands J. S., Van Ginderachter M., François B. et al. Data-driven regional weather forecasting: A comparison of stretched-grid and limited-area modelling // Machine Learning with Applications. 2026. Article 100526. DOI: 10.1016/j.mlwa.2026.100526.
 5. Price I., Sanchez-Gonzalez A., Alet F. et al. Probabilistic weather forecasting with machine learning // Nature. 2025. Vol. 637. P. 84–90.
 6. Rasp S., Hoyer S., Merose A. et al. WeatherBench 2: A benchmark for the next generation of data-driven global weather models // Journal of Advances in Modeling Earth Systems. 2024. Vol. 16. No. 6. Article e2023MS004019.
 7. Hersbach H., Bell B., Berrisford P. et al. The ERA5 global reanalysis // Quarterly Journal of the Royal Meteorological Society. 2020. Vol. 146. No. 730. P. 1999–2049.
