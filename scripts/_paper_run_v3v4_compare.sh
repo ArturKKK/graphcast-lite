@@ -15,9 +15,16 @@
 # ни на сколько, — так что перекос невелик. Это консервативная проверка для v4:
 # если она выигрывает даже так, вывод надёжен.
 #
-# Запуск: nohup setsid bash scripts/_paper_run_v3v4_compare.sh </dev/null >/dev/null 2>&1 &
+# Запуск: bash scripts/_paper_run_v3v4_compare.sh   (сам уходит в фон)
 # Лог:    /workdir/paper_results/v3v4_master.log
 set -uo pipefail
+
+# Уходим в фон сами: длинную строку с nohup/setsid терминал рвёт при вставке.
+if [[ "${DAEMONIZED:-}" != "1" ]]; then
+  DAEMONIZED=1 setsid nohup bash "$0" "$@" </dev/null >/dev/null 2>&1 &
+  echo "запущено в фоне. лог: /workdir/paper_results/v3v4_master.log"
+  exit 0
+fi
 
 REPO=/workdir/graphcast-lite
 VENV=/data/venvs/graphcast
