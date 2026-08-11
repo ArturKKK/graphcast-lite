@@ -1,0 +1,101 @@
+{
+  "_comment": "Абляция: многоуровневый меш с логарифмическим кодированием длины ребра. Отличие от multires_krsk_33f_multimesh только в graph.edge_feature_mode. Проверяет замер 11.08.2026: в режиме legacy при уровнях [0..6] 98.4 % рёбер получают признак меньше 0.1, а шкалу задают 30 рёбер нулевого уровня. ОГОВОРКА: веса берутся от глобальной v3, обученной в режиме legacy, поэтому процессор снова стартует с незнакомого распределения признаков — как и прежний многоуровневый прогон. Сравнивать только с ним, не с основной моделью.",
+  "batch_size": 1,
+  "learning_rate": 0.0001,
+  "num_epochs": 32,
+  "early_stopping_patience": 12,
+  "early_stopping_delta": 1e-05,
+  "wandb_log": false,
+  "random_seed": 42,
+  "use_latitude_weighting": true,
+  "max_ar_steps": 4,
+  "initial_ar_steps": 1,
+  "use_residual": true,
+  "roi_only_loss": false,
+  "data_dir": "/data/datasets/multires_krsk_33f",
+  "freeze_processor_epochs": 6,
+  "finetune_processor_lr_factor": 0.1,
+  "static_channels": [
+    7,
+    8
+  ],
+  "forcing_channels": [
+    29,
+    30,
+    31,
+    32
+  ],
+  "graph": {
+    "grid2mesh_edge_creation": "radius",
+    "mesh2grid_edge_creation": "contained",
+    "grid2mesh_radius_query": 0.6,
+    "mesh_levels": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "edge_feature_mode": "unit_log"
+  },
+  "pipeline": {
+    "encoder": {
+      "mlp": {
+        "mlp_hidden_dims": [
+          256,
+          256
+        ],
+        "output_dim": 256,
+        "use_layer_norm": true,
+        "layer_norm_mode": "node"
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [
+          256,
+          256
+        ],
+        "output_dim": 256,
+        "activation": "swish"
+      }
+    },
+    "processor": {
+      "gcn": {
+        "layer_type": "interaction_net",
+        "output_dim": 256,
+        "activation": "swish",
+        "use_layer_norm": true,
+        "num_message_passing_steps": 12,
+        "edge_feature_dim": 4
+      }
+    },
+    "decoder": {
+      "mlp": {
+        "mlp_hidden_dims": [
+          256,
+          128
+        ],
+        "output_dim": 128,
+        "use_layer_norm": false
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [
+          128,
+          128
+        ],
+        "output_dim": 33,
+        "activation": "swish"
+      }
+    }
+  },
+  "data": {
+    "dataset_name": "multires",
+    "num_features_used": 33,
+    "obs_window_used": 2,
+    "pred_window_used": 1,
+    "want_feats_flattened": true
+  }
+}

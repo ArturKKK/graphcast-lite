@@ -100,6 +100,15 @@ class GraphBuildingConfig(BaseModel):
     # mesh graph configs
     mesh_levels: List[int]
 
+    # Кодирование признаков рёбер меша:
+    #   "legacy"   — длина и 3D-смещение, делённые на максимум длины В ТЕКУЩЕМ
+    #                графе (как обучены все модели статьи; умолчание менять нельзя);
+    #   "unit_log" — единичный вектор направления плюс логарифм длины в [0, 1].
+    # Второй режим нужен для честного сравнения наборов уровней меша: в legacy
+    # распределение признака зависит от того, какие уровни включены, и при
+    # уровнях [0..6] 98 % рёбер спрессованы у нуля (замер 11.08.2026).
+    edge_feature_mode: Optional[str] = "legacy"
+
     # mesh-to-grid graph configs
     mesh2grid_edge_creation: Mesh2GridEdgeCreation
 

@@ -34,19 +34,41 @@ from src.mesh.create_mesh import filter_mesh, get_edges_from_faces
 from src.utils import get_bipartite_graph_spatial_features, get_mesh_lat_long
 
 
+# Режим кодирования признаков рёбер. Ставится один раз при сборке модели из
+# graph_config.edge_feature_mode. Хранится в модуле, а не протаскивается
+# параметром, потому что признаки считаются из четырёх мест (create_graphs,
+# dual_mesh дважды, roi_residual), и менять четыре сигнатуры ради одного флага
+# накладнее, чем держать здесь одно значение по умолчанию.
+EDGE_FEATURE_MODE = "legacy"
+
+
+def set_edge_feature_mode(mode: str) -> None:
+    """Задаёт режим кодирования признаков рёбер для всех последующих сборок графа."""
+    global EDGE_FEATURE_MODE
+    if mode not in ("legacy", "unit_log"):
+        raise ValueError(f"неизвестный edge_feature_mode: {mode!r}")
+    EDGE_FEATURE_MODE = mode
+
+
 def _compute_mesh_edge_features(
     mesh_node_lats: np.ndarray,
     mesh_node_longs: np.ndarray,
     edge_index: np.ndarray,
+    mode: str = None,
 ) -> torch.Tensor:
     """Вычисляет пространственные фичи рёбер для processing-графа (mesh↔mesh).
 
-    Для каждого ребра:
-    - relative_distance (нормированная длина) — 1 фича
-    - relative_position (3D вектор в локальных координатах получателя) — 3 фичи
-    Итого 4 фичи на ребро.
+    Четыре признака на ребро в обоих режимах.
 
-    Это именно то, что делает Google GraphCast для mesh-рёбер.
+    mode="legacy" (по умолчанию, как в GraphCast и как обучены модели статьи):
+    - relative_distance, нормированная на максимум длины В ТЕКУЩЕМ ГРАФЕ — 1
+    - relative_position, 3D вектор в локальных координатах получателя — 3
+
+    mode="unit_log" (введён 11.08.2026):
+    - логарифм длины, приведённый к [0, 1] — 1
+    - единичный вектор направления — 3
+    Нужен для честного сравнения наборов уровней меша: в legacy распределение
+    признака зависит от того, какие уровни включены (см. комментарий ниже).
     """
     from src.utils import lat_lon_deg_to_spherical, spherical_to_cartesian
     from src.utils import get_bipartite_relative_position_in_receiver_local_coordinates
@@ -74,20 +96,47 @@ def _compute_mesh_edge_features(
         longitude_local_coordinates=True,
     )
 
-    # Нормируем по максимальной длине ребра
     relative_edge_distances = np.linalg.norm(relative_position, axis=-1, keepdims=True)
-    max_dist = relative_edge_distances.max()
-    if max_dist > 0:
-        relative_edge_distances_norm = relative_edge_distances / max_dist
-        relative_position_norm = relative_position / max_dist
-    else:
-        relative_edge_distances_norm = relative_edge_distances
-        relative_position_norm = relative_position
+    mode = mode or EDGE_FEATURE_MODE
 
-    # [num_edges, 4]: distance + 3D position
-    edge_features = np.concatenate(
-        [relative_edge_distances_norm, relative_position_norm], axis=-1
-    )
+    if mode == "unit_log":
+        # Направление отдельно от длины.
+        #
+        # Зачем. В режиме "legacy" всё делится на максимальную длину ребра В
+        # ТЕКУЩЕМ ГРАФЕ, и распределение признака зависит от набора уровней меша.
+        # Замер от 11.08.2026: при уровнях [4, 6] максимум 419 км и рёбра
+        # ложатся на 0.25 и 1.0; при уровнях [0..6] максимум 6699 км, и 98.4 %
+        # рёбер спрессованы в полоску шириной 0.06 у нуля, а шкалу им задают
+        # тридцать рёбер нулевого уровня — 0.018 % от общего числа. Кодировщику
+        # приходится различать содержательные масштабы (105, 209, 419 км) по
+        # почти одинаковому входу. Это плохая обусловленность, и она делает
+        # сравнение конфигураций меша нечестным.
+        #
+        # Здесь: три числа — единичный вектор направления, четвёртое — логарифм
+        # длины, приведённый к [0, 1]. Каждый уровень дробления ровно вдвое
+        # короче предыдущего, поэтому в логарифме уровни встают равномерно, и
+        # признак раскладывается по всему диапазону при любом наборе уровней.
+        # Размерность прежняя (4), конфиги менять не нужно.
+        eps = 1e-12
+        direction = relative_position / np.maximum(relative_edge_distances, eps)
+        log_d = np.log(np.maximum(relative_edge_distances, eps))
+        lo, hi = log_d.min(), log_d.max()
+        log_norm = (log_d - lo) / (hi - lo) if hi > lo else np.zeros_like(log_d)
+        edge_features = np.concatenate([log_norm, direction], axis=-1)
+    else:
+        # legacy: как было до 11.08.2026. На этом режиме обучены все модели
+        # статьи, менять умолчание нельзя — поедут опубликованные числа.
+        max_dist = relative_edge_distances.max()
+        if max_dist > 0:
+            relative_edge_distances_norm = relative_edge_distances / max_dist
+            relative_position_norm = relative_position / max_dist
+        else:
+            relative_edge_distances_norm = relative_edge_distances
+            relative_position_norm = relative_position
+        edge_features = np.concatenate(
+            [relative_edge_distances_norm, relative_position_norm], axis=-1
+        )
+
     return torch.tensor(edge_features, dtype=torch.float32)
 
 

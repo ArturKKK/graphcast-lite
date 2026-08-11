@@ -39,6 +39,7 @@ from src.create_graphs import (
     create_decoding_graph,
     create_processing_graph,
     create_encoding_graph,
+    set_edge_feature_mode,
 )
 
 
@@ -560,6 +561,13 @@ class WeatherPrediction(nn.Module):
 
         # PROCESSING-граф: рёбра внутри mesh для message passing
         self.using_interaction_net = pipeline_config.processor.gcn.layer_type == GraphLayerType.InteractionNet
+
+        # Режим кодирования признаков рёбер задаётся до сборки графа: он влияет
+        # на все последующие вызовы _compute_mesh_edge_features, в том числе из
+        # dual_mesh и roi_residual.
+        _efm = getattr(graph_config, "edge_feature_mode", None) or "legacy"
+        set_edge_feature_mode(_efm)
+        print(f"[graph] уровни меша {graph_config.mesh_levels}, признаки рёбер: {_efm}")
 
         proc_graph_result = create_processing_graph(
             meshes=self._meshes, mesh_levels=graph_config.mesh_levels,
