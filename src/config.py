@@ -157,6 +157,12 @@ class GraphBlock(BaseModel):
         Only for InteractionNet: number of message passing steps with separate weights.
     edge_feature_dim: Optional[int]
         Only for InteractionNet: dimensionality of edge features from graph construction.
+    aggregation: Optional[str]
+        Only for InteractionNet: как сводить рёберные сообщения в узел — "mean"
+        (по умолчанию; на нём обучены все модели статьи) или "sum" (как в
+        классическом Interaction Network). Для многоуровневого меша разница
+        принципиальна: при сумме длинные рёбра добавляют сигнал, при среднем —
+        разбавляют локальный.
     """
     layer_type: GraphLayerType
     gat_props: Optional[GATProps] = None
@@ -167,6 +173,7 @@ class GraphBlock(BaseModel):
     activation: Optional[str] = "prelu"
     num_message_passing_steps: Optional[int] = None
     edge_feature_dim: Optional[int] = None
+    aggregation: Optional[str] = "mean"
 
 
 class ModelConfig(BaseModel):

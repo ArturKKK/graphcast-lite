@@ -177,8 +177,15 @@ class InteractionNetLayer(nn.Module):
     """
 
     def __init__(self, node_dim: int, edge_dim: int, hidden_dim: int,
-                 activation: str = "swish", use_layer_norm: bool = True):
+                 activation: str = "swish", use_layer_norm: bool = True,
+                 aggregation: str = "mean"):
         super().__init__()
+        # "mean" — историческое значение, на нём обучены все модели статьи.
+        # "sum" — как в классическом Interaction Network. Разница принципиальна
+        # для многоуровневого меша: при сумме длинные рёбра ДОБАВЛЯЮТ сигнал,
+        # при среднем — РАЗБАВЛЯЮТ локальный. Подозреваемый номер один в том,
+        # почему меш [0..6] проиграл (см. docs/ablations_2026-08.md, п. 3).
+        self.aggregation = aggregation
         from torch_geometric.nn import LayerNorm as PygLayerNorm
 
         act = _get_activation(activation)
@@ -216,9 +223,10 @@ class InteractionNetLayer(nn.Module):
         edge_input = torch.cat([x[senders], x[receivers], edge_attr], dim=-1)
         edge_update = self.edge_mlp(edge_input)
 
-        # 2) Aggregate edges → nodes (scatter_mean по receivers)
+        # 2) Aggregate edges → nodes (по receivers; способ задаётся конфигом)
         from torch_geometric.utils import scatter
-        aggregated = scatter(edge_update, receivers, dim=0, dim_size=x.size(0), reduce="mean")
+        aggregated = scatter(edge_update, receivers, dim=0, dim_size=x.size(0),
+                             reduce=self.aggregation)
 
         # 3) Node update
         node_input = torch.cat([x, aggregated], dim=-1)
@@ -246,7 +254,8 @@ class InteractionNetProcessor(nn.Module):
 
     def __init__(self, node_dim: int, raw_edge_dim: int, edge_latent_dim: int,
                  hidden_dim: int, num_steps: int,
-                 activation: str = "swish", use_layer_norm: bool = True):
+                 activation: str = "swish", use_layer_norm: bool = True,
+                 aggregation: str = "mean"):
         super().__init__()
 
         act = _get_activation(activation)
@@ -265,6 +274,7 @@ class InteractionNetProcessor(nn.Module):
                 hidden_dim=hidden_dim,
                 activation=activation,
                 use_layer_norm=use_layer_norm,
+                aggregation=aggregation,
             )
             for _ in range(num_steps)
         ])
@@ -380,6 +390,7 @@ class GraphLayer(nn.Module):
             raw_edge_dim = graph_config.edge_feature_dim or 4  # distance + 3D relative position
             activation = graph_config.activation or "swish"
             use_ln = graph_config.use_layer_norm if graph_config.use_layer_norm is not None else True
+            aggregation = getattr(graph_config, "aggregation", None) or "mean"
 
             # Residual connections требуют output_dim == input_dim
             assert graph_config.output_dim == input_dim, (
@@ -395,7 +406,9 @@ class GraphLayer(nn.Module):
                 num_steps=num_steps,
                 activation=activation,
                 use_layer_norm=use_ln,
+                aggregation=aggregation,
             )
+            print(f"[processor] InteractionNet: {num_steps} шагов, агрегация {aggregation!r}")
 
         else:
             print(graph_config.layer_type)
