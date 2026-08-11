@@ -152,19 +152,24 @@ else
   echo "[4/4] merge already present"
 fi
 
-# ----- 5. (опция) slim: освободить глобальный датасет после сборки merge -----
+# ----- 5. coords.npz для global_extra -----
+# Сборщику 33f нужны координаты глобальной сетки, а у global_extra своих нет.
+# Раньше копирование стояло ВНУТРИ ветки SLIM ниже, поэтому на виртуалках без
+# режима экономии места файл не появлялся вовсе, и сборка падала с
+# FileNotFoundError на coords.npz (11.08.2026 — потерян запуск). Делаем всегда:
+# операция стоит доли секунды, а её отсутствие стоит прогона.
+for _gx in "$DATA"/global_512x256_extra_*; do
+  if [[ -d "$_gx" && ! -f "$_gx/coords.npz" && -f "$BASE_DIR/coords.npz" ]]; then
+    cp -p "$BASE_DIR/coords.npz" "$_gx/coords.npz"
+    echo "[5] coords.npz скопирован в $(basename "$_gx") (нужен для сборки 33f)"
+  fi
+done
+
+# ----- 6. (опция) slim: освободить глобальный датасет после сборки merge -----
 # Нужно на VM, где дополнительно собирается 33f (global_extra 43 ГБ + 33f 60 ГБ).
 # Внимание: wb2_512x256_19f_ar требуется для эксперимента M4 (глобальный инференс v2),
 # поэтому на VM линии статьи SLIM_AFTER_MERGE НЕ включать.
 if [[ "${SLIM_AFTER_MERGE:-0}" == "1" && -f "$MERGE_DIR/data.npy" ]]; then
-  # ВАЖНО: coords.npz глобальной сетки нужен сборщику 33f (у global_extra своих
-  # координат нет) — сохраняем его в global_extra ДО удаления базового датасета.
-  for _gx in "$DATA"/global_512x256_extra_*; do
-    if [[ -d "$_gx" && ! -f "$_gx/coords.npz" && -f "$BASE_DIR/coords.npz" ]]; then
-      cp -p "$BASE_DIR/coords.npz" "$_gx/coords.npz"
-      echo "[5] coords.npz скопирован в $(basename "$_gx") (нужен для сборки 33f)"
-    fi
-  done
   echo "[5] SLIM: удаляю $BASE_DIR (глобальный 19f больше не нужен, merge собран)"
   rm -rf "$BASE_DIR"
   echo "[5] /data теперь: $(du -sh "$DATA" 2>/dev/null | cut -f1)"

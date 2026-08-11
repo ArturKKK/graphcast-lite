@@ -61,6 +61,22 @@ source "$VENV/bin/activate" 2>/dev/null || { log "venv не поднялся —
 export PYTHONPATH="$REPO"
 
 if [[ ! -f "$D33R/data.npy" ]]; then
+  # Сборщику нужны координаты глобальной сетки, а у global_extra своих нет.
+  # 11.08.2026 на этом потеряли запуск: копирование в setup_vm сидело внутри
+  # ветки SLIM, которую здесь не включают. Проверяем сами и чиним двумя путями.
+  GX=/data/datasets/global_512x256_extra_2010-2021_07deg
+  if [[ ! -f "$GX/coords.npz" ]]; then
+    if [[ -f /data/datasets/wb2_512x256_19f_ar/coords.npz ]]; then
+      cp -p /data/datasets/wb2_512x256_19f_ar/coords.npz "$GX/coords.npz"
+      log "coords.npz скопирован в global_extra из базового датасета"
+    else
+      log "coords.npz нет и базового датасета нет — восстанавливаю из merge"
+      python -u scripts/fix_global_extra_coords.py >> "$OUT/cosine_build.log" 2>&1
+      log "восстановление rc=$?"
+    fi
+  fi
+  [[ -f "$GX/coords.npz" ]] || { log "coords.npz так и нет — сборка невозможна"; exit 1; }
+
   log "нет $D33R — собираю 33-канальный региональный датасет (часы CPU)"
   python -u scripts/build_multires_russia_33f.py \
       --multires-dir /data/datasets/multires_krsk_19f_merge \
