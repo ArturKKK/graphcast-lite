@@ -283,7 +283,33 @@ def main():
     else:
         G = meta.num_longitudes * meta.num_latitudes
     C = exp_cfg.data.num_features_used
-    P_model = exp_cfg.data.pred_window_used  # сколько шагов модель выдаёт за раз
+
+    # Сколько шагов модель выдаёт за один проход.
+    #
+    # Раньше бралось из `data.pred_window_used`, но этот параметр описывает
+    # ЗАГРУЗЧИК — сколько будущих кадров подать для учебной развёртки, — а не
+    # ширину выхода. У региональных моделей там 1, и всё сходилось случайно;
+    # у глобальных v3 и v4 там 8 и 12, из-за чего скрипт уходил в ветку
+    # «многошаговая модель», получал один шаг и падал при сравнении с истиной.
+    # В мае это лечили ручной правкой конфига перед каждым прогоном
+    # (см. experiments/wb2_512x256_33f_ar_v3/INFERENCE_REPORT_200samples.md).
+    #
+    # Истина — ширина декодировщика: сколько каналов он выдаёт, столько шагов
+    # по C каналов в них и лежит.
+    P_model = getattr(exp_cfg.data, 'pred_window_used', 1)
+    try:
+        dec_out = exp_cfg.pipeline.decoder.gcn.output_dim
+        if dec_out and C:
+            inferred = max(1, dec_out // C)
+            if inferred != P_model:
+                print(f"[config] pred_window_used={P_model}, но декодировщик выдаёт "
+                      f"{dec_out} каналов при C={C} → модель одношаговая "
+                      f"({inferred}). Беру {inferred}.")
+            P_model = inferred
+    except AttributeError:
+        print(f"[config] не удалось прочитать ширину декодировщика, "
+              f"оставляю pred_window_used={P_model}")
+
     AR_STEPS = args.ar_steps if args.ar_steps else P_model  # сколько горизонтов хотим
     P = AR_STEPS  # общее число горизонтов для метрик
     OBS = exp_cfg.data.obs_window_used
