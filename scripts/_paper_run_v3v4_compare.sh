@@ -76,10 +76,21 @@ s = pathlib.Path("experiments/$EXP4/checkpoint.pth")
 if s.exists():
     ck = torch.load(s, map_location="cpu")
     torch.save(ck.get("model_state_dict", ck), "$HEAVY/v4_last.pth")
-    print("[prep] v4 чекпойнт эпохи", ck.get("epoch"))
+    # В train.py в чекпойнт кладётся счётчик цикла (с нуля), а в лог пишется
+    # epoch+1. Печатаем в той же нумерации, что и лог, иначе расходится.
+    e = ck.get("epoch")
+    print("[prep] v4 чекпойнт эпохи", (e + 1) if isinstance(e, int) else e,
+          "(в нумерации training_log.txt)")
 else:
     print("[prep] чекпойнта v4 нет!")
 PY
+CKPT_EPOCH=$(python - <<PY
+import torch, pathlib
+s = pathlib.Path("experiments/$EXP4/checkpoint.pth")
+e = torch.load(s, map_location="cpu").get("epoch") if s.exists() else None
+print((e + 1) if isinstance(e, int) else "?")
+PY
+)
 
 # ── 4. Прогон обеих моделей одинаковыми настройками ───────────────────
 run() {                     # run <тег> <каталог эксперимента> [доп. аргументы]
@@ -113,5 +124,5 @@ for t in v3_global v4_global; do
   [[ -f "$OUT/$t.log" ]] || continue
   log "$t: $(grep -oE 'skill=[-0-9.]+%' "$OUT/$t.log" | tail -1)  $(grep -E '^\s+t2m' "$OUT/$t.log" | tail -1 | tr -s ' ')"
 done
-log "напоминание: у v4 эпоха $STOP_EPOCH, у v3 — лучшая эпоха 30, бюджет в пользу v3"
+log "напоминание: у v4 эпоха ${CKPT_EPOCH:-?} (реальная, из чекпойнта), у v3 — лучшая эпоха 30, бюджет в пользу v3"
 log "=== ALL DONE ==="
