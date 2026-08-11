@@ -1,0 +1,107 @@
+{
+  "_comment": "v5: суточный шаг. Единственное отличие от wb2_512x256_33f_ar_v3 — data.time_stride=4, то есть вход t-24ч и t, цель t+24ч. Архитектура, граф, датасет, lr, сид, шум — те же. Проверяемый вопрос: одношаговый прогноз на сутки против четырёх шестичасовых шагов (у v3 на +24 ч приземная температура 1.24 °C, замер 11.08.2026, 200 сроков). Шаг общий для входа и цели: иначе авторегрессия рвётся на втором шаге.",
+  "batch_size": 1,
+  "learning_rate": 0.0003,
+  "num_epochs": 30,
+  "early_stopping_patience": 15,
+  "early_stopping_delta": 1e-05,
+  "wandb_log": false,
+  "random_seed": 42,
+  "use_latitude_weighting": true,
+  "max_ar_steps": 3,
+  "use_residual": true,
+  "roi_only_loss": false,
+  "noise_sigma": 0.05,
+  "noise_apply_from_ar_step": 1,
+  "data_dir": "/data/datasets/wb2_512x256_33f_v3",
+  "freeze_processor_epochs": 0,
+  "finetune_processor_lr_factor": 1.0,
+  "static_channels": [
+    7,
+    8
+  ],
+  "forcing_channels": [
+    29,
+    30,
+    31,
+    32
+  ],
+  "channel_loss_weights": {
+    "0": 2.0,
+    "1": 1.5,
+    "2": 1.5,
+    "3": 2.0,
+    "4": 1.5,
+    "5": 0.1,
+    "17": 2.0,
+    "19": 1.2
+  },
+  "graph": {
+    "grid2mesh_edge_creation": "radius",
+    "mesh2grid_edge_creation": "contained",
+    "grid2mesh_radius_query": 0.6,
+    "mesh_levels": [
+      4,
+      6
+    ]
+  },
+  "pipeline": {
+    "encoder": {
+      "mlp": {
+        "mlp_hidden_dims": [
+          256,
+          256
+        ],
+        "output_dim": 256,
+        "use_layer_norm": true,
+        "layer_norm_mode": "node"
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [
+          256,
+          256
+        ],
+        "output_dim": 256,
+        "activation": "swish"
+      }
+    },
+    "processor": {
+      "gcn": {
+        "layer_type": "interaction_net",
+        "output_dim": 256,
+        "activation": "swish",
+        "use_layer_norm": true,
+        "num_message_passing_steps": 12,
+        "edge_feature_dim": 4
+      }
+    },
+    "decoder": {
+      "mlp": {
+        "mlp_hidden_dims": [
+          256,
+          128
+        ],
+        "output_dim": 128,
+        "use_layer_norm": false
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [
+          128,
+          128
+        ],
+        "output_dim": 33,
+        "activation": "swish"
+      }
+    }
+  },
+  "data": {
+    "dataset_name": "wb2_512x256_33f_v3",
+    "num_features_used": 33,
+    "obs_window_used": 2,
+    "pred_window_used": 3,
+    "want_feats_flattened": true,
+    "time_stride": 4
+  }
+}

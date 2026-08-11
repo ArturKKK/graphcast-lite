@@ -230,6 +230,7 @@ def main():
             pred_steps=ds_pred_steps,
             n_features=exp_cfg.data.num_features_used,
             test_split=args.split,
+            time_stride=getattr(exp_cfg.data, "time_stride", 1),
         )
     else:
         train_ds, val_ds, test_ds, meta = load_train_and_test_datasets(
@@ -312,6 +313,11 @@ def main():
 
     AR_STEPS = args.ar_steps if args.ar_steps else P_model  # сколько горизонтов хотим
     P = AR_STEPS  # общее число горизонтов для метрик
+    # Длина одного шага в часах: срок датасета 6 ч, умноженный на time_stride.
+    # У модели с суточным шагом горизонты идут +24/+48/+72, а не +6/+12/+18.
+    STEP_H = 6 * int(getattr(exp_cfg.data, 'time_stride', 1) or 1)
+    if STEP_H != 6:
+        print(f'[predict] шаг модели {STEP_H} ч, горизонты будут кратны ему')
     OBS = exp_cfg.data.obs_window_used
 
     if AR_STEPS > P_model:
@@ -765,7 +771,7 @@ def main():
         for p in range(len(sm_pred_h)):
             sp, sb = sm_pred_h[p], sm_base_h[p]
             sk = 1.0 - (sp.rmse / (sb.rmse + 1e-12))
-            print(f"  +{(p+1)*6:02d}h: RMSE={sp.rmse:.6f} | base={sb.rmse:.6f} | skill={sk*100:.2f}% | ACC={sp.acc:.4f} (base {sb.acc:.4f})")
+            print(f"  +{(p+1)*STEP_H:02d}h: RMSE={sp.rmse:.6f} | base={sb.rmse:.6f} | skill={sk*100:.2f}% | ACC={sp.acc:.4f} (base {sb.acc:.4f})")
 
     if args.per_channel:
         var_path = Path(data_dir) / "variables.json"
@@ -804,7 +810,7 @@ def main():
             print(f"\nPer-horizon per-channel RMSE (physical units):")
             header = f"  {'var':>10s} {'unit':>6s}"
             for p in range(len(sm_pred_h)):
-                header += f" {'+'+ str((p+1)*6) + 'h':>8s}"
+                header += f" {'+'+ str((p+1)*STEP_H) + 'h':>8s}"
             print(header)
             
             for c in key_idx:
@@ -859,7 +865,7 @@ def main():
             for p in range(len(sm_pred_rh)):
                 sp, sb = sm_pred_rh[p], sm_base_rh[p]
                 sk = 1.0 - (sp.rmse / (sb.rmse + 1e-12))
-                print(f"    +{(p+1)*6:02d}h: RMSE={sp.rmse:.6f} | base={sb.rmse:.6f} | skill={sk*100:.2f}% | ACC={sp.acc:.4f} (base {sb.acc:.4f})")
+                print(f"    +{(p+1)*STEP_H:02d}h: RMSE={sp.rmse:.6f} | base={sb.rmse:.6f} | skill={sk*100:.2f}% | ACC={sp.acc:.4f} (base {sb.acc:.4f})")
 
         # Per-channel region
         if args.per_channel:
@@ -883,7 +889,7 @@ def main():
                 print(f"\n  Per-horizon per-channel RMSE — REGION ({len(region_idxs)} nodes):")
                 header = f"    {'var':>10s} {'unit':>6s}"
                 for p in range(len(sm_pred_rh)):
-                    header += f" {'+'+ str((p+1)*6) + 'h':>8s}"
+                    header += f" {'+'+ str((p+1)*STEP_H) + 'h':>8s}"
                 print(header)
 
                 for c in key_idx_r:

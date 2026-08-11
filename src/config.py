@@ -238,6 +238,12 @@ class DataConfig(BaseModel):
     obs_window_used: int
     pred_window_used: int
     want_feats_flattened: bool
+    # Шаг между кадрами в сроках датасета (срок = 6 ч).
+    #   1 — шестичасовой шаг, как во всех моделях статьи;
+    #   4 — суточный: вход t−24ч и t, цель t+24ч.
+    # Шаг общий для входа и цели — иначе авторегрессия рвётся на втором шаге
+    # (модель выдаст t+24ч, а для следующего входа понадобится t+18ч).
+    time_stride: int = 1
 
 
 class ExperimentConfig(BaseModel):
