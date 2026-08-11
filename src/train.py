@@ -160,8 +160,9 @@ def train_epoch(
     use_residual=True,
     noise_sigma=0.0,
     noise_apply_from_ar_step=1,
+    scheduler=None,
 ):
-    """Один проход обучения. ТЕПЕРЬ С АВТОРЕГРЕССИЕЙ."""  
+    """Один проход обучения. ТЕПЕРЬ С АВТОРЕГРЕССИЕЙ."""
     model.train()  
     total_loss = 0  
     # print(threshold) # Можно раскомментировать для отладки
@@ -250,8 +251,12 @@ def train_epoch(
         loss_batch = loss_batch / steps_to_run
         loss_batch.backward()
         optimiser.step()
-        
-        total_loss += loss_batch.detach().item()  
+        # Шаг планировщика — ПОШАГОВЫЙ, а не поэпохный: разогрев меряется в
+        # шагах (у GraphCast 1000), а эпоха у нас это около 12 800 шагов.
+        if scheduler is not None:
+            scheduler.step()
+
+        total_loss += loss_batch.detach().item()
         # --- КОНЕЦ НОВОЙ ЛОГИКИ ---
 
     avg_loss = total_loss / len(train_dataloader)  
@@ -517,6 +522,59 @@ def train(
             print(f"[Init] val_loss={intial_val_loss:.5f} val_acc={initial_val_acc:.4f} raw_RMSE={init_raw_rmse:.4f}")
         _log(f"{'init':>5}  {'--':>2}  {'--':>10}  {intial_val_loss:10.5f}  {initial_val_acc:8.4f}  {'--':>10}  {'--':>8}  {datetime.now().strftime('%H:%M:%S')}")
 
+    # --- График темпа обучения ---
+    # По умолчанию выключен: старые конфиги ведут себя ровно как раньше.
+    #
+    # Зачем. До 11.08.2026 темп был постоянным всё обучение, и в логах это видно:
+    # глобальная v3 взяла лучшее значение на 18-й эпохе и за следующие
+    # восемнадцать не улучшила его вовсе. Похоже на блуждание вокруг минимума со
+    # слишком крупным шагом. В GraphCast — линейный разогрев 1000 шагов и косинусный
+    # спад до нуля.
+    #
+    # Планировщик масштабирует ВСЕ группы параметров одинаково, поэтому
+    # соотношение lr между процессором и интерфейсами при дообучении
+    # сохраняется, а разморозка процессора (она меняет только requires_grad)
+    # ничего не ломает.
+    scheduler = None
+    lr_schedule = str(getattr(config, 'lr_schedule', 'constant')).lower()
+    base_lr_cfg = float(getattr(config, 'learning_rate', 1e-4))
+    if lr_schedule == 'cosine':
+        import math
+        warmup = int(getattr(config, 'lr_warmup_steps', 1000))
+        min_factor = float(getattr(config, 'lr_min_factor', 0.0))
+        steps_per_epoch = max(1, len(train_dataloader))
+        total_steps = max(1, num_epochs * steps_per_epoch)
+
+        def _lr_lambda(step: int) -> float:
+            if step < warmup:
+                return (step + 1) / max(1, warmup)
+            prog = (step - warmup) / max(1, total_steps - warmup)
+            prog = min(1.0, max(0.0, prog))
+            return min_factor + (1.0 - min_factor) * 0.5 * (1.0 + math.cos(math.pi * prog))
+
+        # При возобновлении отматываем планировщик на уже пройденные шаги,
+        # иначе он начнёт разогрев заново с середины обучения.
+        done_steps = start_epoch * steps_per_epoch
+        if done_steps:
+            # LambdaLR с last_epoch != -1 требует `initial_lr` в группах и
+            # умножает на него. Брать текущий lr из группы нельзя: при
+            # возобновлении там лежит УЖЕ уменьшенное значение из чекпойнта, и
+            # спад применился бы второй раз. Восстанавливаем базовые темпы из
+            # конфига. Порядок групп задан в src/main.py: сначала интерфейсы,
+            # затем процессор с множителем.
+            proc_factor = float(getattr(config, 'finetune_processor_lr_factor', 0.1))
+            for gi, g in enumerate(optimiser.param_groups):
+                g['initial_lr'] = base_lr_cfg if gi == 0 else base_lr_cfg * proc_factor
+            _log("# lr: базовые темпы восстановлены из конфига: "
+                 + ", ".join(f"{g['initial_lr']:.2e}" for g in optimiser.param_groups))
+        scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimiser, _lr_lambda, last_epoch=done_steps - 1 if done_steps else -1)
+        _log(f"# lr: косинус, разогрев {warmup} шагов, {steps_per_epoch} шагов/эпоху, "
+             f"всего {total_steps}, до {min_factor:g} от базового"
+             + (f", возобновление с шага {done_steps}" if done_steps else ""))
+    elif lr_schedule != 'constant':
+        _log(f"# ВНИМАНИЕ: неизвестный lr_schedule={lr_schedule!r}, темп остаётся постоянным")
+
     # --- Fine-tuning: freeze/unfreeze processor ---
     freeze_proc_epochs = getattr(config, 'freeze_processor_epochs', 0)
 
@@ -566,9 +624,10 @@ def train(
             use_residual=use_residual,
             noise_sigma=noise_sigma,
             noise_apply_from_ar_step=noise_apply_from,
-        )  
+            scheduler=scheduler,
+        )
 
-        epoch_val_loss, epoch_val_acc, epoch_raw_rmse = test(  
+        epoch_val_loss, epoch_val_acc, epoch_raw_rmse = test(
             model, val_dataloader, loss_fn, device, lat_weights,
             spatial_mask=spatial_mask, channel_mask=channel_mask,
             static_channels=static_ch, forcing_channels=forcing_ch,

@@ -240,6 +240,11 @@ class ExperimentConfig(BaseModel):
     wandb_name: Optional[str] = None
     wandb_key: str = "3a59363c20cd4fdf2b95dfd7a9cd72398d15321e"
     use_latitude_weighting: bool = True  # Включить вес по широте
+    # График темпа обучения. "constant" — как было до 11.08.2026 (без изменения
+    # темпа за всё обучение), "cosine" — линейный разогрев, затем косинусный спад.
+    lr_schedule: str = "constant"
+    lr_warmup_steps: int = 1000          # Длина разогрева В ШАГАХ (у GraphCast 1000)
+    lr_min_factor: float = 0.0           # Доля базового темпа в конце спада
     max_ar_steps: int = 1                # Максимальное число шагов авторегрессии
     data_dir: Optional[str] = None       # Путь к датасету (если задан, используется вместо data.dataset_name)
     static_channels: List[int] = []      # Индексы каналов-констант (lsm, z_surf и т.п.):
