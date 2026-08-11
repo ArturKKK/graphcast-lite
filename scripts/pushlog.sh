@@ -34,11 +34,15 @@ done
 nvidia-smi --query-gpu=memory.used,utilization.gpu --format=csv,noheader 2>/dev/null
 
 git add -f "$DEST" || exit 1
+# Отслеживаемые логи в каталогах экспериментов дописываются прямо во время
+# обучения. Если их не заигнорить, rebase упирается в незакоммиченные изменения.
+git add -f experiments/*/training_log.txt 2>/dev/null
 if git diff --cached --quiet; then
   echo "нечего коммитить — логи не изменились"
   exit 0
 fi
 git commit -qm "логи обучения $(date '+%d.%m %H:%M')" || exit 1
-git pull -q --rebase origin main-arthur || { echo "ОШИБКА pull"; exit 1; }
+# --autostash: обучение могло дописать лог за те секунды, что шёл коммит
+git pull -q --rebase --autostash origin main-arthur || { echo "ОШИБКА pull"; exit 1; }
 git push -q origin main-arthur || { echo "ОШИБКА push"; exit 1; }
 echo PUSHED
