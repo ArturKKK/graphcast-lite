@@ -157,3 +157,18 @@ Patience counter is now 2
 
 
 Epoch 18 (AR=3) with attention threshold 0.07051199999999999
+[Epoch 19] train_loss=0.03624  val_loss=0.02312  val_ACC=0.9908  raw_RMSE=0.1239
+Patience counter is now 3 
+
+
+Epoch 19 (AR=3) with attention threshold 0.075936
+[Epoch 20] train_loss=0.03595  val_loss=0.02324  val_ACC=0.9908  raw_RMSE=0.1238
+Patience counter is now 4 
+
+
+Epoch 20 (AR=3) with attention threshold 0.08135999999999999
+[Epoch 21] train_loss=0.03571  val_loss=0.02301  val_ACC=0.9908  raw_RMSE=0.1234
+Patience counter is now 5 
+
+
+Epoch 21 (AR=3) with attention threshold 0.086784
