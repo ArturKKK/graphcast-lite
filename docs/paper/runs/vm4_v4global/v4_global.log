@@ -67,3 +67,141 @@ Traceback (most recent call last):
   File "/workdir/graphcast-lite/scripts/predict.py", line 70, in update
     err = y_pred.float() - y_true.float()
 RuntimeError: The size of tensor a (33) must match the size of tensor b (132) at non-singleton dimension 1
+[predict] data_dir=/data/datasets/wb2_512x256_33f_v3 (chunked=True, pred_steps=4)
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] train: 14021 samples, grid=512×256, feat=33, obs=2, pred=4
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] val: 1753 samples, grid=512×256, feat=33, obs=2, pred=4
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] test_only: 1753 samples, grid=512×256, feat=33, obs=2, pred=4
+Encoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [172034, 72], [2, 205302]  | [172034, 256]  | 348,162  |
+| ├─(mlp)MLP                |                            | [172034, 256]  | 150,786  |
+| │    └─(MLP)ModuleList    | --                         | --             | 150,786  |
+| │    │    └─(0)Linear     | [172034, 72]               | [172034, 256]  | 18,688   |
+| │    │    └─(1)PReLU      | [172034, 256]              | [172034, 256]  | 1        |
+| │    │    └─(2)Linear     | [172034, 256]              | [172034, 256]  | 65,792   |
+| │    │    └─(3)PReLU      | [172034, 256]              | [172034, 256]  | 1        |
+| │    │    └─(4)Linear     | [172034, 256]              | [172034, 256]  | 65,792   |
+| │    │    └─(5)LayerNorm  | [172034, 256]              | [172034, 256]  | 512      |
+| ├─(graph_layer)GraphLayer |                            | [172034, 256]  | 197,376  |
+| │    └─(activation)SiLU   | [172034, 256]              | [172034, 256]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 197,376  |
+| │    │    └─(0)GCNConv    | [172034, 256], [2, 205302] | [172034, 256]  | 65,792   |
+| │    │    └─(1)SiLU       | [172034, 256]              | [172034, 256]  | --       |
+| │    │    └─(2)GCNConv    | [172034, 256], [2, 205302] | [172034, 256]  | 65,792   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [172034, 256], [2, 205302] | [172034, 256]  | 65,792   |
++---------------------------+----------------------------+----------------+----------+
+
+Processor summary: 
+  (summary skipped: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument mat1 in method wrapper_CUDA_addmm))
+
+Decoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [172034, 256], [2, 393216] | [172034, 33]   | 152,483  |
+| ├─(mlp)MLP                |                            | [172034, 128]  | 115,202  |
+| │    └─(MLP)ModuleList    | --                         | --             | 115,202  |
+| │    │    └─(0)Linear     | [172034, 256]              | [172034, 256]  | 65,792   |
+| │    │    └─(1)PReLU      | [172034, 256]              | [172034, 256]  | 1        |
+| │    │    └─(2)Linear     | [172034, 256]              | [172034, 128]  | 32,896   |
+| │    │    └─(3)PReLU      | [172034, 128]              | [172034, 128]  | 1        |
+| │    │    └─(4)Linear     | [172034, 128]              | [172034, 128]  | 16,512   |
+| ├─(graph_layer)GraphLayer |                            | [172034, 33]   | 37,281   |
+| │    └─(activation)SiLU   | [172034, 128]              | [172034, 128]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 37,281   |
+| │    │    └─(0)GCNConv    | [172034, 128], [2, 393216] | [172034, 128]  | 16,512   |
+| │    │    └─(1)SiLU       | [172034, 128]              | [172034, 128]  | --       |
+| │    │    └─(2)GCNConv    | [172034, 128], [2, 393216] | [172034, 128]  | 16,512   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [172034, 128], [2, 393216] | [172034, 33]   | 4,257    |
++---------------------------+----------------------------+----------------+----------+
+
+[config] pred_window_used=12, но декодировщик выдаёт 33 каналов при C=33 → модель одношаговая (1). Беру 1.
+[AR-rollout] Модель выдаёт 1 шаг(ов), но мы прогоним 4 шагов авторегрессионно.
+[static] Каналы [7, 8] — статика, carry-forward при AR
+[forcing] Каналы [29, 30, 31, 32] — форсинг (из ground truth при AR)
+[predict] device=cuda | grid=512x256 | 200/1753 test samples
+[metrics] Исключены из aggregate метрик: каналы [7, 8, 29, 30, 31, 32] (static+forcing)
+[metrics] per-sample MSE будут сохранены в /workdir/paper_results/v4_global_samples.npz
+[Main] Инференс (200 samples, DA=none)...
+  [50/200] RMSE=0.223812 ACC=0.9751
+  [100/200] RMSE=0.224654 ACC=0.9751
+  [150/200] RMSE=0.224193 ACC=0.9749
+  [200/200] RMSE=0.223805 ACC=0.9749
+[Save] per-sample metrics → /workdir/paper_results/v4_global_samples.npz (N=200, AR=4, C=33)
+
+============================================================
+=== Inference summary (200 samples) ===
+Grid: 512x256 (G=131072) | C=33 | AR=4 horizons
+Overall: MSE=0.050089 | RMSE=0.223805 | MAE=0.114618
+Baseline: RMSE=0.557523 | MAE=0.287242
+Skill: 59.86%
+ACC: 0.9749 | base: 0.8472 | Δ=+0.1277
+
+Per-horizon:
+  +06h: RMSE=0.139752 | base=0.365743 | skill=61.79% | ACC=0.9901 (base 0.9338)
+  +12h: RMSE=0.188076 | base=0.521822 | skill=63.96% | ACC=0.9821 (base 0.8657)
+  +18h: RMSE=0.242116 | base=0.616060 | skill=60.70% | ACC=0.9704 (base 0.8135)
+  +24h: RMSE=0.294671 | base=0.676558 | skill=56.45% | ACC=0.9569 (base 0.7757)
+
+Per-horizon per-channel RMSE (physical units):
+         var   unit      +6h     +12h     +18h     +24h
+         t2m      K    0.96°C    1.28°C    1.54°C    1.81°C
+         10u    m/s     0.85     1.11     1.34     1.59
+         10v    m/s     0.87     1.14     1.40     1.67
+         msl    hPa     0.78     1.16     1.58     2.02
+       t@850      K    0.79°C    1.09°C    1.35°C    1.59°C
+       u@850    m/s     1.29     1.65     2.01     2.41
+       v@850    m/s     1.25     1.63     2.03     2.46
+       z@850    gpm      6.2      9.4     13.0     16.7
+       z@500    gpm      8.3     13.1     19.2     26.2
+
+Per-channel metrics overall (physical units, avg over 4 horizons):
+    #        var      ACC  RMSE_norm    RMSE_phys     unit
+    0        t2m   0.9974     0.0679       1.4344        K  (≈1.43 °C)
+    1        10u   0.9756     0.2252       1.2528      m/s
+    2        10v   0.9634     0.2733       1.3034      m/s
+    3        msl   0.9955     0.1078       1.4594      hPa
+    4         tp   0.7911     0.6391       0.0013        m
+    5         sp   0.9998     0.0180       1.7173      hPa
+    6       tcwv   0.9919     0.1269       2.1109    kg/m²
+    7     z_surf   0.9999     0.0000       0.0000      gpm
+    8        lsm   1.0001     0.0000       0.0000        -
+    9      t@850   0.9966     0.0799       1.2390        K  (≈1.24 °C)
+   10      u@850   0.9753     0.2285       1.8837      m/s
+   11      v@850   0.9548     0.3024       1.8982      m/s
+   12      z@850   0.9975     0.0787      11.9967      gpm
+   13      q@850   0.9820     0.1872       0.0008    kg/kg
+   14      t@500   0.9970     0.0816       1.0641        K  (≈1.06 °C)
+   15      u@500   0.9774     0.2186       2.6285      m/s
+   16      v@500   0.9574     0.2945       2.7116      m/s
+   17      z@500   0.9989     0.0521      17.9694      gpm
+   18      q@500   0.9565     0.2946       0.0003    kg/kg
+   19      z@250   0.9989     0.0684      38.8595      gpm
+   20      t@250   0.9923     0.1299       1.1252        K  (≈1.13 °C)
+   21      u@250   0.9834     0.1825       3.2986      m/s
+   22      v@250   0.9703     0.2463       3.3111      m/s
+   23      q@250   0.9399     0.3216       0.0000    kg/kg
+   24     z@1000   0.9957     0.1067      11.8910      gpm
+   25     t@1000   0.9966     0.0770       1.3034        K  (≈1.30 °C)
+   26     u@1000   0.9758     0.2228       1.3734      m/s
+   27     v@1000   0.9640     0.2673       1.4204      m/s
+   28     q@1000   0.9966     0.0812       0.0005    kg/kg
+   29   sin_hour   0.2135     0.0000       0.0000        ?
+   30   cos_hour   0.2135     0.0000       0.0000        ?
+   31    sin_doy   0.1776     0.0000       0.0000        ?
+   32    cos_doy   0.2134     0.0000       0.0000        ?
+============================================================
+[predict] data_dir=/data/datasets/wb2_512x256_33f_v3 (chunked=True, pred_steps=4)
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] train: 14021 samples, grid=512×256, feat=33, obs=2, pred=4
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] val: 1753 samples, grid=512×256, feat=33, obs=2, pred=4
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] test_only: 1753 samples, grid=512×256, feat=33, obs=2, pred=4
