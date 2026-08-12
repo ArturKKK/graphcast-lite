@@ -1,0 +1,82 @@
+### PROVENANCE ###############################################
+# tag: v3_global | started: 2026-07-27T15:02:26+03:00 | host: k8smr-macos-build--graphcast-v3-1627659973-task-0
+# git commit: 290ea46 | gpu: NVIDIA H100 80GB HBM3
+# dataset: /data/datasets/wb2_512x256_33f_v3
+#   info: {"time_start":"2010-01-01","time_end":"2021-12-31","n_time":17532,"n_lon":512,"n_lat":256,"n_feat":33,"n_feat_base":19,"n_feat_extra":14,"extra_file":"data_extra.npy","variables":["t2m","10u","10v","msl","tp","sp","tcwv","z_surf","lsm","t@850","u@850","v@850","z@850","q@850","t@500","u@500","v@500",
+# experiment: experiments/wb2_512x256_33f_ar_v3 (config md5 f546ce638e77bc358d5ce1da97cae44c)
+#   ckpt: 22397f67ef83a01a50f83e035179656a
+# COMMAND:
+#   python -u scripts/predict.py experiments/wb2_512x256_33f_ar_v3 --data-dir /data/datasets/wb2_512x256_33f_v3 --split test_only --ar-steps 4 --max-samples 200 --per-channel --no-save --save-sample-metrics /workdir/paper_results/v3_global_samples.npz 
+##############################################################
+
+[predict] data_dir=/data/datasets/wb2_512x256_33f_v3 (chunked=True, pred_steps=4)
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] train: 14021 samples, grid=512×256, feat=33, obs=2, pred=4
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] val: 1753 samples, grid=512×256, feat=33, obs=2, pred=4
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] test_only: 1753 samples, grid=512×256, feat=33, obs=2, pred=4
+Encoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [172034, 72], [2, 205302]  | [172034, 256]  | 348,162  |
+| ├─(mlp)MLP                |                            | [172034, 256]  | 150,786  |
+| │    └─(MLP)ModuleList    | --                         | --             | 150,786  |
+| │    │    └─(0)Linear     | [172034, 72]               | [172034, 256]  | 18,688   |
+| │    │    └─(1)PReLU      | [172034, 256]              | [172034, 256]  | 1        |
+| │    │    └─(2)Linear     | [172034, 256]              | [172034, 256]  | 65,792   |
+| │    │    └─(3)PReLU      | [172034, 256]              | [172034, 256]  | 1        |
+| │    │    └─(4)Linear     | [172034, 256]              | [172034, 256]  | 65,792   |
+| │    │    └─(5)LayerNorm  | [172034, 256]              | [172034, 256]  | 512      |
+| ├─(graph_layer)GraphLayer |                            | [172034, 256]  | 197,376  |
+| │    └─(activation)SiLU   | [172034, 256]              | [172034, 256]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 197,376  |
+| │    │    └─(0)GCNConv    | [172034, 256], [2, 205302] | [172034, 256]  | 65,792   |
+| │    │    └─(1)SiLU       | [172034, 256]              | [172034, 256]  | --       |
+| │    │    └─(2)GCNConv    | [172034, 256], [2, 205302] | [172034, 256]  | 65,792   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [172034, 256], [2, 205302] | [172034, 256]  | 65,792   |
++---------------------------+----------------------------+----------------+----------+
+
+Processor summary: 
+  (summary skipped: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument mat1 in method wrapper_CUDA_addmm))
+
+Decoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [172034, 256], [2, 393216] | [172034, 33]   | 152,483  |
+| ├─(mlp)MLP                |                            | [172034, 128]  | 115,202  |
+| │    └─(MLP)ModuleList    | --                         | --             | 115,202  |
+| │    │    └─(0)Linear     | [172034, 256]              | [172034, 256]  | 65,792   |
+| │    │    └─(1)PReLU      | [172034, 256]              | [172034, 256]  | 1        |
+| │    │    └─(2)Linear     | [172034, 256]              | [172034, 128]  | 32,896   |
+| │    │    └─(3)PReLU      | [172034, 128]              | [172034, 128]  | 1        |
+| │    │    └─(4)Linear     | [172034, 128]              | [172034, 128]  | 16,512   |
+| ├─(graph_layer)GraphLayer |                            | [172034, 33]   | 37,281   |
+| │    └─(activation)SiLU   | [172034, 128]              | [172034, 128]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 37,281   |
+| │    │    └─(0)GCNConv    | [172034, 128], [2, 393216] | [172034, 128]  | 16,512   |
+| │    │    └─(1)SiLU       | [172034, 128]              | [172034, 128]  | --       |
+| │    │    └─(2)GCNConv    | [172034, 128], [2, 393216] | [172034, 128]  | 16,512   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [172034, 128], [2, 393216] | [172034, 33]   | 4,257    |
++---------------------------+----------------------------+----------------+----------+
+
+[static] Каналы [7, 8] — статика, carry-forward при AR
+[forcing] Каналы [29, 30, 31, 32] — форсинг (из ground truth при AR)
+[predict] device=cuda | grid=512x256 | 200/1753 test samples
+[metrics] Исключены из aggregate метрик: каналы [7, 8, 29, 30, 31, 32] (static+forcing)
+[metrics] per-sample MSE будут сохранены в /workdir/paper_results/v3_global_samples.npz
+[Main] Инференс (200 samples, DA=none)...
+Traceback (most recent call last):
+  File "/workdir/graphcast-lite/scripts/predict.py", line 895, in <module>
+    main()
+  File "/workdir/graphcast-lite/scripts/predict.py", line 639, in main
+    sm_pred.update(y_cpu, out_cpu)
+  File "/workdir/graphcast-lite/scripts/predict.py", line 70, in update
+    err = y_pred.float() - y_true.float()
+RuntimeError: The size of tensor a (33) must match the size of tensor b (132) at non-singleton dimension 1
+
+### finished: 2026-07-27T15:02:38+03:00, exit=1 ###
