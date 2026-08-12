@@ -9,8 +9,14 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
-DEST=docs/paper/runs/vm4_v4global
+
+# Каталог свой у каждой виртуалки. Иначе две машины пишут одни и те же имена
+# файлов, затирают друг друга и ловят конфликт на rebase.
+TAG=$(hostname | grep -oE 'graphcast-v[0-9]+-[0-9]+' | head -1)
+[[ -z "$TAG" ]] && TAG=$(hostname | tr -c 'a-zA-Z0-9-' '-' | cut -c1-40)
+DEST="docs/paper/runs/$TAG"
 mkdir -p "$DEST"
+echo "каталог прогонов: $DEST"
 
 # Логи обучений: training_log.txt из каждого каталога эксперимента, где он
 # обновлялся за последние сутки, плюс master-логи запускающих скриптов.
