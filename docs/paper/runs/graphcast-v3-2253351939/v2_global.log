@@ -1,0 +1,123 @@
+### PROVENANCE ###############################################
+# tag: v2_global | started: 2026-07-27T14:59:17+03:00 | host: k8smr-macos-build--graphcast-v3-1627659973-task-0
+# git commit: 290ea46 | gpu: NVIDIA H100 80GB HBM3
+# dataset: /data/datasets/wb2_512x256_19f_ar
+#   info: {"time_start":"2010-01-01","time_end":"2021-12-31","n_time":17532,"n_lon":512,"n_lat":256,"n_feat":19,"variables":["t2m","10u","10v","msl","tp","sp","tcwv","z_surf","lsm","t@850","u@850","v@850","z@850","q@850","t@500","u@500","v@500","z@500","q@500"],"dtype":"float16","file":"data.npy","size_gb":81
+# experiment: experiments/wb2_512x256_19f_ar_v2 (config md5 504a72eb4aeed778bfe8d96e1b7a1622)
+#   ckpt: 1a841c3c9420f94be69a23d0dcecc090
+# COMMAND:
+#   python -u scripts/predict.py experiments/wb2_512x256_19f_ar_v2 --data-dir /data/datasets/wb2_512x256_19f_ar --split test_only --ar-steps 4 --max-samples 200 --per-channel --no-save --save-sample-metrics /workdir/paper_results/v2_global_samples.npz 
+##############################################################
+
+[predict] data_dir=/data/datasets/wb2_512x256_19f_ar (chunked=True, pred_steps=4)
+[ChunkDataset] train: 14021 samples, grid=512×256, feat=19, obs=2, pred=4
+[ChunkDataset] val: 1753 samples, grid=512×256, feat=19, obs=2, pred=4
+[ChunkDataset] test_only: 1753 samples, grid=512×256, feat=19, obs=2, pred=4
+Encoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [172034, 44], [2, 205302]  | [172034, 256]  | 340,994  |
+| ├─(mlp)MLP                |                            | [172034, 256]  | 143,618  |
+| │    └─(MLP)ModuleList    | --                         | --             | 143,618  |
+| │    │    └─(0)Linear     | [172034, 44]               | [172034, 256]  | 11,520   |
+| │    │    └─(1)PReLU      | [172034, 256]              | [172034, 256]  | 1        |
+| │    │    └─(2)Linear     | [172034, 256]              | [172034, 256]  | 65,792   |
+| │    │    └─(3)PReLU      | [172034, 256]              | [172034, 256]  | 1        |
+| │    │    └─(4)Linear     | [172034, 256]              | [172034, 256]  | 65,792   |
+| │    │    └─(5)LayerNorm  | [172034, 256]              | [172034, 256]  | 512      |
+| ├─(graph_layer)GraphLayer |                            | [172034, 256]  | 197,376  |
+| │    └─(activation)SiLU   | [172034, 256]              | [172034, 256]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 197,376  |
+| │    │    └─(0)GCNConv    | [172034, 256], [2, 205302] | [172034, 256]  | 65,792   |
+| │    │    └─(1)SiLU       | [172034, 256]              | [172034, 256]  | --       |
+| │    │    └─(2)GCNConv    | [172034, 256], [2, 205302] | [172034, 256]  | 65,792   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [172034, 256], [2, 205302] | [172034, 256]  | 65,792   |
++---------------------------+----------------------------+----------------+----------+
+
+Processor summary: 
+  (summary skipped: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument mat1 in method wrapper_CUDA_addmm))
+
+Decoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [172034, 256], [2, 393216] | [172034, 19]   | 150,677  |
+| ├─(mlp)MLP                |                            | [172034, 128]  | 115,202  |
+| │    └─(MLP)ModuleList    | --                         | --             | 115,202  |
+| │    │    └─(0)Linear     | [172034, 256]              | [172034, 256]  | 65,792   |
+| │    │    └─(1)PReLU      | [172034, 256]              | [172034, 256]  | 1        |
+| │    │    └─(2)Linear     | [172034, 256]              | [172034, 128]  | 32,896   |
+| │    │    └─(3)PReLU      | [172034, 128]              | [172034, 128]  | 1        |
+| │    │    └─(4)Linear     | [172034, 128]              | [172034, 128]  | 16,512   |
+| ├─(graph_layer)GraphLayer |                            | [172034, 19]   | 35,475   |
+| │    └─(activation)SiLU   | [172034, 128]              | [172034, 128]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 35,475   |
+| │    │    └─(0)GCNConv    | [172034, 128], [2, 393216] | [172034, 128]  | 16,512   |
+| │    │    └─(1)SiLU       | [172034, 128]              | [172034, 128]  | --       |
+| │    │    └─(2)GCNConv    | [172034, 128], [2, 393216] | [172034, 128]  | 16,512   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [172034, 128], [2, 393216] | [172034, 19]   | 2,451    |
++---------------------------+----------------------------+----------------+----------+
+
+[AR-rollout] Модель выдаёт 1 шаг(ов), но мы прогоним 4 шагов авторегрессионно.
+[predict] device=cuda | grid=512x256 | 200/1753 test samples
+[metrics] per-sample MSE будут сохранены в /workdir/paper_results/v2_global_samples.npz
+[Main] Инференс (200 samples, DA=none)...
+  [50/200] RMSE=3.860786 ACC=0.9060
+  [100/200] RMSE=3.911727 ACC=0.9066
+  [150/200] RMSE=3.897133 ACC=0.9062
+  [200/200] RMSE=3.902317 ACC=0.9059
+[Save] per-sample metrics → /workdir/paper_results/v2_global_samples.npz (N=200, AR=4, C=19)
+
+============================================================
+=== Inference summary (200 samples) ===
+Grid: 512x256 (G=131072) | C=19 | AR=4 horizons
+Overall: MSE=15.228080 | RMSE=3.902317 | MAE=2.697752
+Baseline: RMSE=0.543929 | MAE=0.256266
+Skill: -617.43%
+ACC: 0.9059 | base: 0.8553 | Δ=+0.0506
+
+Per-horizon:
+  +06h: RMSE=1.019288 | base=0.367597 | skill=-177.28% | ACC=0.9760 (base 0.9335)
+  +12h: RMSE=2.527003 | base=0.513983 | skill=-391.65% | ACC=0.9318 (base 0.8704)
+  +18h: RMSE=4.184597 | base=0.598747 | skill=-598.89% | ACC=0.8802 (base 0.8247)
+  +24h: RMSE=5.998064 | base=0.652403 | skill=-819.38% | ACC=0.8355 (base 0.7924)
+
+Per-horizon per-channel RMSE (physical units):
+         var   unit      +6h     +12h     +18h     +24h
+         t2m      K   19.14°C   50.81°C   89.89°C  133.83°C
+         10u    m/s     5.79    14.68    24.09    34.28
+         10v    m/s     4.88    11.63    17.94    24.30
+         msl    hPa    15.21    43.86    76.06   111.17
+       t@850      K   14.54°C   39.19°C   70.92°C  106.72°C
+       u@850    m/s     8.55    22.74    36.46    50.04
+       v@850    m/s     6.36    15.30    23.21    31.01
+       z@850    gpm    167.7    473.0    829.9   1224.7
+       z@500    gpm    356.5    980.2   1736.5   2579.8
+
+Per-channel metrics overall (physical units, avg over 4 horizons):
+    #        var      ACC  RMSE_norm    RMSE_phys     unit
+    0        t2m   0.9889     4.0252      85.0539        K  (≈85.05 °C)
+    1        10u   0.8813     4.0229      22.3847      m/s
+    2        10v   0.7835     3.4321      16.3663      m/s
+    3        msl   0.9615     5.2631      71.2376      hPa
+    4         tp   0.5180     2.6565       0.0052        m
+    5         sp   0.9960     3.1630     301.6722      hPa
+    6       tcwv   0.9744     3.7063      61.6651    kg/m²
+    7     z_surf   0.9976     3.0643    2592.4574      gpm
+    8        lsm   0.9944     3.1679       1.4451        -
+    9      t@850   0.9871     4.3467      67.3897        K  (≈67.39 °C)
+   10      u@850   0.8924     4.0342      33.2554      m/s
+   11      v@850   0.7570     3.3553      21.0610      m/s
+   12      z@850   0.9811     5.1243     781.1116      gpm
+   13      q@850   0.9524     3.4498       0.0143    kg/kg
+   14      t@500   0.9847     4.4016      57.4297        K  (≈57.43 °C)
+   15      u@500   0.9053     4.0562      48.7833      m/s
+   16      v@500   0.7742     3.3994      31.2993      m/s
+   17      z@500   0.9906     4.7594    1640.0433      gpm
+   18      q@500   0.8909     3.5529       0.0040    kg/kg
+============================================================
+
+### finished: 2026-07-27T15:02:26+03:00, exit=0 ###
