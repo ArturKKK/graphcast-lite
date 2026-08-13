@@ -44,7 +44,10 @@ for f in "$DEST"/*_training_log.txt; do
 done
 nvidia-smi --query-gpu=memory.used,utilization.gpu --format=csv,noheader 2>/dev/null
 
-git add -f "$DEST" || exit 1
+# Файлы внутри каталога попадают под правила .gitignore (*.log и прочее), а
+# `git add -f <каталог>` их не пробивает — 13.08.2026 из-за этого скрипт молча
+# написал «нечего коммитить», хотя скопировал 80 файлов. Перечисляем поимённо.
+find "$DEST" -type f -print0 | xargs -0 --no-run-if-empty git add -f -- || exit 1
 # Отслеживаемые логи в каталогах экспериментов дописываются прямо во время
 # обучения. Если их не заигнорить, rebase упирается в незакоммиченные изменения.
 git add -f experiments/*/training_log.txt 2>/dev/null
