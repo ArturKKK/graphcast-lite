@@ -55,10 +55,18 @@ git add -f experiments/*/training_log.txt 2>/dev/null
 staged=$(git diff --cached --name-only | wc -l)
 echo "в индексе файлов: $staged"
 if [[ "$staged" -eq 0 ]]; then
-  echo "нечего коммитить — логи не изменились"
-  exit 0
+  # Раньше здесь стоял exit — и это съело два прогона: первый запуск коммитил
+  # логи, но падал на пуше (не было кредов), а следующие видели «нечего
+  # коммитить» и выходили, не доводя коммит до сервера. Теперь выходим только
+  # если и пушить нечего.
+  if git diff --quiet HEAD @{upstream} 2>/dev/null; then
+    echo "нечего коммитить и нечего пушить"
+    exit 0
+  fi
+  echo "новых логов нет, но есть незапушенные коммиты — отправляю"
+else
+  git commit -qm "логи обучения $(date '+%d.%m %H:%M')" || exit 1
 fi
-git commit -qm "логи обучения $(date '+%d.%m %H:%M')" || exit 1
 # --autostash: обучение могло дописать лог за те секунды, что шёл коммит
 git pull -q --rebase --autostash origin main-arthur || { echo "ОШИБКА pull"; exit 1; }
 git push -q origin main-arthur || { echo "ОШИБКА push"; exit 1; }
