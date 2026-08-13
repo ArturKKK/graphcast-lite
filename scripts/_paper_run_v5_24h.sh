@@ -71,8 +71,23 @@ fi
 # ── 3. Обучение ───────────────────────────────────────────────────────
 log "коммит: $(git rev-parse --short HEAD)"
 [[ -n "$(git status --porcelain)" ]] && log "ВНИМАНИЕ: незакоммиченные изменения"
-log "START обучения $EXP (шаг 24 ч, с нуля, без pretrained)"
-python -u -m src.main "experiments/$EXP" >> "$OUT/v5_train.log" 2>&1
+# Возобновление, если чекпойнт уцелел. /data стирается при перезапуске
+# виртуалки, а /workdir нет — значит experiments/*/checkpoint.pth переживает.
+# Без этого флага повторный запуск начал бы обучение с нуля.
+RESUME=""
+if [[ -f "experiments/$EXP/checkpoint.pth" ]]; then
+  RESUME="--resume"
+  EP=$(python - <<PY
+import torch, pathlib
+s = pathlib.Path("experiments/$EXP/checkpoint.pth")
+e = torch.load(s, map_location="cpu").get("epoch")
+print((e + 1) if isinstance(e, int) else "?")
+PY
+)
+  log "найден чекпойнт эпохи $EP — продолжаю, а не начинаю заново"
+fi
+log "START обучения $EXP (шаг 24 ч) $RESUME"
+python -u -m src.main "experiments/$EXP" $RESUME >> "$OUT/v5_train.log" 2>&1
 log "DONE обучение rc=$?"
 
 # ── 4. Оценка: горизонты +24/+48/+72 ч ────────────────────────────────

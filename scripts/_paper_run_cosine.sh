@@ -91,8 +91,13 @@ fi
 # ── 3. Провенанс и обучение ───────────────────────────────────────────
 log "коммит: $(git rev-parse --short HEAD)"
 [[ -n "$(git status --porcelain)" ]] && log "ВНИМАНИЕ: незакоммиченные изменения — модель будет невоспроизводима"
-log "START обучения $EXP (косинус, разогрев 1000 шагов)"
-python -u -m src.main "experiments/$EXP" --pretrained "$PRETRAINED" >> "$OUT/cosine_train.log" 2>&1
+# Возобновление, если чекпойнт уцелел после перезапуска виртуалки.
+# ВАЖНО: планировщик темпа при возобновлении отматывается на пройденные шаги и
+# восстанавливает базовые темпы из конфига — иначе спад применился бы дважды.
+RESUME=""
+[[ -f "experiments/$EXP/checkpoint.pth" ]] && { RESUME="--resume"; log "найден чекпойнт — продолжаю"; }
+log "START обучения $EXP (косинус, разогрев 1000 шагов) $RESUME"
+python -u -m src.main "experiments/$EXP" --pretrained "$PRETRAINED" $RESUME >> "$OUT/cosine_train.log" 2>&1
 log "DONE обучение rc=$?"
 
 # ── 4. Оценка на том же окне, что и основная модель ───────────────────
