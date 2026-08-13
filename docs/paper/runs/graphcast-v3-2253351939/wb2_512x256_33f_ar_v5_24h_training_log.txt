@@ -38,3 +38,23 @@ epoch  ar  train_loss    val_loss   val_ACC     best_vl  patience  timestamp
    29   3     0.10311     0.08361    0.9638     0.08065         9  06:14:15
    30   3     0.10262     0.08450    0.9634     0.08065        10  08:22:31
 === Training finished: 2026-08-13T08:22:31.269798 ===
+=== Training started: 2026-08-13T11:26:14.299046 ===
+# commit: 3fb65496a15a3ef3a88798247088d4594de1a84a  (есть незакоммиченные изменения!)
+# config md5: 17a7c26c464aab0a8949364ff532f104
+# dataset: /data/datasets/wb2_512x256_33f_v3
+#   n_time=17532 n_feat=33 nodes=512x256
+epochs=30  max_ar=3  epochs_per_stage=10
+>>> Resumed from epoch 30, AR=3, best_vl=0.08065
+epoch  ar  train_loss    val_loss   val_ACC     best_vl  patience  timestamp
+------------------------------------------------------------------------------------------
+=== Training finished: 2026-08-13T11:26:14.328468 ===
+=== Training started: 2026-08-13T11:55:38.769875 ===
+# commit: 77ef810518b8b7aebf9df7f96b9ca57c3b2ba57f  (есть незакоммиченные изменения!)
+# config md5: 17a7c26c464aab0a8949364ff532f104
+# dataset: /data/datasets/wb2_512x256_33f_v3
+#   n_time=17532 n_feat=33 nodes=512x256
+epochs=30  max_ar=3  epochs_per_stage=10
+>>> Resumed from epoch 30, AR=3, best_vl=0.08065
+epoch  ar  train_loss    val_loss   val_ACC     best_vl  patience  timestamp
+------------------------------------------------------------------------------------------
+=== Training finished: 2026-08-13T11:55:38.796170 ===
