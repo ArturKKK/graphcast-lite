@@ -174,3 +174,56 @@ Patience counter is now 4
 
 
 Epoch 20 (AR=3) with attention threshold 0.08135999999999999
+[Epoch 21] train_loss=0.02704  val_loss=0.01801  val_ACC=0.9923  raw_RMSE=0.1107
+Patience counter is now 5 
+
+
+Epoch 21 (AR=3) with attention threshold 0.086784
+[Epoch 22] train_loss=0.02699  val_loss=0.01800  val_ACC=0.9924  raw_RMSE=0.1106
+Patience counter is now 6 
+
+
+Epoch 22 (AR=3) with attention threshold 0.09220800000000001
+[Epoch 23] train_loss=0.02695  val_loss=0.01799  val_ACC=0.9924  raw_RMSE=0.1106
+Patience counter is now 7 
+
+
+Epoch 23 (AR=3) with attention threshold 0.097632
+[Epoch 24] train_loss=0.02691  val_loss=0.01796  val_ACC=0.9924  raw_RMSE=0.1105
+Patience counter is now 8 
+
+
+
+>>> УРОВЕНЬ СЛОЖНОСТИ ПОВЫШЕН! Теперь обучаем на 4 шага(ов) вперед. <<<
+
+Epoch 24 (AR=4) with attention threshold 0.103056
+[Epoch 25] train_loss=0.03173  val_loss=0.01804  val_ACC=0.9923  raw_RMSE=0.1107
+Patience counter is now 1 
+
+
+Epoch 25 (AR=4) with attention threshold 0.10848
+[Epoch 26] train_loss=0.03167  val_loss=0.01804  val_ACC=0.9923  raw_RMSE=0.1107
+Patience counter is now 2 
+
+
+Epoch 26 (AR=4) with attention threshold 0.11390399999999999
+[Epoch 27] train_loss=0.03163  val_loss=0.01804  val_ACC=0.9923  raw_RMSE=0.1107
+Patience counter is now 3 
+
+
+Epoch 27 (AR=4) with attention threshold 0.119328
+[Epoch 28] train_loss=0.03160  val_loss=0.01804  val_ACC=0.9923  raw_RMSE=0.1107
+Patience counter is now 4 
+
+
+Epoch 28 (AR=4) with attention threshold 0.12475199999999999
+[Epoch 29] train_loss=0.03158  val_loss=0.01804  val_ACC=0.9923  raw_RMSE=0.1107
+Patience counter is now 5 
+
+
+Epoch 29 (AR=4) with attention threshold 0.130176
+[Epoch 30] train_loss=0.03157  val_loss=0.01804  val_ACC=0.9923  raw_RMSE=0.1107
+Patience counter is now 6 
+
+
+Epoch 30 (AR=4) with attention threshold 0.1356
