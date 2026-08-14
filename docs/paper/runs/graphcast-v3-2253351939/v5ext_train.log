@@ -76,3 +76,33 @@ Val loss reduced by 0.00032. Saving best model...
 
 
 Epoch 32 (AR=3) with attention threshold 0.1356
+[Epoch 33] train_loss=0.08242  val_loss=0.07676  val_ACC=0.9675  raw_RMSE=0.2261
+Val loss reduced by 0.00021. Saving best model... 
+
+
+Epoch 33 (AR=3) with attention threshold 0.1356
+[Epoch 34] train_loss=0.08127  val_loss=0.07658  val_ACC=0.9676  raw_RMSE=0.2256
+Val loss reduced by 0.00017. Saving best model... 
+
+
+Epoch 34 (AR=3) with attention threshold 0.1356
+[Epoch 35] train_loss=0.08032  val_loss=0.07649  val_ACC=0.9677  raw_RMSE=0.2253
+Val loss reduced by 0.0001. Saving best model... 
+
+
+Epoch 35 (AR=3) with attention threshold 0.1356
+[Epoch 36] train_loss=0.07949  val_loss=0.07641  val_ACC=0.9678  raw_RMSE=0.2252
+Val loss reduced by 7e-05. Saving best model... 
+
+
+Epoch 36 (AR=3) with attention threshold 0.1356
+[Epoch 37] train_loss=0.07879  val_loss=0.07648  val_ACC=0.9678  raw_RMSE=0.2251
+Patience counter is now 1 
+
+
+Epoch 37 (AR=3) with attention threshold 0.1356
+[Epoch 38] train_loss=0.07819  val_loss=0.07635  val_ACC=0.9678  raw_RMSE=0.2248
+Val loss reduced by 7e-05. Saving best model... 
+
+
+Epoch 38 (AR=3) with attention threshold 0.1356
