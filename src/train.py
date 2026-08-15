@@ -38,7 +38,24 @@ def load_checkpoint(path, model, optimiser, device):
     """Загружает чекпоинт и возвращает состояние обучения."""
     ckpt = torch.load(path, map_location=device)
     model.load_state_dict(ckpt['model_state_dict'])
-    optimiser.load_state_dict(ckpt['optimizer_state_dict'])
+    try:
+        optimiser.load_state_dict(ckpt['optimizer_state_dict'])
+    except ValueError as e:
+        # Обычная причина — разное число групп параметров. Модель, обученная с
+        # `--pretrained` и заморозкой процессора, имеет ДВЕ группы (интерфейсы и
+        # процессор с пониженным темпом); без `--pretrained` оптимизатор
+        # создаётся с одной, и состояние не подходит. Раньше это падало с
+        # невнятным сообщением из недр torch (15.08.2026 потеряли полтора часа).
+        n_ckpt = len(ckpt['optimizer_state_dict'].get('param_groups', []))
+        n_now = len(optimiser.param_groups)
+        print(f"\n!!! Состояние оптимизатора из чекпойнта не подошло: {e}")
+        print(f"    групп в чекпойнте: {n_ckpt}, у текущего оптимизатора: {n_now}")
+        if n_ckpt != n_now:
+            print(f"    Скорее всего не передан --pretrained: модель обучалась от "
+                  f"чужих весов с заморозкой процессора, и групп было две.")
+        print(f"    Продолжаю с ЧИСТЫМИ моментами Adam. Веса модели загружены, но "
+              f"первые эпохи уйдут на восстановление моментов — сравнение с "
+              f"исходным прогоном будет нечестным.\n")
     return {
         'start_epoch': ckpt['epoch'] + 1,  # следующая эпоха
         'ar_steps': ckpt['ar_steps'],

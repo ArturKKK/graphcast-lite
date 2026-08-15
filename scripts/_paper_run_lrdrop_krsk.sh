@@ -50,8 +50,18 @@ if [[ ! -f "experiments/$EXP/checkpoint.pth" ]]; then
   cp -p "experiments/$SRC/best_model.pth" "experiments/$EXP/best_model.pth" 2>/dev/null
   log "состояние перенесено из $SRC"
 fi
+# --pretrained обязателен, хотя веса тут же перезапишутся чекпойнтом.
+# Основная модель обучалась от глобальной v3 с заморозкой процессора, поэтому у
+# её оптимизатора ДВЕ группы параметров (интерфейсы и процессор с пониженным
+# темпом), и обе лежат в чекпойнте. Без --pretrained main.py создаёт оптимизатор
+# с одной группой, и возобновление падает с
+# "loaded state dict has a different number of parameter groups"
+# (наступили 15.08.2026, потеряли полтора часа).
+PRETRAINED=experiments/wb2_512x256_33f_ar_v3/best_model.pth
+[[ -f "$PRETRAINED" ]] || { log "нет $PRETRAINED — нужен для структуры оптимизатора"; exit 1; }
 log "START обучения $EXP (40 эпох, косинус, возобновление)"
-python -u -m src.main "experiments/$EXP" --resume >> "$OUT/lrdrop_krsk_train.log" 2>&1
+python -u -m src.main "experiments/$EXP" --pretrained "$PRETRAINED" --resume \
+    >> "$OUT/lrdrop_krsk_train.log" 2>&1
 log "DONE обучение rc=$?"
 
 log "START оценки по области интереса"
