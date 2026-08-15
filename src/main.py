@@ -112,6 +112,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str,
                 pred_steps=ar_target_steps,
                 n_features=experiment_config.data.num_features_used,
                 time_stride=getattr(experiment_config.data, "time_stride", 1),
+                obs_stride=getattr(experiment_config.data, "obs_stride", 0),
             )
         )
     else:

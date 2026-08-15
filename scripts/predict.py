@@ -231,6 +231,7 @@ def main():
             n_features=exp_cfg.data.num_features_used,
             test_split=args.split,
             time_stride=getattr(exp_cfg.data, "time_stride", 1),
+            obs_stride=getattr(exp_cfg.data, "obs_stride", 0),
         )
     else:
         train_ds, val_ds, test_ds, meta = load_train_and_test_datasets(

@@ -91,15 +91,28 @@ class TimeseriesChunkDataset(Dataset):
         n_features: Optional[int] = None,
         test_fraction: float = 0.2,
         time_stride: int = 1,
+        obs_stride: int = 0,
     ):
         self.data_dir = data_dir
         self.obs_window = obs_window
         self.pred_steps = pred_steps
         self.split = split
         self.test_fraction = test_fraction
-        # Шаг между кадрами в единицах сроков датасета (6 ч). 1 — как всегда,
-        # 4 — суточная сетка (модель v5).
+        # Шаг ЦЕЛИ в единицах сроков датасета (6 ч): на сколько вперёд смотрит
+        # модель за одно применение. 1 — +6 ч, 4 — +24 ч, 28 — +7 суток.
         self.time_stride = max(1, int(time_stride))
+        # Шаг ВХОДА: расстояние между входными кадрами. По умолчанию совпадает с
+        # шагом цели — так было до 15.08.2026, и так обязано быть, если модель
+        # применяется авторегрессионно (иначе на втором шаге понадобится кадр,
+        # который мы перепрыгнули).
+        #
+        # Но для ПРЯМОГО прогноза итерировать не нужно, и тогда вход можно
+        # оставить частым. Это важно: у суточной модели вход шёл через 24 ч, и
+        # по двум таким срокам почти не видно, куда и как быстро движутся
+        # системы — она проигрывала на +24 ч (1,31 против 1,24 °C у
+        # шестичасовой). Развязка шагов возвращает информацию о тенденции,
+        # сохраняя нулевое накопление ошибки.
+        self.obs_stride = max(1, int(obs_stride if obs_stride else self.time_stride))
 
         # 1. Load scalers
         scalers = np.load(os.path.join(data_dir, "scalers.npz"))
@@ -186,9 +199,11 @@ class TimeseriesChunkDataset(Dataset):
         # 5. Determine valid sample indices
         # A sample at global time t needs timesteps [t, t+1, ..., t + obs + pred - 1]
         # But we can't cross chunk boundaries (temporal discontinuity!)
-        # С шагом time_stride окно растягивается: кадры берутся не подряд, а
-        # через s, поэтому занимаемый интервал равен (obs+pred−1)*s + 1.
-        window_size = (obs_window + pred_steps - 1) * self.time_stride + 1
+        # Шаг входа и шаг цели независимы (см. комментарий к obs_stride).
+        # Входные кадры: t, t+os, …, t+(obs−1)*os
+        # Целевые:       последний_вход + ts, +2*ts, …, +pred*ts
+        window_size = ((obs_window - 1) * self.obs_stride
+                       + pred_steps * self.time_stride + 1)
 
         self._sample_indices: List[Tuple[int, int]] = []  # (chunk_idx, local_t)
         for ci, chunk in enumerate(self.chunks):
@@ -240,12 +255,20 @@ class TimeseriesChunkDataset(Dataset):
         # Шаг обязан быть одинаковым для входа и цели, иначе авторегрессия
         # рвётся на втором шаге: модель выдаст t+24ч, а для следующего входа
         # понадобится t+18ч, которого мы перепрыгнули.
-        s = self.time_stride
-        n_frames = self.obs_window + self.pred_steps
-        if s == 1:
-            window = chunk[local_t : local_t + n_frames]
+        os_, ts = self.obs_stride, self.time_stride
+        if os_ == 1 and ts == 1:
+            window = chunk[local_t : local_t + self.obs_window + self.pred_steps]
+        elif os_ == ts:
+            n_frames = self.obs_window + self.pred_steps
+            window = chunk[local_t : local_t + (n_frames - 1) * ts + 1 : ts]
         else:
-            window = chunk[local_t : local_t + (n_frames - 1) * s + 1 : s]
+            # Шаги входа и цели различаются — берём кадры поимённо, читая из
+            # memmap только нужные, а не весь занимаемый интервал (при шаге
+            # цели в 28 сроков он был бы в тридцать кадров).
+            last_obs = local_t + (self.obs_window - 1) * os_
+            idx = [local_t + i * os_ for i in range(self.obs_window)] + \
+                  [last_obs + (j + 1) * ts for j in range(self.pred_steps)]
+            window = chunk[idx]
 
         if self.flat_grid:
             # Flat data: window shape (obs+pred, N_nodes, feat_total)
@@ -295,6 +318,7 @@ def load_chunked_datasets(
     test_fraction: float = 0.2,
     test_split: str = "test_only",
     time_stride: int = 1,
+    obs_stride: int = 0,
 ) -> Tuple[Dataset, Dataset, Dataset, DatasetMetadata]:
     """
     Convenience function matching the interface of load_train_and_test_datasets.
@@ -326,17 +350,17 @@ def load_chunked_datasets(
     train_ds = TimeseriesChunkDataset(
         data_path, obs_window=obs_window, pred_steps=pred_steps,
         split="train", n_features=n_feat, test_fraction=test_fraction,
-        time_stride=time_stride,
+        time_stride=time_stride, obs_stride=obs_stride,
     )
     val_ds = TimeseriesChunkDataset(
         data_path, obs_window=obs_window, pred_steps=pred_steps,
         split="val", n_features=n_feat, test_fraction=test_fraction,
-        time_stride=time_stride,
+        time_stride=time_stride, obs_stride=obs_stride,
     )
     test_ds = TimeseriesChunkDataset(
         data_path, obs_window=obs_window, pred_steps=pred_steps,
         split=test_split, n_features=n_feat, test_fraction=test_fraction,
-        time_stride=time_stride,
+        time_stride=time_stride, obs_stride=obs_stride,
     )
     if time_stride > 1:
         print(f"[ChunkDataset] шаг по времени {time_stride} сроков "
