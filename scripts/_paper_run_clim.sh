@@ -21,6 +21,14 @@ D33R=/data/datasets/multires_krsk_33f
 mkdir -p "$OUT"; exec >>"$OUT/clim_master.log" 2>&1
 cd "$REPO" || exit 1
 log() { echo "[$(date '+%d.%m %H:%M:%S')] $*"; }
+
+# Защита от повторного запуска: два процесса пишут в один файл и молотят диск,
+# отбирая его у даталоадера обучения. 15.08.2026 запустили дважды подряд.
+if pgrep -f "paper_climatology.py" | grep -qv "^$$\$"; then
+  log "расчёт уже идёт — второй запуск не нужен, выхожу"
+  exit 0
+fi
+
 log "=== КЛИМАТОЛОГИЧЕСКИЙ ЭТАЛОН ==="
 
 source "$VENV/bin/activate" 2>/dev/null || { log "нет venv — стоп"; exit 1; }
