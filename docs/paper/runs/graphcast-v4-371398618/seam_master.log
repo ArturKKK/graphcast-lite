@@ -1,0 +1,12 @@
+[13:44:59] === SEAM START (commit 803569e), MAXN=100 ===
+[13:44:59] свободно на /data: 3.0T
+[13:44:59] START seam_flagship_preds
+[13:46:36] DONE  seam_flagship_preds rc=0 | skill=74.20%
+[13:46:36] размер предсказаний: 7.6G
+[13:46:36] === SEAM DONE ===
+[14:21:11] === SEAM START (commit 803569e), MAXN=100 ===
+[14:21:11] свободно на /data: 3.0T
+[14:21:12] START seam_flagship_preds
+[14:22:56] DONE  seam_flagship_preds rc=0 | skill=74.20%
+[14:22:56] размер предсказаний: 7.6G
+[14:22:56] === SEAM DONE ===
