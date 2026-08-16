@@ -1,0 +1,66 @@
+[predict] data_dir=/data/datasets/wb2_512x256_33f_v3 (chunked=True, pred_steps=20)
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] train: 14008 samples, grid=512×256, feat=33, obs=2, pred=20
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] val: 1751 samples, grid=512×256, feat=33, obs=2, pred=20
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] test_only: 1752 samples, grid=512×256, feat=33, obs=2, pred=20
+[graph] уровни меша [4, 6], признаки рёбер: legacy
+[processor] InteractionNet: 12 шагов, агрегация 'mean'
+Encoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [172034, 72], [2, 205302]  | [172034, 256]  | 348,162  |
+| ├─(mlp)MLP                |                            | [172034, 256]  | 150,786  |
+| │    └─(MLP)ModuleList    | --                         | --             | 150,786  |
+| │    │    └─(0)Linear     | [172034, 72]               | [172034, 256]  | 18,688   |
+| │    │    └─(1)PReLU      | [172034, 256]              | [172034, 256]  | 1        |
+| │    │    └─(2)Linear     | [172034, 256]              | [172034, 256]  | 65,792   |
+| │    │    └─(3)PReLU      | [172034, 256]              | [172034, 256]  | 1        |
+| │    │    └─(4)Linear     | [172034, 256]              | [172034, 256]  | 65,792   |
+| │    │    └─(5)LayerNorm  | [172034, 256]              | [172034, 256]  | 512      |
+| ├─(graph_layer)GraphLayer |                            | [172034, 256]  | 197,376  |
+| │    └─(activation)SiLU   | [172034, 256]              | [172034, 256]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 197,376  |
+| │    │    └─(0)GCNConv    | [172034, 256], [2, 205302] | [172034, 256]  | 65,792   |
+| │    │    └─(1)SiLU       | [172034, 256]              | [172034, 256]  | --       |
+| │    │    └─(2)GCNConv    | [172034, 256], [2, 205302] | [172034, 256]  | 65,792   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [172034, 256], [2, 205302] | [172034, 256]  | 65,792   |
++---------------------------+----------------------------+----------------+----------+
+
+Processor summary: 
+  (summary skipped: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument mat1 in method wrapper_CUDA_addmm))
+
+Decoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [172034, 256], [2, 393216] | [172034, 33]   | 152,483  |
+| ├─(mlp)MLP                |                            | [172034, 128]  | 115,202  |
+| │    └─(MLP)ModuleList    | --                         | --             | 115,202  |
+| │    │    └─(0)Linear     | [172034, 256]              | [172034, 256]  | 65,792   |
+| │    │    └─(1)PReLU      | [172034, 256]              | [172034, 256]  | 1        |
+| │    │    └─(2)Linear     | [172034, 256]              | [172034, 128]  | 32,896   |
+| │    │    └─(3)PReLU      | [172034, 128]              | [172034, 128]  | 1        |
+| │    │    └─(4)Linear     | [172034, 128]              | [172034, 128]  | 16,512   |
+| ├─(graph_layer)GraphLayer |                            | [172034, 33]   | 37,281   |
+| │    └─(activation)SiLU   | [172034, 128]              | [172034, 128]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 37,281   |
+| │    │    └─(0)GCNConv    | [172034, 128], [2, 393216] | [172034, 128]  | 16,512   |
+| │    │    └─(1)SiLU       | [172034, 128]              | [172034, 128]  | --       |
+| │    │    └─(2)GCNConv    | [172034, 128], [2, 393216] | [172034, 128]  | 16,512   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [172034, 128], [2, 393216] | [172034, 33]   | 4,257    |
++---------------------------+----------------------------+----------------+----------+
+
+[config] pred_window_used=4, но декодировщик выдаёт 33 каналов при C=33 → модель одношаговая (1). Беру 1.
+[AR-rollout] Модель выдаёт 1 шаг(ов), но мы прогоним 20 шагов авторегрессионно.
+[static] Каналы [7, 8] — статика, carry-forward при AR
+[forcing] Каналы [29, 30, 31, 32] — форсинг (из ground truth при AR)
+[predict] device=cuda | grid=512x256 | 200/1752 test samples
+[metrics] Исключены из aggregate метрик: каналы [7, 8, 29, 30, 31, 32] (static+forcing)
+[metrics] per-sample MSE будут сохранены в /workdir/paper_results/lrdrop_v3_d5_samples.npz
+[Main] Инференс (200 samples, DA=none)...
+  [50/200] RMSE=0.385708 ACC=0.9237
