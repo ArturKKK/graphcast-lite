@@ -21,9 +21,17 @@ CURRENT_WORKING_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Синхронизирует случайности (random, numpy, torch) для воспроизводимости.
 def set_random_seeds(seed: int = 42):
-    random.seed(42)
-    np.random.seed(42)
-    torch.manual_seed(42)
+    # До 16.08.2026 аргумент игнорировался и всюду был зашит 42: все прогоны шли
+    # на одном сиде, и повторить эксперимент на другом было нельзя. На уже
+    # посчитанные модели это не влияет (в конфигах и так стоял 42), но делало
+    # невозможной оценку разброса — а без неё непонятно, где в наших абляциях
+    # эффект, а где случайность.
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    print(f"[seed] случайности синхронизированы, сид {seed}")
 
 
 # Создаёт регулярную широтно-долготную сетку
