@@ -64,9 +64,27 @@ python -u -m src.main "experiments/$EXP" --pretrained "$PRETRAINED" --resume \
     >> "$OUT/lrdrop_krsk_train.log" 2>&1
 log "DONE обучение rc=$?"
 
-log "START оценки по области интереса"
+# ВАЖНО: оценивать надо ПОСЛЕДНЮЮ эпоху, а не best_model.pth.
+# Лучшее значение (0.01796) досталось в наследство от исходного прогона вместе с
+# чекпойнтом, и дообучение его не побило. Значит best_model.pth так и остался
+# весами 15-й эпохи ИСХОДНОЙ модели — оценка мерила бы её, а не дообученную.
+mkdir -p /data/paper_heavy
+python -u - "experiments/$EXP/checkpoint.pth" /data/paper_heavy/krsk_lrdrop_last.pth <<'PYEOF'
+import sys, torch, pathlib
+src, dst = pathlib.Path(sys.argv[1]), sys.argv[2]
+if src.exists():
+    ck = torch.load(src, map_location="cpu")
+    torch.save(ck.get("model_state_dict", ck), dst)
+    e = ck.get("epoch")
+    print("[prep] последняя эпоха", (e + 1) if isinstance(e, int) else e)
+else:
+    print("[prep] чекпойнта нет")
+PYEOF
+CK=""
+[[ -f /data/paper_heavy/krsk_lrdrop_last.pth ]] && CK="--ckpt /data/paper_heavy/krsk_lrdrop_last.pth"
+log "START оценки по области интереса $CK"
 python -u scripts/predict.py "experiments/$EXP" --data-dir "$D33R" --split test_only \
-    --ar-steps 4 --max-samples 2000 --per-channel --no-save --region 50 60 83 98 \
+    --ar-steps 4 --max-samples 2000 --per-channel --no-save --region 50 60 83 98 $CK \
     --save-sample-metrics "$OUT/lrdrop_krsk_roi_samples.npz" >> "$OUT/lrdrop_krsk_roi.log" 2>&1
 log "DONE оценка rc=$? | $(grep -oE 'skill=[-0-9.]+%' "$OUT/lrdrop_krsk_roi.log" | tail -1)"
 grep -E '^\s+(t2m|msl)\b' "$OUT/lrdrop_krsk_roi.log" | tail -2
