@@ -1,0 +1,207 @@
+Using device: cuda
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] train: 12853 samples, flat_nodes=133279, feat=33, obs=2, pred=4
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] val: 1607 samples, flat_nodes=133279, feat=33, obs=2, pred=4
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] test_only: 1607 samples, flat_nodes=133279, feat=33, obs=2, pred=4
+Encoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [174241, 72], [2, 207099]  | [174241, 256]  | 348,162  |
+| ├─(mlp)MLP                |                            | [174241, 256]  | 150,786  |
+| │    └─(MLP)ModuleList    | --                         | --             | 150,786  |
+| │    │    └─(0)Linear     | [174241, 72]               | [174241, 256]  | 18,688   |
+| │    │    └─(1)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(2)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(3)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(4)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(5)LayerNorm  | [174241, 256]              | [174241, 256]  | 512      |
+| ├─(graph_layer)GraphLayer |                            | [174241, 256]  | 197,376  |
+| │    └─(activation)SiLU   | [174241, 256]              | [174241, 256]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 197,376  |
+| │    │    └─(0)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
+| │    │    └─(1)SiLU       | [174241, 256]              | [174241, 256]  | --       |
+| │    │    └─(2)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
++---------------------------+----------------------------+----------------+----------+
+
+Processor summary: 
+  (summary skipped: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument mat1 in method wrapper_CUDA_addmm))
+
+Decoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [174241, 256], [2, 399837] | [174241, 33]   | 152,483  |
+| ├─(mlp)MLP                |                            | [174241, 128]  | 115,202  |
+| │    └─(MLP)ModuleList    | --                         | --             | 115,202  |
+| │    │    └─(0)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(1)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(2)Linear     | [174241, 256]              | [174241, 128]  | 32,896   |
+| │    │    └─(3)PReLU      | [174241, 128]              | [174241, 128]  | 1        |
+| │    │    └─(4)Linear     | [174241, 128]              | [174241, 128]  | 16,512   |
+| ├─(graph_layer)GraphLayer |                            | [174241, 33]   | 37,281   |
+| │    └─(activation)SiLU   | [174241, 128]              | [174241, 128]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 37,281   |
+| │    │    └─(0)GCNConv    | [174241, 128], [2, 399837] | [174241, 128]  | 16,512   |
+| │    │    └─(1)SiLU       | [174241, 128]              | [174241, 128]  | --       |
+| │    │    └─(2)GCNConv    | [174241, 128], [2, 399837] | [174241, 128]  | 16,512   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [174241, 128], [2, 399837] | [174241, 33]   | 4,257    |
++---------------------------+----------------------------+----------------+----------+
+
+
+>>> Загружаю pretrained веса: experiments/wb2_512x256_33f_ar_v3/best_model.pth
+  Отброшены записи с иным размером (1): ['_processing_edge_features']
+  Это ожидаемо при смене mesh_levels — буферы геометрии пересчитаны под новую сетку.
+  Missing keys (1): ['_processing_edge_features']...
+  Pretrained веса загружены.
+
+[Fine-tune] Processor ЗАМОРОЖЕН на 6 эпох.
+[Fine-tune] После разморозки processor lr = 1.0e-05 (x0.1)
+[Train] Включен Weighted Loss.
+[Train] static_channels=[7, 8], forcing_channels=[29, 30, 31, 32]
+[Train] → маска каналов: 27/33 dynamic (no-loss: [7, 8, 29, 30, 31, 32])
+[Init] val_loss=0.21405 val_acc=0.9091 raw_RMSE=0.3974
+
+Epoch 0 (AR=1) with attention threshold 0.0
+[Epoch 1] train_loss=0.03993  val_loss=0.03460  val_ACC=0.9839  raw_RMSE=0.1599
+Val loss reduced by inf. Saving best model... 
+
+
+Epoch 1 (AR=1) with attention threshold 0.0
+[Epoch 2] train_loss=0.03238  val_loss=0.03254  val_ACC=0.9850  raw_RMSE=0.1546
+Val loss reduced by 0.00206. Saving best model... 
+
+
+Epoch 2 (AR=1) with attention threshold 0.0
+[Epoch 3] train_loss=0.03090  val_loss=0.03130  val_ACC=0.9856  raw_RMSE=0.1512
+Val loss reduced by 0.00124. Saving best model... 
+
+
+Epoch 3 (AR=1) with attention threshold 0.0
+[Epoch 4] train_loss=0.03000  val_loss=0.03062  val_ACC=0.9860  raw_RMSE=0.1493
+Val loss reduced by 0.00068. Saving best model... 
+
+
+Epoch 4 (AR=1) with attention threshold 0.0
+[Epoch 5] train_loss=0.02936  val_loss=0.03008  val_ACC=0.9863  raw_RMSE=0.1478
+Val loss reduced by 0.00054. Saving best model... 
+
+
+Epoch 5 (AR=1) with attention threshold 0.0
+[Epoch 6] train_loss=0.02885  val_loss=0.02962  val_ACC=0.9866  raw_RMSE=0.1465
+Val loss reduced by 0.00045. Saving best model... 
+
+
+
+>>> PROCESSOR РАЗМОРОЖЕН (epoch 6). lr = 1.0e-05 <<<
+
+Epoch 6 (AR=1) with attention threshold 0.005424
+[Epoch 7] train_loss=0.02117  val_loss=0.02014  val_ACC=0.9912  raw_RMSE=0.1185
+Val loss reduced by 0.00949. Saving best model... 
+
+
+Epoch 7 (AR=1) with attention threshold 0.010848
+[Epoch 8] train_loss=0.01890  val_loss=0.01929  val_ACC=0.9917  raw_RMSE=0.1156
+Val loss reduced by 0.00085. Saving best model... 
+
+
+
+>>> УРОВЕНЬ СЛОЖНОСТИ ПОВЫШЕН! Теперь обучаем на 2 шага(ов) вперед. <<<
+
+Epoch 8 (AR=2) with attention threshold 0.016272
+[Epoch 9] train_loss=0.02432  val_loss=0.01911  val_ACC=0.9918  raw_RMSE=0.1148
+Val loss reduced by 0.00018. Saving best model... 
+
+
+Epoch 9 (AR=2) with attention threshold 0.021696
+[Epoch 10] train_loss=0.02371  val_loss=0.01890  val_ACC=0.9919  raw_RMSE=0.1140
+Val loss reduced by 0.00021. Saving best model... 
+
+
+Epoch 10 (AR=2) with attention threshold 0.02712
+[Epoch 11] train_loss=0.02340  val_loss=0.01876  val_ACC=0.9920  raw_RMSE=0.1135
+Val loss reduced by 0.00014. Saving best model... 
+
+
+Epoch 11 (AR=2) with attention threshold 0.032544
+[Epoch 12] train_loss=0.02318  val_loss=0.01869  val_ACC=0.9920  raw_RMSE=0.1132
+Val loss reduced by 6e-05. Saving best model... 
+
+
+Epoch 12 (AR=2) with attention threshold 0.037968
+[Epoch 13] train_loss=0.02301  val_loss=0.01860  val_ACC=0.9920  raw_RMSE=0.1129
+Val loss reduced by 9e-05. Saving best model... 
+
+
+Epoch 13 (AR=2) with attention threshold 0.043392
+[Epoch 14] train_loss=0.02287  val_loss=0.01847  val_ACC=0.9921  raw_RMSE=0.1125
+Val loss reduced by 0.00013. Saving best model... 
+
+
+Epoch 14 (AR=2) with attention threshold 0.048816
+[Epoch 15] train_loss=0.02275  val_loss=0.01841  val_ACC=0.9921  raw_RMSE=0.1123
+Val loss reduced by 6e-05. Saving best model... 
+
+
+Epoch 15 (AR=2) with attention threshold 0.05424
+[Epoch 16] train_loss=0.02264  val_loss=0.01844  val_ACC=0.9921  raw_RMSE=0.1124
+Patience counter is now 1 
+
+
+
+>>> УРОВЕНЬ СЛОЖНОСТИ ПОВЫШЕН! Теперь обучаем на 3 шага(ов) вперед. <<<
+
+Epoch 16 (AR=3) with attention threshold 0.059664
+Traceback (most recent call last):
+  File "/home/mlcore/conda/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/home/mlcore/conda/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/workdir/graphcast-lite/src/main.py", line 280, in <module>
+    main()
+  File "/workdir/graphcast-lite/src/main.py", line 273, in main
+    run_experiment(
+  File "/workdir/graphcast-lite/src/main.py", line 233, in run_experiment
+    results = train(
+  File "/workdir/graphcast-lite/src/train.py", line 560, in train
+    epoch_train_loss = train_epoch(  
+  File "/workdir/graphcast-lite/src/train.py", line 209, in train_epoch
+    delta_pred = model(X=inp, attention_threshold=threshold, epoch=epoch, batch_num=i)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workdir/graphcast-lite/src/models.py", line 849, in forward
+    processed_mesh_node_features = self.processor.forward(
+  File "/workdir/graphcast-lite/src/models.py", line 471, in forward
+    out = self.graph_layer(X=X, edge_index=edge_index, attention_threshold=attention_threshold, **kwargs)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1561, in _call_impl
+    result = forward_call(*args, **kwargs)
+  File "/workdir/graphcast-lite/src/models.py", line 439, in forward
+    return self.layers(x=X, edge_index=edge_index, edge_attr_raw=edge_attr)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1561, in _call_impl
+    result = forward_call(*args, **kwargs)
+  File "/workdir/graphcast-lite/src/models.py", line 283, in forward
+    x, edge_attr = step(x, edge_index, edge_attr)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workdir/graphcast-lite/src/models.py", line 233, in forward
+    new_edge_attr = self.edge_norm(new_edge_attr)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch_geometric/nn/norm/layer_norm.py", line 103, in forward
+    out = out * self.weight + self.bias
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 320.00 MiB. GPU 0 has a total capacity of 79.18 GiB of which 20.56 MiB is free. Process 3231909 has 23.91 GiB memory in use. Process 3235063 has 55.23 GiB memory in use. Of the allocated memory 54.29 GiB is allocated by PyTorch, and 214.69 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)

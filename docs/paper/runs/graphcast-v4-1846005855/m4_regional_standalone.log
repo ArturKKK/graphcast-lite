@@ -1,0 +1,68 @@
+### PROVENANCE ###############################################
+# tag: m4_regional_standalone | started: 2026-08-06T12:04:24+00:00 | host: k8smr-macos-build--graphcast-v4-3510779436-task-0
+# git commit: 5e5758b | gpu: NVIDIA H100 80GB HBM3
+# COMMAND:
+#   python -u scripts/predict.py experiments/region_krsk_cds_19f --ckpt "experiments/region_krsk_cds_19f/best_model (18).pth" --data-dir /data/datasets/region_krsk_61x41_19f_2010-2020_025deg --split test_only --ar-steps 4 --max-samples 100 --per-channel --no-save --save-sample-metrics /workdir/paper_results/m4_regional_standalone_samples.npz
+##############################################################
+
+[predict] data_dir=/data/datasets/region_krsk_61x41_19f_2010-2020_025deg (chunked=True, pred_steps=4)
+[ChunkDataset] train: 12853 samples, grid=61×41, feat=19, obs=2, pred=4
+[ChunkDataset] val: 1607 samples, grid=61×41, feat=19, obs=2, pred=4
+[ChunkDataset] test_only: 1607 samples, grid=61×41, feat=19, obs=2, pred=4
+Encoder summary: 
++---------------------------+-------------------------+----------------+----------+
+| Layer                     | Input Shape             | Output Shape   | #Param   |
+|---------------------------+-------------------------+----------------+----------|
+| Model                     | [12743, 44], [2, 4077]  | [12743, 128]   | 88,578   |
+| ├─(mlp)MLP                |                         | [12743, 128]   | 39,042   |
+| │    └─(MLP)ModuleList    | --                      | --             | 39,042   |
+| │    │    └─(0)Linear     | [12743, 44]             | [12743, 128]   | 5,760    |
+| │    │    └─(1)PReLU      | [12743, 128]            | [12743, 128]   | 1        |
+| │    │    └─(2)Linear     | [12743, 128]            | [12743, 128]   | 16,512   |
+| │    │    └─(3)PReLU      | [12743, 128]            | [12743, 128]   | 1        |
+| │    │    └─(4)Linear     | [12743, 128]            | [12743, 128]   | 16,512   |
+| │    │    └─(5)LayerNorm  | [12743, 128]            | [12743, 128]   | 256      |
+| ├─(graph_layer)GraphLayer |                         | [12743, 128]   | 49,536   |
+| │    └─(activation)SiLU   | [12743, 128]            | [12743, 128]   | --       |
+| │    └─(layers)ModuleList | --                      | --             | 49,536   |
+| │    │    └─(0)GCNConv    | [12743, 128], [2, 4077] | [12743, 128]   | 16,512   |
+| │    │    └─(1)SiLU       | [12743, 128]            | [12743, 128]   | --       |
+| │    │    └─(2)GCNConv    | [12743, 128], [2, 4077] | [12743, 128]   | 16,512   |
+| │    │    └─(3)SiLU       | --                      | --             | --       |
+| │    │    └─(4)GCNConv    | [12743, 128], [2, 4077] | [12743, 128]   | 16,512   |
++---------------------------+-------------------------+----------------+----------+
+
+Processor summary: 
+  (summary skipped: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument mat1 in method wrapper_CUDA_addmm))
+
+Decoder summary: 
++---------------------------+-------------------------+----------------+----------+
+| Layer                     | Input Shape             | Output Shape   | #Param   |
+|---------------------------+-------------------------+----------------+----------|
+| Model                     | [12743, 128], [2, 7503] | [12743, 19]    | 38,485   |
+| ├─(mlp)MLP                |                         | [12743, 64]    | 28,930   |
+| │    └─(MLP)ModuleList    | --                      | --             | 28,930   |
+| │    │    └─(0)Linear     | [12743, 128]            | [12743, 128]   | 16,512   |
+| │    │    └─(1)PReLU      | [12743, 128]            | [12743, 128]   | 1        |
+| │    │    └─(2)Linear     | [12743, 128]            | [12743, 64]    | 8,256    |
+| │    │    └─(3)PReLU      | [12743, 64]             | [12743, 64]    | 1        |
+| │    │    └─(4)Linear     | [12743, 64]             | [12743, 64]    | 4,160    |
+| ├─(graph_layer)GraphLayer |                         | [12743, 19]    | 9,555    |
+| │    └─(activation)SiLU   | [12743, 64]             | [12743, 64]    | --       |
+| │    └─(layers)ModuleList | --                      | --             | 9,555    |
+| │    │    └─(0)GCNConv    | [12743, 64], [2, 7503]  | [12743, 64]    | 4,160    |
+| │    │    └─(1)SiLU       | [12743, 64]             | [12743, 64]    | --       |
+| │    │    └─(2)GCNConv    | [12743, 64], [2, 7503]  | [12743, 64]    | 4,160    |
+| │    │    └─(3)SiLU       | --                      | --             | --       |
+| │    │    └─(4)GCNConv    | [12743, 64], [2, 7503]  | [12743, 19]    | 1,235    |
++---------------------------+-------------------------+----------------+----------+
+
+Traceback (most recent call last):
+  File "/workdir/graphcast-lite/scripts/predict.py", line 895, in <module>
+    main()
+  File "/workdir/graphcast-lite/scripts/predict.py", line 277, in main
+    model.load_state_dict(state, strict=False)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/nn/modules/module.py", line 2153, in load_state_dict
+    raise RuntimeError('Error(s) in loading state_dict for {}:\n\t{}'.format(
+RuntimeError: Error(s) in loading state_dict for WeatherPrediction:
+	size mismatch for _processing_edge_features: copying a param with shape torch.Size([1492, 4]) from checkpoint, the shape in current model is torch.Size([65280, 4]).
