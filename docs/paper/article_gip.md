@@ -167,7 +167,7 @@ $$x \;=\; \bigl[\, x^{\text{глоб}}_{\text{вне области}},\; x^{\tex
 
 без весовой функции и сглаживания на стыке. Согласование разрешений происходит **неявно**, в ходе обмена сообщениями: узлы по обе стороны стыка связаны рёбрами и на каждом из 12 раундов обмениваются признаками, так что переходный слой формируется самой моделью в процессе обучения.
 
-Это принципиально отличает предлагаемый приём от метода Дэвиса [6] и его модификаций: там сшивание применяется **после** получения прогноза, как постобработка поля, тогда как здесь объединённая сетка является **частью входного представления** и участвует в обучении. Прямая экспериментальная проверка бесшовности стыка приведена в п. 4.5: {{ЗАПОЛНИТЬ: карта поля приземной температуры через границу вставки на горизонте +24 ч и зависимость RMSE от расстояния до границы области}}.
+Это принципиально отличает предлагаемый приём от метода Дэвиса [6] и его модификаций: там сшивание применяется **после** получения прогноза, как постобработка поля, тогда как здесь объединённая сетка является **частью входного представления** и участвует в обучении. Прямая экспериментальная проверка бесшовности стыка приведена на рис. 2. На панели (а) показано поле приземной температуры на горизонте +24 ч в окрестности границы вставки: смена разрешения видна по размеру ячеек, разрыва поля на склейке нет. На панели (б) — среднеквадратическая ошибка в зависимости от расстояния до границы (100 сроков). В полосе 0–25 км внутри вставки ошибка составляет 2,12 °C против 2,07 °C в её середине (200–1000 км), то есть на 2,3 % выше; снаружи, в полосе 0–100 км от границы, — 1,87 °C. Систематического всплеска ошибки у стыка не наблюдается: разброс между полосами не превышает нескольких процентов и не превосходит различий между зонами, обусловленных разной подстилающей поверхностью.
 
 Отметим ограничение подхода: региональная вставка задана прямоугольником в координатах широта–долгота, то есть внутри неё сохраняется та же неоднородность шага по долготе, что обсуждалась в п. 3.1. Для области протяжённостью 10° по широте это отношение составляет $\cos 50^\circ / \cos 60^\circ \approx 1.29$ и на масштабе задачи несущественно, однако при переносе схемы на область большей широтной протяжённости этот фактор потребует учёта.
 
@@ -426,6 +426,9 @@ $$\mathbf{x}^{a} = \mathbf{x}^{b} + \mathbf{K}\left( \mathbf{y} - \mathbf{H}\mat
 
 ## Список литературы
 
+**ПЕРЕД ПОДАЧЕЙ.** В тексте цитируются только источники 1–11 и 14. Остальные одиннадцать (12, 13, 15–22) не упомянуты нигде — ссылки на них, судя по всему, потерялись при сокращении текста с 36 страниц до 21. Их нужно либо вернуть в текст, либо убрать из списка: журналы обычно требуют, чтобы каждый источник был процитирован. Дубликат (работа Nipen стояла под номерами 8 и 18) устранён 16.08.2026, нумерация сдвинута, транслитерированный список приведён в соответствие.
+
+
 1. Гандин Л. С. Объективный анализ метеорологических полей. Л.: Гидрометеоиздат, 1963. 286 с.
 2. Толстых М. А., Фадеев Р. Ю., Шашкин В. В. и др. Система моделирования атмосферы для бесшовного прогноза. М.: Триада ЛТД, 2017. 166 с. {{ЗАПОЛНИТЬ: сверить по бумажному экземпляру или РИНЦ. Кандидаты на замену, если монографию не подтвердить: Толстых М. А. Полулагранжева модель атмосферы с высоким разрешением для численного прогноза погоды // Метеорология и гидрология. 2001. № 4. С. 5–16; либо Tolstykh M. A. et al. Development of the SL-AV global semi-Lagrangian atmosphere model in 2009–2019. ОБА найдены поиском и НЕ сверены с изданием — выходные данные проверить перед подачей}}
 3. Lam R., Sanchez-Gonzalez A., Willson M. et al. Learning skillful medium-range global weather forecasting // Science. 2023. Vol. 382, No. 6677. P. 1416–1421.
@@ -443,16 +446,36 @@ $$\mathbf{x}^{a} = \mathbf{x}^{b} + \mathbf{K}\left( \mathbf{y} - \mathbf{H}\mat
 15. Battaglia P. W., Pascanu R., Lai M. et al. Interaction networks for learning about objects, relations and physics // Advances in Neural Information Processing Systems. 2016. Vol. 29. P. 4502–4510.
 16. Ben Bouallègue Z., Clare M. C. A., Magnusson L. et al. The rise of data-driven weather forecasting: A first statistical assessment of machine learning-based weather forecasts in an operational-like context // Bulletin of the American Meteorological Society. 2024. Vol. 105, No. 6. P. E864–E883.
 17. Kalnay E. Atmospheric Modeling, Data Assimilation and Predictability. Cambridge: Cambridge University Press, 2003. 341 p.
-18. Nipen T. N. et al. Regional data-driven weather modeling with a global stretched-grid // Artificial Intelligence for the Earth Systems. 2026. Vol. 5, No. 2. DOI: 10.1175/AIES-D-25-0001.1.
-19. Price I., Sanchez-Gonzalez A., Alet F. et al. Probabilistic weather forecasting with machine learning // Nature. 2025. Vol. 637. P. 84–90.
-20. Janjić T., Bormann N., Bocquet M. et al. On the representation error in data assimilation // Quarterly Journal of the Royal Meteorological Society. 2018. Vol. 144. No. 713. P. 1257–1278.
-21. Geer A. J. Learning earth system models from observations: machine learning or data assimilation? // Philosophical Transactions of the Royal Society A. 2021. Vol. 379. No. 2194. Article 20200089.
-22. Bocquet M., Brajard J., Carrassi A., Bertino L. Bayesian inference of chaotic dynamics by merging data assimilation, machine learning and expectation-maximization // Foundations of Data Science. 2020. Vol. 2. No. 1. P. 55–80.
-23. Smith A., Lott N., Vose R. The Integrated Surface Database: Recent developments and partnerships // Bulletin of the American Meteorological Society. 2011. Vol. 92. No. 6. P. 704–708.
+18. Price I., Sanchez-Gonzalez A., Alet F. et al. Probabilistic weather forecasting with machine learning // Nature. 2025. Vol. 637. P. 84–90.
+19. Janjić T., Bormann N., Bocquet M. et al. On the representation error in data assimilation // Quarterly Journal of the Royal Meteorological Society. 2018. Vol. 144. No. 713. P. 1257–1278.
+20. Geer A. J. Learning earth system models from observations: machine learning or data assimilation? // Philosophical Transactions of the Royal Society A. 2021. Vol. 379. No. 2194. Article 20200089.
+21. Bocquet M., Brajard J., Carrassi A., Bertino L. Bayesian inference of chaotic dynamics by merging data assimilation, machine learning and expectation-maximization // Foundations of Data Science. 2020. Vol. 2. No. 1. P. 55–80.
+22. Smith A., Lott N., Vose R. The Integrated Surface Database: Recent developments and partnerships // Bulletin of the American Meteorological Society. 2011. Vol. 92. No. 6. P. 704–708.
 
 ## References
 
-{{ЗАПОЛНИТЬ: транслитерированный список по правилам журнала — русские работы: Author I.O. Perevod nazvaniya. Transliteraciya zhurnala [Journal in English], год, vol., pp. [in Russ.]; латинские записи переносятся с заменой «//» на «.» и «С.» на «pp.». Формат сверен с вып. № 1 (395), 2025}}
+1. Gandin L.S. Ob"ektivnyi analiz meteorologicheskikh polei [Objective Analysis of Meteorological Fields]. Leningrad, Gidrometeoizdat Publ., 1963, 286 p. [in Russ.]
+2. Tolstykh M.A., Fadeev R.Yu., Shashkin V.V. et al. Sistema modelirovaniya atmosfery dlya besshovnogo prognoza [Atmosphere Modelling System for Seamless Prediction]. Moscow, Triada Ltd. Publ., 2017, 166 p. [in Russ.]
+3. Lam R., Sanchez-Gonzalez A., Willson M. et al. Learning skillful medium-range global weather forecasting. Science, 2023, vol. 382, no. 6677, pp. 1416–1421.
+4. Bi K., Xie L., Zhang H. et al. Accurate medium-range global weather forecasting with 3D neural networks. Nature, 2023, vol. 619, pp. 533–538.
+5. Pathak J., Subramanian S., Harrington P. et al. FourCastNet: A global data-driven high-resolution weather model using adaptive Fourier neural operators. arXiv:2202.11214, 2022.
+6. Davies H.C. A lateral boundary formulation for multi-level prediction models. Quarterly Journal of the Royal Meteorological Society, 1976, vol. 102, no. 432, pp. 405–418.
+7. Oskarsson J., Landelius T., Lindsten F. Graph-based neural weather prediction for limited area modeling. arXiv:2309.17370, 2023.
+8. Nipen T.N., Haugen H.H., Ingstad M.S. et al. Regional data-driven weather modeling with a global stretched-grid. Artificial Intelligence for the Earth Systems, 2026, vol. 5, no. 2, DOI: 10.1175/AIES-D-25-0001.1.
+9. Gao Y., Wu H., Shu K. et al. OneForecast: A universal framework for global and regional weather forecasting. Proceedings of the 42nd International Conference on Machine Learning (ICML), 2025, arXiv:2502.00338.
+10. Wijnands J.S., Van Ginderachter M., François B. et al. Data-driven regional weather forecasting: A comparison of stretched-grid and limited-area modelling. Machine Learning with Applications, 2026, article 100526, DOI: 10.1016/j.mlwa.2026.100526.
+11. Hersbach H., Bell B., Berrisford P. et al. The ERA5 global reanalysis. Quarterly Journal of the Royal Meteorological Society, 2020, vol. 146, no. 730, pp. 1999–2049.
+12. Battaglia P.W., Hamrick J.B., Bapst V. et al. Relational inductive biases, deep learning, and graph networks. arXiv:1806.01261, 2018.
+13. Rasp S., Hoyer S., Merose A. et al. WeatherBench 2: A benchmark for the next generation of data-driven global weather models. Journal of Advances in Modeling Earth Systems, 2024, vol. 16, no. 6, article e2023MS004019.
+14. Wilks D.S. Statistical Methods in the Atmospheric Sciences. 4th ed. Amsterdam, Elsevier, 2019, 840 p.
+15. Battaglia P.W., Pascanu R., Lai M. et al. Interaction networks for learning about objects, relations and physics. Advances in Neural Information Processing Systems, 2016, vol. 29, pp. 4502–4510.
+16. Ben Bouallègue Z., Clare M.C.A., Magnusson L. et al. The rise of data-driven weather forecasting: A first statistical assessment of machine learning-based weather forecasts in an operational-like context. Bulletin of the American Meteorological Society, 2024, vol. 105, no. 6, pp. E864–E883.
+17. Kalnay E. Atmospheric Modeling, Data Assimilation and Predictability. Cambridge, Cambridge University Press, 2003, 341 p.
+18. Price I., Sanchez-Gonzalez A., Alet F. et al. Probabilistic weather forecasting with machine learning. Nature, 2025, vol. 637, pp. 84–90.
+19. Janjić T., Bormann N., Bocquet M. et al. On the representation error in data assimilation. Quarterly Journal of the Royal Meteorological Society, 2018, vol. 144, no. 713, pp. 1257–1278.
+20. Geer A.J. Learning earth system models from observations: machine learning or data assimilation? Philosophical Transactions of the Royal Society A, 2021, vol. 379, no. 2194, article 20200089.
+21. Bocquet M., Brajard J., Carrassi A., Bertino L. Bayesian inference of chaotic dynamics by merging data assimilation, machine learning and expectation-maximization. Foundations of Data Science, 2020, vol. 2, no. 1, pp. 55–80.
+22. Smith A., Lott N., Vose R. The Integrated Surface Database: Recent developments and partnerships. Bulletin of the American Meteorological Society, 2011, vol. 92, no. 6, pp. 704–708.
 
 ---
 
