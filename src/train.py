@@ -343,11 +343,86 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device,
             no_loss_ch = sorted(set(static_channels or []) | set(forcing_channels or []))
             acc_values.append(spatial_corr(outs, y_step0, exclude_channels=no_loss_ch if no_loss_ch else None))  
 
-    avg_loss = total_loss / len(test_dataloader)  
+    avg_loss = total_loss / len(test_dataloader)
     avg_acc  = sum(acc_values) / max(1, len(acc_values))
     avg_raw_rmse = (sum(raw_rmse_values) / max(1, len(raw_rmse_values))) ** 0.5
 
     return avg_loss, avg_acc, avg_raw_rmse
+
+
+def test_multistep(model, test_dataloader, loss_fn, device, ar_steps,
+                   lat_weights=None, spatial_mask=None, channel_mask=None,
+                   static_channels=None, forcing_channels=None, use_residual=True):
+    """Валидация на НЕСКОЛЬКИХ горизонтах, а не только на первом шаге.
+
+    Зачем. `test()` выше меряет ошибку одношагового прогноза — так было с самого
+    начала, ради скорости. Но по этой метрике выбирается и лучшее состояние
+    модели, и момент ранней остановки, а она систематически промахивается мимо
+    дальних сроков: за август это подтвердилось четырежды, самый явный случай —
+    у глобальной суточной модели последняя эпоха обошла «лучшую» на +120 ч
+    (38,5 против 37,3 %), проигрывая ей на +24 ч.
+
+    Возвращает (средний лосс по горизонтам, средний ACC, RMSE, список по
+    горизонтам). Отбор по среднему честнее одношагового: он учитывает и ближние
+    сроки, и дальние.
+
+    Цена — примерно вчетверо больше времени валидации при ar_steps=4, то есть
+    около десяти процентов к длительности эпохи.
+    """
+    model.eval()
+    per_h_loss = [0.0] * ar_steps
+    per_h_n = [0] * ar_steps
+    acc_values, raw_rmse_values = [], []
+    no_loss_ch = sorted(set(static_channels or []) | set(forcing_channels or []))
+
+    with torch.no_grad():
+        for batch in test_dataloader:
+            X, y = batch
+            y = y.squeeze(0) if len(y.shape) == 4 else y
+            X, y = X.to(device), y.to(device)
+
+            obs = model.obs_window if hasattr(model, 'obs_window') else 2
+            C = X.shape[-1] // obs
+            total_target = y.shape[-1] // C if C > 0 else 1
+            steps = min(ar_steps, total_target)
+            y_steps = y.view(y.shape[0], y.shape[1], total_target, C)
+
+            curr = X.view(X.shape[0], X.shape[1], obs, C)
+            for h in range(steps):
+                inp = curr.view(X.shape[0], X.shape[1], -1)
+                pred = model(X=inp, attention_threshold=0.0)
+                if pred.dim() == 2:
+                    pred = pred.unsqueeze(0)
+                x_last = curr[:, :, -1, :]
+                out = x_last + pred if use_residual else pred
+
+                target = y_steps[:, :, h, :]
+                # Статика переносится со входа, форсинг известен из цели —
+                # ровно как в обучении и при инференсе.
+                if static_channels:
+                    for ch in static_channels:
+                        out[:, :, ch] = x_last[:, :, ch]
+                if forcing_channels:
+                    for ch in forcing_channels:
+                        out[:, :, ch] = target[:, :, ch]
+
+                per_h_loss[h] += weighted_mse_loss(
+                    out, target, lat_weights, channel_mask=channel_mask,
+                    spatial_mask=spatial_mask).item()
+                per_h_n[h] += 1
+                if h == 0:
+                    raw_rmse_values.append(((out - target) ** 2).mean().item())
+                    acc_values.append(spatial_corr(
+                        out, target, exclude_channels=no_loss_ch or None))
+
+                curr = torch.cat([curr[:, :, 1:, :], out.unsqueeze(2)], dim=2)
+
+    per_h = [per_h_loss[i] / max(1, per_h_n[i]) for i in range(ar_steps)]
+    avg_loss = sum(per_h) / max(1, len(per_h))
+    avg_acc = sum(acc_values) / max(1, len(acc_values))
+    avg_raw = (sum(raw_rmse_values) / max(1, len(raw_rmse_values))) ** 0.5
+    return avg_loss, avg_acc, avg_raw, per_h
+
 
 def train(
     model: WeatherPrediction,
@@ -555,6 +630,9 @@ def train(
     scheduler = None
     lr_schedule = str(getattr(config, 'lr_schedule', 'constant')).lower()
     base_lr_cfg = float(getattr(config, 'learning_rate', 1e-4))
+    val_ar_steps = max(1, int(getattr(config, 'val_ar_steps', 1)))
+    if val_ar_steps > 1:
+        _log(f"# валидация на {val_ar_steps} горизонтах, отбор по среднему")
     if lr_schedule == 'cosine':
         import math
         warmup = int(getattr(config, 'lr_warmup_steps', 1000))
@@ -644,12 +722,24 @@ def train(
             scheduler=scheduler,
         )
 
-        epoch_val_loss, epoch_val_acc, epoch_raw_rmse = test(
-            model, val_dataloader, loss_fn, device, lat_weights,
-            spatial_mask=spatial_mask, channel_mask=channel_mask,
-            static_channels=static_ch, forcing_channels=forcing_ch,
-            use_residual=use_residual,
-        )  
+        # Валидация: по умолчанию одношаговая, как было всегда. Если в конфиге
+        # задан val_ar_steps > 1 — меряем на нескольких горизонтах и отбираем
+        # состояние по среднему, а не по ошибке на +6 ч (см. test_multistep).
+        per_h = None
+        if val_ar_steps > 1:
+            epoch_val_loss, epoch_val_acc, epoch_raw_rmse, per_h = test_multistep(
+                model, val_dataloader, loss_fn, device, val_ar_steps,
+                lat_weights=lat_weights, spatial_mask=spatial_mask,
+                channel_mask=channel_mask, static_channels=static_ch,
+                forcing_channels=forcing_ch, use_residual=use_residual,
+            )
+        else:
+            epoch_val_loss, epoch_val_acc, epoch_raw_rmse = test(
+                model, val_dataloader, loss_fn, device, lat_weights,
+                spatial_mask=spatial_mask, channel_mask=channel_mask,
+                static_channels=static_ch, forcing_channels=forcing_ch,
+                use_residual=use_residual,
+            )
 
         if print_losses:  
             print(f"[Epoch {epoch+1}] train_loss={epoch_train_loss:.5f}  val_loss={epoch_val_loss:.5f}  val_ACC={epoch_val_acc:.4f}  raw_RMSE={epoch_raw_rmse:.4f}")  
@@ -673,6 +763,8 @@ def train(
 
         # --- Пишем строку в лог-файл ---
         _log(f"{epoch+1:5d}  {ar_steps:2d}  {epoch_train_loss:10.5f}  {epoch_val_loss:10.5f}  {epoch_val_acc:8.4f}  {best_val_loss:10.5f}  {patience_counter:8d}  {datetime.now().strftime('%H:%M:%S')}")
+        if per_h:
+            _log('#   по горизонтам: ' + '  '.join(f'+{6*(i+1)}ч {v:.5f}' for i, v in enumerate(per_h)))
 
         # --- Сохраняем чекпоинт для возможного возобновления ---
         save_checkpoint(
