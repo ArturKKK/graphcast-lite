@@ -94,6 +94,10 @@ run() {   # run <тег> <эксперимент> <шагов> [доп. аргу
 # ── 7 суток = 168 ч ───────────────────────────────────────────────────
 log "--- 7 СУТОК ---"
 run d7_v3     wb2_512x256_33f_ar_v3           28
+# Шестичасовая со сбросом темпа: на пяти сутках она подтянулась с 26,0 до 33,1 %,
+# и без неё сравнение с суточной моделью на горизонтах статьи снова становится
+# нечестным — у одной был сброс темпа, у другой нет.
+run d7_v3lr   wb2_512x256_33f_ar_v3_lrdrop    28
 run d7_v5     wb2_512x256_33f_ar_v5_24h        7
 [[ -f "$HEAVY/v5ext_last.pth" ]] && \
   run d7_v5ext wb2_512x256_33f_ar_v5_24h_ext   7 --ckpt "$HEAVY/v5ext_last.pth"
@@ -101,12 +105,13 @@ run d7_v5     wb2_512x256_33f_ar_v5_24h        7
 # ── 14 суток = 336 ч ──────────────────────────────────────────────────
 log "--- 14 СУТОК ---"
 run d14_v3    wb2_512x256_33f_ar_v3           56
+run d14_v3lr  wb2_512x256_33f_ar_v3_lrdrop    56
 run d14_v5    wb2_512x256_33f_ar_v5_24h       14
 [[ -f "$HEAVY/v5ext_last.pth" ]] && \
   run d14_v5ext wb2_512x256_33f_ar_v5_24h_ext 14 --ckpt "$HEAVY/v5ext_last.pth"
 
 log "--- ИТОГ: приземная температура ---"
-for t in d7_v3 d7_v5 d7_v5ext d14_v3 d14_v5 d14_v5ext; do
+for t in d7_v3 d7_v3lr d7_v5 d7_v5ext d14_v3 d14_v3lr d14_v5 d14_v5ext; do
   [[ -f "$OUT/$t.log" ]] || continue
   log "$t: $(grep -E '^\s+t2m' "$OUT/$t.log" | tail -1 | tr -s ' ' | cut -c1-150)"
 done
