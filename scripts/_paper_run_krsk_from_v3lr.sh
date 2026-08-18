@@ -38,6 +38,22 @@ if [[ ! -x "$VENV/bin/python" || ! -f "$D33R/data.npy" ]]; then
 fi
 source "$VENV/bin/activate" 2>/dev/null || { log "нет venv — стоп"; exit 1; }
 export PYTHONPATH="$REPO"
+if [[ ! -f "$D33R/data.npy" ]]; then
+  # Сборка регионального 33-канального набора. На свежей виртуалке /data пусто,
+  # и без этого шага раннер просто останавливался (17.08.2026 потеряли прогон).
+  GX=/data/datasets/global_512x256_extra_2010-2021_07deg
+  if [[ ! -f "$GX/coords.npz" && -f /data/datasets/wb2_512x256_19f_ar/coords.npz ]]; then
+    cp -p /data/datasets/wb2_512x256_19f_ar/coords.npz "$GX/coords.npz"
+    log "coords.npz скопирован в global_extra"
+  fi
+  log "собираю региональный датасет (часы CPU)"
+  python -u scripts/build_multires_russia_33f.py \
+      --multires-dir /data/datasets/multires_krsk_19f_merge \
+      --extra-dir "$GX" \
+      --region-extra-dir /data/datasets/region_krsk_61x41_extra_2010-2020_025deg \
+      --out-dir "$D33R" >> "$OUT/krsk_v3lr_build.log" 2>&1
+  log "сборка rc=$? размер $(du -sh "$D33R" 2>/dev/null | cut -f1)"
+fi
 [[ -f "$D33R/data.npy" ]] || { log "нет $D33R — стоп"; exit 1; }
 [[ -f "$PRETRAINED" ]] || { log "НЕТ ВЕСОВ $PRETRAINED — их надо запушить с машины, где считался контроль"; exit 1; }
 
