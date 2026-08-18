@@ -15,6 +15,6 @@ wkhtmltopdf --enable-local-file-access --page-size A4 \
 python3 - <<'PY'
 import re
 d = open("docs/paper/article_gip.pdf", "rb").read()
-print(f"готово: docs/paper/article_gip.pdf — "
-      f"{len(re.findall(rb'/Type\s*/Page[^s]', d))} стр., {len(d)//1024} КБ")
+pages = len(re.findall(rb"/Type\s*/Page[^s]", d))
+print("готово: docs/paper/article_gip.pdf — {} стр., {} КБ".format(pages, len(d) // 1024))
 PY
