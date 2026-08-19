@@ -60,7 +60,10 @@ fi
 PRETRAINED=experiments/wb2_512x256_33f_ar_v3/best_model.pth
 [[ -f "$PRETRAINED" ]] || { log "нет $PRETRAINED — нужен для структуры оптимизатора"; exit 1; }
 log "START обучения $EXP (40 эпох, косинус, возобновление)"
-python -u -m src.main "experiments/$EXP" --pretrained "$PRETRAINED" --resume \
+# --reset-patience обязателен: терпение приходит из чекпойнта уже
+# исчерпанным (13 при пороге 12), и без обнуления ранняя остановка
+# срабатывает после первой же эпохи — 16.08.2026 приём так и не проверили.
+python -u -m src.main "experiments/$EXP" --pretrained "$PRETRAINED" --resume --reset-patience \
     >> "$OUT/lrdrop_mh_train.log" 2>&1
 log "DONE обучение rc=$?"
 

@@ -439,6 +439,9 @@ def train(
     print_losses: bool = True,
     wandb_log: bool = True,
     resume_checkpoint: str = None,  # путь к checkpoint.pth для возобновления
+    # Обнулить терпение и рекорд при возобновлении: нужно, когда сошедшуюся
+    # модель продолжают с новым расписанием темпа.
+    reset_patience: bool = False,
 ):
     # --- Инициализация весов (Новое) ---
     lat_weights = None
@@ -555,6 +558,16 @@ def train(
         val_losses = ckpt_state['val_losses']
         print(f"\n>>> ВОЗОБНОВЛЕНИЕ с эпохи {start_epoch + 1}, AR={ar_steps}, "
               f"best_val_loss={best_val_loss:.5f}, patience={patience_counter} <<<\n")
+
+        # Возобновление сошедшейся модели с новым расписанием темпа — это не
+        # починка упавшего прогона, а другой эксперимент. Счётчик терпения и
+        # рекорд достались от старого темпа: у региональной модели терпение
+        # пришло равным 13 при пороге 12, ранняя остановка сработала после
+        # первой же эпохи, и сброс темпа так и не был проверен (16.08.2026).
+        if reset_patience:
+            patience_counter = 0
+            best_val_loss = float("inf")
+            print(">>> терпение и рекорд обнулены: новое расписание темпа <<<\n")
 
     # --- File logging (можно отключить nohup и просто смотреть файл) ---
     log_path = os.path.join(results_save_dir, "training_log.txt")

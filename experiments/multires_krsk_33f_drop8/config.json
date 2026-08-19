@@ -1,0 +1,99 @@
+{
+  "_comment": "Krasnoyarsk multires 33f — финетюн от глобальной v3 (wb2_512x256_33f_ar_v3/best_model.pth). Каналы: 0-18 базовые 19f, 19-23 @250 гПа, 24-28 @1000 гПа (РЕАЛЬНЫЕ 0.25° в ROI из region_krsk_61x41_extra, вне ROI — билинейные из global extra), 29-32 time-forcing. Схема обучения СОВПАДАЕТ с дипломной 19f-линией (max_ar=4, 32 эпохи, freeze_processor=6, lr_factor=0.1), чтобы сравнение 19f vs 33f отличалось ТОЛЬКО набором каналов. По той же причине сознательно НЕ включены channel_loss_weights и noise_sigma (в 19f-моделях их не было — иначе появился бы конфаундер).",
+  "batch_size": 1,
+  "learning_rate": 7.5e-05,
+  "num_epochs": 8,
+  "early_stopping_patience": 15,
+  "early_stopping_delta": 1e-05,
+  "wandb_log": false,
+  "random_seed": 42,
+  "use_latitude_weighting": true,
+  "max_ar_steps": 4,
+  "initial_ar_steps": 4,
+  "use_residual": true,
+  "roi_only_loss": false,
+  "data_dir": "/data/datasets/multires_krsk_33f",
+  "freeze_processor_epochs": 0,
+  "finetune_processor_lr_factor": 1.0,
+  "static_channels": [
+    7,
+    8
+  ],
+  "forcing_channels": [
+    29,
+    30,
+    31,
+    32
+  ],
+  "graph": {
+    "grid2mesh_edge_creation": "radius",
+    "mesh2grid_edge_creation": "contained",
+    "grid2mesh_radius_query": 0.6,
+    "mesh_levels": [
+      4,
+      6
+    ]
+  },
+  "pipeline": {
+    "encoder": {
+      "mlp": {
+        "mlp_hidden_dims": [
+          256,
+          256
+        ],
+        "output_dim": 256,
+        "use_layer_norm": true,
+        "layer_norm_mode": "node"
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [
+          256,
+          256
+        ],
+        "output_dim": 256,
+        "activation": "swish"
+      }
+    },
+    "processor": {
+      "gcn": {
+        "layer_type": "interaction_net",
+        "output_dim": 256,
+        "activation": "swish",
+        "use_layer_norm": true,
+        "num_message_passing_steps": 12,
+        "edge_feature_dim": 4
+      }
+    },
+    "decoder": {
+      "mlp": {
+        "mlp_hidden_dims": [
+          256,
+          128
+        ],
+        "output_dim": 128,
+        "use_layer_norm": false
+      },
+      "gcn": {
+        "layer_type": "conv_gcn",
+        "hidden_dims": [
+          128,
+          128
+        ],
+        "output_dim": 33,
+        "activation": "swish"
+      }
+    }
+  },
+  "data": {
+    "dataset_name": "multires",
+    "num_features_used": 33,
+    "obs_window_used": 2,
+    "pred_window_used": 1,
+    "want_feats_flattened": true
+  },
+  "lr_schedule": "cosine",
+  "lr_warmup_steps": 1000,
+  "lr_min_factor": 0.0,
+  "val_ar_steps": 4
+}

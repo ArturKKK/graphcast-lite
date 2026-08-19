@@ -78,7 +78,8 @@ def load_model_from_experiment_config(
 
 
 def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str,
-                   resume: bool = False, pretrained_ckpt: str = None):
+                   resume: bool = False, pretrained_ckpt: str = None,
+                   reset_patience: bool = False):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -254,6 +255,7 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str,
         print_losses=True,
         wandb_log=experiment_config.wandb_log,
         resume_checkpoint=checkpoint_path,
+        reset_patience=reset_patience,
     )
 
     return results
@@ -262,6 +264,10 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str,
 def main():
     experiment_directory = sys.argv[1]
     resume = "--resume" in sys.argv
+    # --reset-patience: возобновляемся не после падения, а чтобы прогнать
+    # сошедшуюся модель с новым темпом. Старые терпение и рекорд относятся к
+    # прежнему темпу и остановили бы прогон на первой эпохе.
+    reset_patience = "--reset-patience" in sys.argv
 
     # --pretrained path/to/model.pth — загрузить веса другой модели для fine-tuning
     pretrained_ckpt = None
@@ -283,6 +289,7 @@ def main():
     run_experiment(
         experiment_config=experiment_config, results_save_dir=results_save_dir,
         resume=resume, pretrained_ckpt=pretrained_ckpt,
+        reset_patience=reset_patience,
     )
 
 
