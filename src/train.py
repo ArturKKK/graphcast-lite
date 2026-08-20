@@ -515,16 +515,39 @@ def train(
             print(f"[Train] boundary_mask_width={bmw} → {inner}/{total} active grid points "
                   f"(inner {n_lon-2*bmw}×{n_lat-2*bmw})")
 
+    # Вес области интереса в функции потерь.
+    #
+    # Узлов вставки 2501 из 133 279, то есть 1,9 %: обучение почти целиком идёт
+    # по глобальному полю, а публикуем мы ошибку по вставке. roi_only_loss —
+    # предельный случай (глобальное поле выключено совсем), он опасен: прогноз
+    # во вставке на сутки живёт притоком извне, и деградация глобального поля
+    # вернётся в область через развёртку. roi_loss_weight даёт промежуточные
+    # варианты: вес w у узлов вставки при единице у остальных отдаёт области
+    # долю 2501·w / (130 778 + 2501·w) от целевой функции.
     roi_spatial_mask = None
-    if getattr(config, 'roi_only_loss', False) and dataset_metadata is not None:
+    roi_only = bool(getattr(config, 'roi_only_loss', False))
+    roi_w = float(getattr(config, 'roi_loss_weight', 1.0))
+    if (roi_only or roi_w != 1.0) and dataset_metadata is not None:
         roi_mask_np = getattr(dataset_metadata, 'is_regional', None)
-        if roi_mask_np is not None:
-            roi_spatial_mask = torch.as_tensor(roi_mask_np, dtype=torch.float32, device=device).view(1, -1, 1)
-            active = int(roi_spatial_mask.sum().item())
-            total = roi_spatial_mask.shape[1]
-            print(f"[Train] roi_only_loss=True → {active}/{total} active ROI nodes")
+        if roi_mask_np is None:
+            print("[Train] вес области задан, но metadata.is_regional отсутствует; "
+                  "использую полный grid loss")
         else:
-            print("[Train] roi_only_loss=True, но metadata.is_regional отсутствует; использую полный grid loss")
+            roi = torch.as_tensor(roi_mask_np, dtype=torch.float32, device=device).view(1, -1, 1)
+            active = int(roi.sum().item())
+            total = roi.shape[1]
+            if roi_only:
+                roi_spatial_mask = roi
+                print(f"[Train] roi_only_loss=True → {active}/{total} узлов области, "
+                      f"глобальное поле в лосс не входит")
+            else:
+                # 1.0 вне области, roi_w внутри — не маска, а веса, и
+                # weighted_mse_loss делит на их сумму, то есть это взвешенное среднее.
+                roi_spatial_mask = 1.0 + (roi_w - 1.0) * roi
+                share = roi_w * active / (roi_w * active + (total - active))
+                print(f"[Train] roi_loss_weight={roi_w:g} → {active}/{total} узлов области, "
+                      f"их доля в целевой функции {share*100:.1f} % (при весе 1 было "
+                      f"{active/total*100:.1f} %)")
 
     spatial_mask = combine_spatial_masks(spatial_mask, roi_spatial_mask)
 
