@@ -172,3 +172,56 @@ Val loss reduced by 8e-05. Saving best model...
 
 
 Epoch 19 (AR=3) with attention threshold 0.075936
+[Epoch 20] train_loss=0.02717  val_loss=0.03455  val_ACC=0.9923  raw_RMSE=0.1110
+Patience counter is now 1 
+
+
+Epoch 20 (AR=3) with attention threshold 0.08135999999999999
+[Epoch 21] train_loss=0.02712  val_loss=0.03442  val_ACC=0.9923  raw_RMSE=0.1110
+Val loss reduced by 2e-05. Saving best model... 
+
+
+Epoch 21 (AR=3) with attention threshold 0.086784
+[Epoch 22] train_loss=0.02707  val_loss=0.03444  val_ACC=0.9923  raw_RMSE=0.1110
+Patience counter is now 1 
+
+
+Epoch 22 (AR=3) with attention threshold 0.09220800000000001
+[Epoch 23] train_loss=0.02702  val_loss=0.03448  val_ACC=0.9923  raw_RMSE=0.1110
+Patience counter is now 2 
+
+
+Epoch 23 (AR=3) with attention threshold 0.097632
+[Epoch 24] train_loss=0.02698  val_loss=0.03442  val_ACC=0.9923  raw_RMSE=0.1111
+Patience counter is now 3 
+
+
+
+>>> УРОВЕНЬ СЛОЖНОСТИ ПОВЫШЕН! Теперь обучаем на 4 шага(ов) вперед. <<<
+
+Epoch 24 (AR=4) with attention threshold 0.103056
+[Epoch 25] train_loss=0.03184  val_loss=0.03427  val_ACC=0.9923  raw_RMSE=0.1114
+Val loss reduced by 0.00014. Saving best model... 
+
+
+Epoch 25 (AR=4) with attention threshold 0.10848
+[Epoch 26] train_loss=0.03174  val_loss=0.03423  val_ACC=0.9922  raw_RMSE=0.1116
+Val loss reduced by 5e-05. Saving best model... 
+
+
+Epoch 26 (AR=4) with attention threshold 0.11390399999999999
+[Epoch 27] train_loss=0.03168  val_loss=0.03424  val_ACC=0.9922  raw_RMSE=0.1115
+Patience counter is now 1 
+
+
+Epoch 27 (AR=4) with attention threshold 0.119328
+[Epoch 28] train_loss=0.03162  val_loss=0.03432  val_ACC=0.9922  raw_RMSE=0.1117
+Patience counter is now 2 
+
+
+Epoch 28 (AR=4) with attention threshold 0.12475199999999999
+[Epoch 29] train_loss=0.03156  val_loss=0.03428  val_ACC=0.9922  raw_RMSE=0.1117
+Patience counter is now 3 
+
+
+Epoch 29 (AR=4) with attention threshold 0.130176
