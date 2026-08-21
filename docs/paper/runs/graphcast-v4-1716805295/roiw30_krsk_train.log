@@ -1,0 +1,107 @@
+Using device: cuda
+[seed] случайности синхронизированы, сид 42
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] train: 12853 samples, flat_nodes=133279, feat=33, obs=2, pred=4
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] val: 1607 samples, flat_nodes=133279, feat=33, obs=2, pred=4
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] test_only: 1607 samples, flat_nodes=133279, feat=33, obs=2, pred=4
+[graph] уровни меша [4, 6], признаки рёбер: legacy
+[processor] InteractionNet: 12 шагов, агрегация 'mean'
+Encoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [174241, 72], [2, 207099]  | [174241, 256]  | 348,162  |
+| ├─(mlp)MLP                |                            | [174241, 256]  | 150,786  |
+| │    └─(MLP)ModuleList    | --                         | --             | 150,786  |
+| │    │    └─(0)Linear     | [174241, 72]               | [174241, 256]  | 18,688   |
+| │    │    └─(1)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(2)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(3)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(4)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(5)LayerNorm  | [174241, 256]              | [174241, 256]  | 512      |
+| ├─(graph_layer)GraphLayer |                            | [174241, 256]  | 197,376  |
+| │    └─(activation)SiLU   | [174241, 256]              | [174241, 256]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 197,376  |
+| │    │    └─(0)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
+| │    │    └─(1)SiLU       | [174241, 256]              | [174241, 256]  | --       |
+| │    │    └─(2)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
++---------------------------+----------------------------+----------------+----------+
+
+Processor summary: 
+  (summary skipped: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument mat1 in method wrapper_CUDA_addmm))
+
+Decoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [174241, 256], [2, 399837] | [174241, 33]   | 152,483  |
+| ├─(mlp)MLP                |                            | [174241, 128]  | 115,202  |
+| │    └─(MLP)ModuleList    | --                         | --             | 115,202  |
+| │    │    └─(0)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(1)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(2)Linear     | [174241, 256]              | [174241, 128]  | 32,896   |
+| │    │    └─(3)PReLU      | [174241, 128]              | [174241, 128]  | 1        |
+| │    │    └─(4)Linear     | [174241, 128]              | [174241, 128]  | 16,512   |
+| ├─(graph_layer)GraphLayer |                            | [174241, 33]   | 37,281   |
+| │    └─(activation)SiLU   | [174241, 128]              | [174241, 128]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 37,281   |
+| │    │    └─(0)GCNConv    | [174241, 128], [2, 399837] | [174241, 128]  | 16,512   |
+| │    │    └─(1)SiLU       | [174241, 128]              | [174241, 128]  | --       |
+| │    │    └─(2)GCNConv    | [174241, 128], [2, 399837] | [174241, 128]  | 16,512   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [174241, 128], [2, 399837] | [174241, 33]   | 4,257    |
++---------------------------+----------------------------+----------------+----------+
+
+
+>>> Загружаю pretrained веса: /data/paper_heavy/krsk33f_last_epoch.pth
+  Pretrained веса загружены.
+
+[Train] Включен Weighted Loss.
+[Train] static_channels=[7, 8], forcing_channels=[29, 30, 31, 32]
+[Train] → маска каналов: 27/33 dynamic (no-loss: [7, 8, 29, 30, 31, 32])
+[Train] roi_loss_weight=30 → 2501/133279 узлов области, их доля в целевой функции 36.5 % (при весе 1 было 1.9 %)
+[Init] val_loss=0.01517 val_acc=0.9922 raw_RMSE=0.1117
+
+Epoch 0 (AR=4) with attention threshold 0.0
+[Epoch 1] train_loss=0.02704  val_loss=0.02870  val_ACC=0.9919  raw_RMSE=0.1138
+Val loss reduced by inf. Saving best model... 
+
+
+Epoch 1 (AR=4) with attention threshold 0.0
+[Epoch 2] train_loss=0.02646  val_loss=0.02890  val_ACC=0.9919  raw_RMSE=0.1141
+Patience counter is now 1 
+
+
+Epoch 2 (AR=4) with attention threshold 0.0
+[Epoch 3] train_loss=0.02588  val_loss=0.02770  val_ACC=0.9920  raw_RMSE=0.1131
+Val loss reduced by 0.00101. Saving best model... 
+
+
+Epoch 3 (AR=4) with attention threshold 0.0
+[Epoch 4] train_loss=0.02529  val_loss=0.02753  val_ACC=0.9920  raw_RMSE=0.1130
+Val loss reduced by 0.00016. Saving best model... 
+
+
+Epoch 4 (AR=4) with attention threshold 0.0
+[Epoch 5] train_loss=0.02471  val_loss=0.02718  val_ACC=0.9921  raw_RMSE=0.1125
+Val loss reduced by 0.00035. Saving best model... 
+
+
+Epoch 5 (AR=4) with attention threshold 0.0
+[Epoch 6] train_loss=0.02425  val_loss=0.02682  val_ACC=0.9921  raw_RMSE=0.1122
+Val loss reduced by 0.00036. Saving best model... 
+
+
+Epoch 6 (AR=4) with attention threshold 0.005424
+[Epoch 7] train_loss=0.02394  val_loss=0.02667  val_ACC=0.9922  raw_RMSE=0.1120
+Val loss reduced by 0.00015. Saving best model... 
+
+
+Epoch 7 (AR=4) with attention threshold 0.010848
+[Epoch 8] train_loss=0.02378  val_loss=0.02666  val_ACC=0.9922  raw_RMSE=0.1119
+Patience counter is now 1 
+
