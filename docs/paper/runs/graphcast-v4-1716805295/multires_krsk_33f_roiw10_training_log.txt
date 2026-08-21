@@ -1,0 +1,11 @@
+=== Training started: 2026-08-21T10:41:55.338651 ===
+# commit: 9011921bade48cf37867ae97a38acdbc1b7650aa  (есть незакоммиченные изменения!)
+# config md5: 4c30170d1bfcca1a321bc276fa49a19b
+# dataset: /data/datasets/multires_krsk_33f
+#   n_time=16072 n_feat=33 nodes=133279
+epochs=8  max_ar=4  epochs_per_stage=8
+epoch  ar  train_loss    val_loss   val_ACC     best_vl  patience  timestamp
+------------------------------------------------------------------------------------------
+ init  --          --     0.01707    0.9922          --        --  10:44:37
+# валидация на 4 горизонтах, отбор по среднему
+# lr: косинус, разогрев 1000 шагов, 12853 шагов/эпоху, всего 102824, до 0 от базового

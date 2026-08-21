@@ -1,0 +1,5 @@
+[21.08 10:41:44] === ВЕС ОБЛАСТИ В ЛОССЕ: W=10 ===
+[prep] конфиг experiments/multires_krsk_33f_roiw10/config.json: roi_loss_weight=10, эпох 8, AR=4, темп 7.5e-05 cosine
+[prep] схема принята, roi_loss_weight=10
+[21.08 10:41:44] коммит: 9011921
+[21.08 10:41:44] START обучения multires_krsk_33f_roiw10 (8 эпох, AR=4, темп 7.5e-5 с косинусом до нуля) 
