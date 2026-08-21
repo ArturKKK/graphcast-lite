@@ -1,0 +1,21 @@
+### PROVENANCE ###
+# started: 2026-07-27T14:57:27+03:00 | commit 290ea46
+# COMMAND: python -u scripts/build_v3_extra_with_time.py --base-dir /data/datasets/wb2_512x256_19f_ar --extra-dir /data/datasets/global_512x256_extra_2010-2021_07deg --out-dir /data/datasets/wb2_512x256_33f_v3
+
+[INFO] T=17532, lon=512, lat=256, time_start=2010-01-01
+[INFO] time_feats sin_h range: [-1.000, 1.000]
+[INFO] time_mean=[-1.4901161e-08 -1.4901161e-08 -5.2133328e-07  1.0026309e-06], time_std=[0.70710677 0.70710677 0.7070958  0.70712215]
+[WRITE] /data/datasets/wb2_512x256_33f_v3/data_extra.npy ≈ 64.3 GB
+  t=0/17532
+  t=5000/17532
+  t=10000/17532
+  t=15000/17532
+[DONE] /data/datasets/wb2_512x256_33f_v3/data_extra.npy: 64.3 GB
+[SYMLINK] /data/datasets/wb2_512x256_33f_v3/data.npy -> /data/datasets/wb2_512x256_19f_ar/data.npy
+[WRITE] scalers.npz: mean[0:5]=[ 2.7893610e+02 -5.6522932e-02  1.9996820e-01  1.0094713e+03
+  6.1068387e-04], std[0:5]=[2.1130327e+01 5.5642886e+00 4.7686729e+00 1.3535380e+01 1.9750483e-03]
+[COPY] coords.npz
+[WRITE] dataset_info.json
+
+Done. Now run:
+  python -m src.main experiments/wb2_512x256_33f_ar_v3
