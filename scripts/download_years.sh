@@ -38,14 +38,51 @@ if command -v zstd >/dev/null; then Z="zstd"; EXT="tar.zst"; else Z="gzip"; EXT=
 log "=== ЗАГРУЗКА ERA5 ${FROM}–${TO}, порциями по ${STEP} года, сжатие ${Z} ==="
 log "ожидаемый объём: примерно $(( (TO - FROM + 1) * 10 )) ГБ до сжатия"
 
-pack() {  # pack <каталог> <имя архива>
-  local dir=$1 name=$2
+# Упаковка через конвейер, а не через tar -I.
+#
+# 22.08.2026: на macOS tar — это bsdtar, у которого -I значит совсем другое
+# (список файлов), и он попытался открыть файл с именем "zstd -3 -T0". tar
+# отработал с ошибкой, архив вышел нулевым, а скрипт следом удалил сырые
+# данные — четыре часа загрузки в никуда. Конвейер работает и с GNU tar, и с
+# bsdtar, а функция возвращает ненулевой код при любом сбое.
+pack() {  # pack <каталог> <имя архива> → 0 только если архив реально собран
+  local dir=$1 name=$2 out rc
   if [[ "$Z" == "zstd" ]]; then
-    tar -I 'zstd -3 -T0' -cf "$OUT/$name.tar.zst" -C "$(dirname "$dir")" "$(basename "$dir")"
+    out="$OUT/$name.tar.zst"
+    tar -cf - -C "$(dirname "$dir")" "$(basename "$dir")" | zstd -3 -T0 -q -f -o "$out"
+    rc=("${PIPESTATUS[@]}")
+    [[ "${rc[0]}" == 0 && "${rc[1]}" == 0 ]] || { echo "  tar rc=${rc[0]} zstd rc=${rc[1]}"; rm -f "$out"; return 1; }
+    zstd -t "$out" 2>/dev/null || { echo "  архив не проходит проверку целостности"; rm -f "$out"; return 1; }
   else
-    tar -czf "$OUT/$name.tar.gz" -C "$(dirname "$dir")" "$(basename "$dir")"
+    out="$OUT/$name.tar.gz"
+    tar -czf "$out" -C "$(dirname "$dir")" "$(basename "$dir")" || { rm -f "$out"; return 1; }
+    gzip -t "$out" 2>/dev/null || { echo "  архив не проходит проверку целостности"; rm -f "$out"; return 1; }
   fi
+  # Порция весит гигабайты; всё, что меньше сотни мегабайт, — признак обрыва.
+  local sz; sz=$(wc -c < "$out" | tr -d ' ')
+  if (( sz < 100000000 )); then
+    echo "  архив подозрительно мал: $sz байт"; rm -f "$out"; return 1
+  fi
+  return 0
 }
+
+# Проверяем упаковку на игрушечном каталоге ДО первой загрузки: сбой должен
+# стоить две секунды, а не четыре часа.
+smoke_pack() {
+  local d="$OUT/.packtest" f
+  rm -rf "$d"; mkdir -p "$d"
+  # 120 МБ нулей, чтобы пройти и порог размера, и сжатие
+  dd if=/dev/zero of="$d/probe.bin" bs=1048576 count=120 2>/dev/null
+  if pack "$d" ".packtest_probe"; then
+    rm -rf "$d" "$OUT/.packtest_probe.$EXT"
+    log "проверка упаковки пройдена ($Z)"
+    return 0
+  fi
+  rm -rf "$d" "$OUT/.packtest_probe.$EXT"
+  log "УПАКОВКА НЕ РАБОТАЕТ ($Z) — загрузку не начинаю, иначе данные будет некуда девать"
+  return 1
+}
+smoke_pack || exit 1
 
 for (( y=FROM; y<=TO; y+=STEP )); do
   y2=$(( y + STEP - 1 )); (( y2 > TO )) && y2=$TO
@@ -69,8 +106,17 @@ for (( y=FROM; y<=TO; y+=STEP )); do
       --start-year "$y" --end-year "$y2" --resume 2>&1 | tail -3 | tee -a "$LOG"
 
   log "--- порция $tag: упаковка ---"
-  pack "$base" "wb2_512x256_19f_$tag"
-  [[ -d "$extra" ]] && pack "$extra" "global_512x256_extra_$tag"
+  ok=1
+  pack "$base" "wb2_512x256_19f_$tag" || ok=0
+  if [[ $ok == 1 && -d "$extra" ]]; then
+    pack "$extra" "global_512x256_extra_$tag" || ok=0
+  fi
+  # Сырое удаляем ТОЛЬКО после успешной упаковки и проверки целостности.
+  if [[ $ok != 1 ]]; then
+    log "УПАКОВКА ПОРЦИИ $tag НЕ УДАЛАСЬ — сырые данные оставляю в $OUT/raw, останавливаюсь"
+    log "починить упаковку и запустить скрипт заново: уже скачанное подхватится по --resume"
+    exit 1
+  fi
   rm -rf "$base" "$extra"
 
   log "порция $tag готова: $(du -sh "$OUT"/*_"$tag".$EXT 2>/dev/null | awk '{printf "%s ", $1}')"
