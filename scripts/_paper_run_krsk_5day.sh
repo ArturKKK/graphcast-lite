@@ -23,7 +23,8 @@ mkdir -p "$OUT"; exec >>"$OUT/krsk5d_master.log" 2>&1
 cd "$REPO" || exit 1
 log() { echo "[$(date '+%d.%m %H:%M:%S')] $*"; }
 log "=== ПРОГНОЗ ПО ОБЛАСТИ НА $((STEPS*6/24)) СУТОК, $STEPS шагов, $MAXN сроков ==="
-pgrep -f "src.main" >/dev/null && { log "карта занята обучением — стоп"; exit 1; }
+BUSY=$(pgrep -af "^python.*(src\.main|scripts/predict\.py)" | head -1)
+[[ -n "$BUSY" ]] && { log "карта занята: $BUSY — стоп"; exit 1; }
 
 if [[ ! -x "$VENV/bin/python" || ! -f "$D33R/data.npy" ]]; then
   log "подготовка окружения и датасета"

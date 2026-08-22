@@ -26,7 +26,11 @@ mkdir -p "$OUT"; exec >>"$OUT/krsk_seed43_master.log" 2>&1
 cd "$REPO" || exit 1
 log() { echo "[$(date '+%d.%m %H:%M:%S')] $*"; }
 log "=== ОСНОВНАЯ МОДЕЛЬ НА СИДЕ 43 ==="
-pgrep -f "src.main" >/dev/null && { log "карта занята — стоп"; exit 1; }
+# Сторож ловит и обучение, и инференс: 22.08.2026 чуть не запустили дожиг
+# поверх пятисуточной развёртки на той же карте — прежний сторож знал
+# только про src.main и predict.py бы не заметил.
+BUSY=$(pgrep -af "^python.*(src\.main|scripts/predict\.py)" | head -1)
+[[ -n "$BUSY" ]] && { log "карта занята: $BUSY — стоп"; exit 1; }
 
 if [[ ! -x "$VENV/bin/python" || ! -f "$D33R/data.npy" ]]; then
   log "подготовка окружения и датасета"
