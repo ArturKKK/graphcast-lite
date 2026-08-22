@@ -1,0 +1,29 @@
+[11:58:31] === M4 START (commit a0297c6), MAXN=200 ===
+[11:58:31] диск /data: 5.4T занято, 3.0T свободно
+[11:58:31] диск /workdir: 521G свободно
+[11:58:31] SMOKE глобальной v2 (ожидаем t2m порядка 1-2 °C, НЕ десятки)
+  +18h: RMSE=0.227313 | base=0.547801 | skill=58.50% | ACC=0.9714 (base 0.8379)
+  +24h: RMSE=0.269498 | base=0.599238 | skill=55.03% | ACC=0.9607 (base 0.8081)
+         t2m      K    0.86°C    1.17°C    1.37°C    1.56°C
+[11:58:49] START m4_global_v2
+[12:01:53] === M4 START (commit 5e5758b), MAXN=100 ===
+[12:01:53] диск /data: 5.4T занято, 3.0T свободно
+[12:01:53] диск /workdir: 519G свободно
+[12:01:53] SMOKE глобальной v2 (ожидаем t2m порядка 1-2 °C, НЕ десятки)
+  +18h: RMSE=0.227313 | base=0.547801 | skill=58.50% | ACC=0.9714 (base 0.8379)
+  +24h: RMSE=0.269498 | base=0.599238 | skill=55.03% | ACC=0.9607 (base 0.8081)
+         t2m      K    0.86°C    1.17°C    1.37°C    1.56°C
+[12:02:08] START m4_global_v2
+[12:03:59] DONE  m4_global_v2 rc=0 | skill=56.56%
+[12:03:59] START m4_interp_to_roi
+[12:04:24] DONE  m4_interp_to_roi rc=0 | skill=-75.66%
+[12:04:24] START m4_regional_standalone
+[12:04:29] DONE  m4_regional_standalone rc=1 | 
+[12:04:30] START m4_multires_control
+[12:06:06] DONE  m4_multires_control rc=0 | skill=74.20%
+[12:06:06] === M4 DONE ===
+[12:03:59] DONE  m4_global_v2 rc=0 | skill=56.56%
+[12:04:24] DONE  m4_interp_to_roi rc=0 | skill=-75.66%
+[12:04:29] DONE  m4_regional_standalone rc=1 | 
+[12:06:06] DONE  m4_multires_control rc=0 | skill=74.20%
+[12:06:06] === M4 DONE ===
