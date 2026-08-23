@@ -117,6 +117,18 @@ for (( y=FROM; y<=TO; y+=STEP )); do
   python3 scripts/build_dataset_512x256_30f.py --out-dir "$extra" --base-dir "$base" \
       --start-year "$y" --end-year "$y2" --resume 2>&1 | tail -3 | tee -a "$LOG"
 
+  # Ворота перед упаковкой: файл создаётся сразу нужного размера и забит
+  # нулями, поэтому ни его наличие, ни размер не доказывают, что данные
+  # дописаны. Пакуем и удаляем сырое только после содержательной проверки.
+  log "--- порция $tag: проверка полноты ---"
+  if ! python3 scripts/verify_dataset.py "$base" ${extra:+"$extra"} 2>&1 | tee -a "$LOG" | grep -q "✗"; then
+    log "проверка пройдена"
+  else
+    log "ПОРЦИЯ $tag НЕПОЛНАЯ — не пакую и ничего не удаляю, см. замечания выше"
+    log "перезапуск скрипта докачает недостающее"
+    exit 1
+  fi
+
   log "--- порция $tag: упаковка ---"
   ok=1
   pack "$base" "wb2_512x256_19f_$tag" || ok=0
