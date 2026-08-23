@@ -1,0 +1,198 @@
+### PROVENANCE ###############################################
+# tag: m5_test_nudge_a0.7 | started: 2026-07-26T17:01:51+03:00 | host: k8smr-macos-build--graphcast-v3-750057806-task-0
+# git commit: d62475f | gpu: NVIDIA H100 80GB HBM3
+# dataset: /data/datasets/multires_krsk_19f_merge
+#   info: {"time_start":"2010-01-01","time_end":"2021-12-31","n_time":16072,"n_nodes":133279,"n_feat":19,"flat":true,"n_global_kept":130778,"n_regional":2501,"roi":[50.0,60.0,83.0,98.0],"variables":["t2m","10u","10v","msl","tp","sp","tcwv","z_surf","lsm","t@850","u@850"
+# experiment: experiments/multires_merge_freeze6_v2 (config md5 48fa48d6ff72346ef9ae4a9e7b2a5129)
+#   ckpt: 6ad5ade3178d63776ce79a12069270ad  experiments/multires_merge_freeze6_v2/best_model.pth
+# COMMAND:
+#   python -u scripts/predict.py experiments/multires_merge_freeze6_v2 --data-dir /data/datasets/multires_krsk_19f_merge --split test_only --ar-steps 4 --max-samples 2000 --per-channel --no-save --region 50 60 83 98 --save-sample-metrics /workdir/paper_results/m5_test_nudge_a0.7_samples.npz --assim-method nudging --nudging-mode sequential --nudging-alpha 0.7 --obs-sparsity 0.1 --obs-roi-only --obs-seed 42
+##############################################################
+
+[predict] data_dir=/data/datasets/multires_krsk_19f_merge (chunked=True, pred_steps=4)
+[ChunkDataset] train: 12853 samples, flat_nodes=133279, feat=19, obs=2, pred=4
+[ChunkDataset] val: 1607 samples, flat_nodes=133279, feat=19, obs=2, pred=4
+[ChunkDataset] test_only: 1607 samples, flat_nodes=133279, feat=19, obs=2, pred=4
+Encoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [174241, 44], [2, 207099]  | [174241, 256]  | 340,994  |
+| ├─(mlp)MLP                |                            | [174241, 256]  | 143,618  |
+| │    └─(MLP)ModuleList    | --                         | --             | 143,618  |
+| │    │    └─(0)Linear     | [174241, 44]               | [174241, 256]  | 11,520   |
+| │    │    └─(1)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(2)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(3)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(4)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(5)LayerNorm  | [174241, 256]              | [174241, 256]  | 512      |
+| ├─(graph_layer)GraphLayer |                            | [174241, 256]  | 197,376  |
+| │    └─(activation)SiLU   | [174241, 256]              | [174241, 256]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 197,376  |
+| │    │    └─(0)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
+| │    │    └─(1)SiLU       | [174241, 256]              | [174241, 256]  | --       |
+| │    │    └─(2)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
++---------------------------+----------------------------+----------------+----------+
+
+Processor summary: 
+  (summary skipped: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument mat1 in method wrapper_CUDA_addmm))
+
+Decoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [174241, 256], [2, 399837] | [174241, 19]   | 150,677  |
+| ├─(mlp)MLP                |                            | [174241, 128]  | 115,202  |
+| │    └─(MLP)ModuleList    | --                         | --             | 115,202  |
+| │    │    └─(0)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(1)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(2)Linear     | [174241, 256]              | [174241, 128]  | 32,896   |
+| │    │    └─(3)PReLU      | [174241, 128]              | [174241, 128]  | 1        |
+| │    │    └─(4)Linear     | [174241, 128]              | [174241, 128]  | 16,512   |
+| ├─(graph_layer)GraphLayer |                            | [174241, 19]   | 35,475   |
+| │    └─(activation)SiLU   | [174241, 128]              | [174241, 128]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 35,475   |
+| │    │    └─(0)GCNConv    | [174241, 128], [2, 399837] | [174241, 128]  | 16,512   |
+| │    │    └─(1)SiLU       | [174241, 128]              | [174241, 128]  | --       |
+| │    │    └─(2)GCNConv    | [174241, 128], [2, 399837] | [174241, 128]  | 16,512   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [174241, 128], [2, 399837] | [174241, 19]   | 2,451    |
++---------------------------+----------------------------+----------------+----------+
+
+[AR-rollout] Модель выдаёт 1 шаг(ов), но мы прогоним 4 шагов авторегрессионно.
+[predict] device=cuda | grid=0x0 | 2000/1607 test samples
+[Region] 2501 nodes (--region [50.0,60.0]N x [83.0,98.0]E)
+[Inline-obs] 250 станций (10.0% от 2501 узлов, seed=42)
+[metrics] per-sample MSE будут сохранены в /workdir/paper_results/m5_test_nudge_a0.7_samples.npz
+[assim] Residual-модель: нуджинг (α=0.7) пошагово в AR-цикле
+[Main] Инференс (2000 samples, DA=nudging)...
+  [50/2000] RMSE=0.184552 ACC=0.9828
+  [100/2000] RMSE=0.179615 ACC=0.9828
+  [150/2000] RMSE=0.182987 ACC=0.9826
+  [200/2000] RMSE=0.183326 ACC=0.9825
+  [250/2000] RMSE=0.183364 ACC=0.9826
+  [300/2000] RMSE=0.183820 ACC=0.9826
+  [350/2000] RMSE=0.184444 ACC=0.9826
+  [400/2000] RMSE=0.184501 ACC=0.9825
+  [450/2000] RMSE=0.184854 ACC=0.9825
+  [500/2000] RMSE=0.184565 ACC=0.9825
+  [550/2000] RMSE=0.184482 ACC=0.9825
+  [600/2000] RMSE=0.184612 ACC=0.9824
+  [650/2000] RMSE=0.184597 ACC=0.9824
+  [700/2000] RMSE=0.184942 ACC=0.9823
+  [750/2000] RMSE=0.185446 ACC=0.9823
+  [800/2000] RMSE=0.185259 ACC=0.9823
+  [850/2000] RMSE=0.185376 ACC=0.9823
+  [900/2000] RMSE=0.185395 ACC=0.9823
+  [950/2000] RMSE=0.185334 ACC=0.9823
+  [1000/2000] RMSE=0.185199 ACC=0.9823
+  [1050/2000] RMSE=0.185275 ACC=0.9823
+  [1100/2000] RMSE=0.185324 ACC=0.9823
+  [1150/2000] RMSE=0.185374 ACC=0.9823
+  [1200/2000] RMSE=0.185203 ACC=0.9823
+  [1250/2000] RMSE=0.184869 ACC=0.9824
+  [1300/2000] RMSE=0.184635 ACC=0.9824
+  [1350/2000] RMSE=0.184307 ACC=0.9825
+  [1400/2000] RMSE=0.184331 ACC=0.9825
+  [1450/2000] RMSE=0.184150 ACC=0.9825
+  [1500/2000] RMSE=0.183991 ACC=0.9825
+  [1550/2000] RMSE=0.183758 ACC=0.9825
+  [1600/2000] RMSE=0.183512 ACC=0.9825
+[Save] per-sample metrics → /workdir/paper_results/m5_test_nudge_a0.7_samples.npz (N=1607, AR=4, C=19)
+
+============================================================
+=== Inference summary (1607 samples) ===
+Grid: 0x0 (G=133279) | C=19 | AR=4 horizons
+Overall: MSE=0.033663 | RMSE=0.183476 | MAE=0.079583
+Baseline: RMSE=0.535283 | MAE=0.250761
+Skill: 65.72%
+ACC: 0.9826 | base: 0.8574 | Δ=+0.1252
+
+Per-horizon:
+  +06h: RMSE=0.125529 | base=0.365052 | skill=65.61% | ACC=0.9920 (base 0.9339)
+  +12h: RMSE=0.161947 | base=0.507499 | skill=68.09% | ACC=0.9867 (base 0.8719)
+  +18h: RMSE=0.201110 | base=0.588722 | skill=65.84% | ACC=0.9790 (base 0.8274)
+  +24h: RMSE=0.228524 | base=0.639297 | skill=64.25% | ACC=0.9725 (base 0.7964)
+
+Per-horizon per-channel RMSE (physical units):
+         var   unit      +6h     +12h     +18h     +24h
+         t2m      K    0.83°C    1.00°C    1.11°C    1.20°C
+         10u    m/s     0.73     0.89     1.04     1.18
+         10v    m/s     0.74     0.91     1.06     1.20
+         msl    hPa     0.65     0.86     1.13     1.37
+       t@850      K    0.64°C    0.80°C    0.91°C    1.01°C
+       u@850    m/s     1.07     1.32     1.54     1.75
+       v@850    m/s     1.07     1.32     1.54     1.75
+       z@850    gpm      5.0      6.4      8.8     10.6
+       z@500    gpm      5.7      7.9     10.9     13.6
+
+Per-channel metrics overall (physical units, avg over 4 horizons):
+    #        var      ACC  RMSE_norm    RMSE_phys     unit
+    0        t2m   0.9987     0.0494       1.0438        K  (≈1.04 °C)
+    1        10u   0.9842     0.1753       0.9753      m/s
+    2        10v   0.9778     0.2079       0.9914      m/s
+    3        msl   0.9970     0.0767       1.0385      hPa
+    4         tp   0.8449     0.5396       0.0011        m
+    5         sp   0.9999     0.0129       1.2264      hPa
+    6       tcwv   0.9959     0.0898       1.4948    kg/m²
+    7     z_surf   0.9999     0.0035       2.9807      gpm
+    8        lsm   1.0000     0.0042       0.0019        -
+    9      t@850   0.9984     0.0551       0.8537        K  (≈0.85 °C)
+   10      u@850   0.9846     0.1746       1.4393      m/s
+   11      v@850   0.9733     0.2296       1.4415      m/s
+   12      z@850   0.9988     0.0524       7.9845      gpm
+   13      q@850   0.9876     0.1565       0.0006    kg/kg
+   14      t@500   0.9985     0.0538       0.7014        K  (≈0.70 °C)
+   15      u@500   0.9853     0.1702       2.0474      m/s
+   16      v@500   0.9740     0.2260       2.0813      m/s
+   17      z@500   0.9996     0.0290      10.0044      gpm
+   18      q@500   0.9698     0.2462       0.0003    kg/kg
+
+--- Region [50.0,60.0]N x [83.0,98.0]E (2501 nodes) ---
+RMSE=0.114726 | base=0.397742 | skill=71.16%
+ACC=0.9209 | base=0.6294
+
+  Per-horizon (region):
+    +06h: RMSE=0.091638 | base=0.260234 | skill=64.79% | ACC=0.9418 (base 0.7944)
+    +12h: RMSE=0.107797 | base=0.373973 | skill=71.18% | ACC=0.9259 (base 0.6465)
+    +18h: RMSE=0.120937 | base=0.440324 | skill=72.53% | ACC=0.9137 (base 0.5618)
+    +24h: RMSE=0.134183 | base=0.480968 | skill=72.10% | ACC=0.9021 (base 0.5150)
+
+  Per-horizon per-channel RMSE — REGION (2501 nodes):
+           var   unit      +6h     +12h     +18h     +24h
+           t2m      K    1.33°C    1.58°C    1.65°C    1.74°C
+           10u    m/s     0.58     0.66     0.71     0.76
+           10v    m/s     0.57     0.65     0.69     0.73
+           msl    hPa     0.70     0.96     1.23     1.49
+         t@850      K    0.74°C    0.91°C    1.02°C    1.10°C
+         u@850    m/s     1.19     1.39     1.55     1.70
+         v@850    m/s     1.09     1.25     1.38     1.51
+         z@850    gpm      4.2      6.5      8.9     11.2
+         z@500    gpm      5.6      8.0     10.8     13.5
+
+  Per-channel region (physical units, avg over 4 horizons):
+      #        var      ACC  RMSE_norm    RMSE_phys     unit
+      0        t2m   0.9357     0.0749       1.5819        K  (≈1.58 °C)
+      1        10u   0.8972     0.1223       0.6803      m/s
+      2        10v   0.8724     0.1392       0.6636      m/s
+      3        msl   0.9684     0.0839       1.1352      hPa
+      4         tp   0.5235     0.1163       0.0002        m
+      5         sp   0.9999     0.0120       1.1430      hPa
+      6       tcwv   0.9490     0.0600       0.9984    kg/m²
+      7     z_surf   1.0000     0.0026       2.2194      gpm
+      8        lsm   0.9998     0.0034       0.0016        -
+      9      t@850   0.9531     0.0613       0.9498        K  (≈0.95 °C)
+     10      u@850   0.9412     0.1781       1.4682      m/s
+     11      v@850   0.9118     0.2096       1.3157      m/s
+     12      z@850   0.9793     0.0534       8.1424      gpm
+     13      q@850   0.8722     0.0994       0.0004    kg/kg
+     14      t@500   0.9535     0.0495       0.6464        K  (≈0.65 °C)
+     15      u@500   0.9345     0.1618       1.9457      m/s
+     16      v@500   0.9381     0.2084       1.9191      m/s
+     17      z@500   0.9885     0.0288       9.9131      gpm
+     18      q@500   0.8785     0.1442       0.0002    kg/kg
+============================================================
+
+### finished: 2026-07-26T17:26:11+03:00, exit=0 ###
