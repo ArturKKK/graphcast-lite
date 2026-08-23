@@ -107,15 +107,28 @@ for (( y=FROM; y<=TO; y+=STEP )); do
     rm -f "$a1" "$a2"
   fi
 
-  log "--- порция $tag: базовые 19 каналов ---"
   mkdir -p "$OUT/raw"
-  python3 scripts/build_dataset_512x256.py --out-dir "$base" \
-      --start-year "$y" --end-year "$y2" --resume 2>&1 | tail -3 | tee -a "$LOG"
-  [[ -f "$base/data.npy" ]] || { log "СБОЙ на базовых каналах, порция $tag"; exit 1; }
+  # Готовый датасет НЕ трогаем. У сборщика --resume при отсутствии progress.json
+  # означает "начать с нуля", а memmap открывается в режиме w+, то есть файл
+  # обнуляется целиком. 23.08.2026 так была стёрта уже скачанная порция базовых
+  # каналов: сборка прошла успешно, progress.json удалился как признак
+  # завершения, а следующий запуск принял это за "качать заново".
+  if python3 scripts/verify_dataset.py "$base" 2>/dev/null | grep -q "✓"; then
+    log "--- порция $tag: базовые 19 каналов уже собраны, пропускаю ---"
+  else
+    log "--- порция $tag: базовые 19 каналов ---"
+    python3 scripts/build_dataset_512x256.py --out-dir "$base" \
+        --start-year "$y" --end-year "$y2" --resume 2>&1 | tail -3 | tee -a "$LOG"
+    [[ -f "$base/data.npy" ]] || { log "СБОЙ на базовых каналах, порция $tag"; exit 1; }
+  fi
 
-  log "--- порция $tag: дополнительные уровни ---"
-  python3 scripts/build_dataset_512x256_30f.py --out-dir "$extra" --base-dir "$base" \
-      --start-year "$y" --end-year "$y2" --resume 2>&1 | tail -3 | tee -a "$LOG"
+  if python3 scripts/verify_dataset.py "$extra" 2>/dev/null | grep -q "✓"; then
+    log "--- порция $tag: дополнительные уровни уже собраны, пропускаю ---"
+  else
+    log "--- порция $tag: дополнительные уровни ---"
+    python3 scripts/build_dataset_512x256_30f.py --out-dir "$extra" --base-dir "$base" \
+        --start-year "$y" --end-year "$y2" --resume 2>&1 | tail -3 | tee -a "$LOG"
+  fi
 
   # Ворота перед упаковкой: файл создаётся сразу нужного размера и забит
   # нулями, поэтому ни его наличие, ни размер не доказывают, что данные
