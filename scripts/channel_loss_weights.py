@@ -39,6 +39,10 @@ def main():
     ap.add_argument('--samples', type=int, default=400, help='сколько сроков усреднить')
     ap.add_argument('--power', type=float, default=1.0, help='1 — полное выравнивание')
     ap.add_argument('--cap', type=float, default=25.0, help='предел веса сверху и снизу')
+    ap.add_argument('--boost', type=float, default=1.0,
+                    help='множитель к весам публикуемых каналов поверх выравнивания')
+    ap.add_argument('--boost-channels', default='t2m,10u,10v,msl,z@500',
+                    help='каким каналам множитель (имена через запятую)')
     ap.add_argument('--out', default=None)
     # Те же σ годятся и на шум в авторегрессии: шум должен быть долей того,
     # что канал реально меняет за 6 ч, а не одинаковым для всех.
@@ -76,12 +80,27 @@ def main():
     # Медиана как опорная точка: веса выходят около единицы, и общий масштаб
     # лосса не уезжает — темп обучения можно не трогать.
     sig_med = float(np.median(sigma[dyn]))
+    # Множитель применяется ДО ограничения: иначе канал, упёршийся в потолок
+    # на выравнивании, множитель просто проигнорировал бы.
+    boost_idx = set()
+    if a.boost != 1.0:
+        for nm in a.boost_channels.split(','):
+            nm = nm.strip()
+            if nm in NAMES and NAMES.index(nm) in dyn:
+                boost_idx.add(NAMES.index(nm))
+            elif nm:
+                print(f"[!] канал '{nm}' не найден или вне лосса — пропускаю")
     w = {}
     for c in dyn:
         if sigma[c] <= 0:
             continue
         wc = (sig_med / sigma[c]) ** (2 * a.power)
+        if c in boost_idx:
+            wc *= a.boost
         w[str(c)] = float(np.clip(wc, 1.0 / a.cap, a.cap))
+    if boost_idx:
+        print(f"множитель {a.boost:g} применён к каналам: "
+              + ", ".join(NAMES[c] for c in sorted(boost_idx)))
 
     share_old = {c: sigma[c] ** 2 for c in dyn}
     share_new = {c: w[str(c)] * sigma[c] ** 2 for c in dyn}
