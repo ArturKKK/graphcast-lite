@@ -98,3 +98,11 @@ Val loss reduced by 7e-05. Saving best model...
 
 
 Epoch 6 (AR=4) with attention threshold 0.005424
+[Epoch 7] train_loss=0.00298  val_loss=0.00318  val_ACC=0.9920  raw_RMSE=0.1132
+Val loss reduced by 5e-05. Saving best model... 
+
+
+Epoch 7 (AR=4) with attention threshold 0.010848
+[Epoch 8] train_loss=0.00295  val_loss=0.00317  val_ACC=0.9920  raw_RMSE=0.1131
+Patience counter is now 1 
+
