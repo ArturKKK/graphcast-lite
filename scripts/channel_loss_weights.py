@@ -40,6 +40,11 @@ def main():
     ap.add_argument('--power', type=float, default=1.0, help='1 — полное выравнивание')
     ap.add_argument('--cap', type=float, default=25.0, help='предел веса сверху и снизу')
     ap.add_argument('--out', default=None)
+    # Те же σ годятся и на шум в авторегрессии: шум должен быть долей того,
+    # что канал реально меняет за 6 ч, а не одинаковым для всех.
+    ap.add_argument('--out-noise', default=None, help='куда записать сигмы шума по каналам')
+    ap.add_argument('--noise-k', type=float, default=0.3,
+                    help='доля от σ невязки, которая идёт в шум (по умолчанию 0.3)')
     a = ap.parse_args()
 
     cfg = json.load(open(os.path.join(a.exp, 'config.json')))
@@ -100,6 +105,15 @@ def main():
     if a.out:
         json.dump(w, open(a.out, 'w'), indent=2)
         print(f"\nвеса записаны в {a.out}")
+
+    if a.out_noise:
+        ns = {str(c): float(a.noise_k * sigma[c]) for c in dyn if sigma[c] > 0}
+        json.dump(ns, open(a.out_noise, 'w'), indent=2)
+        vals = sorted(ns.values())
+        print(f"\nсигмы шума (k={a.noise_k}) записаны в {a.out_noise}")
+        print(f"  диапазон {vals[0]:.5f} … {vals[-1]:.5f}, медиана {vals[len(vals)//2]:.5f}")
+        print(f"  для сравнения, единая сигма 0,05 из прогона 22.08 была бы для "
+              f"самого спокойного канала в {0.05/vals[0]:.0f} раз больше нужной")
 
 
 if __name__ == '__main__':

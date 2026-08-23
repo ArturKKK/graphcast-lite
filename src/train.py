@@ -176,6 +176,9 @@ def train_epoch(
     forcing_channels=None,
     use_residual=True,
     noise_sigma=0.0,
+    # Тензор (1, 1, C) с отдельным сигма на канал. Если задан, noise_sigma
+    # не используется.
+    noise_vec=None,
     noise_apply_from_ar_step=1,
     scheduler=None,
 ):
@@ -246,7 +249,17 @@ def train_epoch(
             # Добавляем шум на выход ПЕРЕД тем, как он станет входом следующего AR-шага.
             # Делает модель устойчивой к собственным ошибкам в длинных rollout'ах.
             # static/forcing каналы перезапишутся carry-forward'ом ниже, так что шум на них не повлияет.
-            if noise_sigma > 0 and (step + 1) < steps_to_run and (step + 1) >= noise_apply_from_ar_step:
+            # Единая сигма на все каналы не годится: они нормированы на разброс
+            # ПОЛЯ, а предсказывается приращение, и его масштаб у каналов
+            # отличается полсотни раз. Шум 0,05 для осадков — десятая доля их
+            # собственного масштаба, а для z@500 — вдвое больше всего сигнала.
+            # Прогон 22.08.2026 с единой сигмой 0,05 проиграл контролю 15 % и
+            # тем сильнее, чем дальше срок. Поэтому noise_vec: своя сигма на
+            # канал, посчитанная из данных по разбросу шестичасовой невязки.
+            _noisy = (step + 1) < steps_to_run and (step + 1) >= noise_apply_from_ar_step
+            if _noisy and noise_vec is not None:
+                out = out + torch.randn_like(out) * noise_vec
+            elif _noisy and noise_sigma > 0:
                 out = out + torch.randn_like(out) * noise_sigma
             
             # САМОЕ ГЛАВНОЕ: Добавляем наш прогноз в историю для следующего шага
@@ -555,7 +568,21 @@ def train(
     use_residual = getattr(config, 'use_residual', True)
     noise_sigma = float(getattr(config, 'noise_sigma', 0.0))
     noise_apply_from = int(getattr(config, 'noise_apply_from_ar_step', 1))
-    if noise_sigma > 0:
+    noise_vec = None
+    ncs = getattr(config, 'noise_channel_sigmas', None)
+    if ncs:
+        C_total = config.data.num_features_used
+        _v = torch.zeros(C_total, dtype=torch.float32, device=device)
+        for _k, _val in ncs.items():
+            _c = int(_k)
+            if 0 <= _c < C_total:
+                _v[_c] = float(_val)
+        noise_vec = _v.view(1, 1, -1)
+        _nz = int((_v > 0).sum())
+        print(f"[Train] input noise injection: своя сигма на канал, {_nz}/{C_total} каналов, "
+              f"медиана {float(_v[_v > 0].median()) if _nz else 0:.5f}, "
+              f"максимум {float(_v.max()):.5f}, apply_from_ar_step={noise_apply_from}")
+    elif noise_sigma > 0:
         print(f"[Train] input noise injection: sigma={noise_sigma}, apply_from_ar_step={noise_apply_from}")
 
     train_losses = []  
@@ -754,6 +781,7 @@ def train(
             static_channels=static_ch, forcing_channels=forcing_ch,
             use_residual=use_residual,
             noise_sigma=noise_sigma,
+            noise_vec=noise_vec,
             noise_apply_from_ar_step=noise_apply_from,
             scheduler=scheduler,
         )

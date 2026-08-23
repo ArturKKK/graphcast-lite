@@ -299,5 +299,10 @@ class ExperimentConfig(BaseModel):
                                            # перед использованием как вход следующего AR-шага.
                                            # GraphCast-style: помогает в длинных rollout'ах (AR>=2).
     noise_apply_from_ar_step: int = 1      # С какого AR-шага начинать инжектить шум (0-based: 1=со второго шага)
+    # Своя сигма шума на канал, {"0": 0.02, ...}. Задана — noise_sigma не
+    # используется. Единая сигма не годится: каналы нормированы на разброс
+    # поля, а предсказывается приращение, масштаб которого у каналов
+    # отличается полсотни раз (замер 23.08.2026).
+    noise_channel_sigmas: Dict[str, float] = {}
     channel_loss_weights: Dict[str, float] = {}  # Per-channel weights {"0": 2.0, "3": 2.0, ...}
                                                  # Применяется поверх static/forcing mask.
