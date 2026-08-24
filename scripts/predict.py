@@ -138,6 +138,10 @@ def main():
                          "Нужно для инференса на региональных датасетах (вместо полного глобуса).")
     ap.add_argument("--mesh-buffer", type=float, default=15.0,
                     help="Буфер (градусы) вокруг данных при prune-mesh (default: 15)")
+    ap.add_argument("--ensemble-ckpt", default=None,
+                    help="Через запятую несколько чекпойнтов. Каждый разворачивается "
+                         "самостоятельно, в метрики идёт СРЕДНЕЕ по участникам. "
+                         "Архитектура у всех должна совпадать.")
     ap.add_argument("--per-channel", action="store_true")
     ap.add_argument("--ar-steps", type=int, default=None,
                     help="Число AR-шагов для авторегрессионного инференса. "
@@ -279,6 +283,30 @@ def main():
     model.load_state_dict(state, strict=False)
     model = model.to(device)  # ensure ALL buffers (edge features etc.) are on device
     model.eval()
+
+    # --- Ансамбль: держим веса участников отдельно, граф и буферы общие ---
+    # Модель одна, меняем только веса перед прогоном каждого участника: сам
+    # объект весит 5,9 млн параметров, а буферы рёбер — сотни мегабайт, и
+    # держать N копий графа незачем.
+    member_states = []
+    if args.ensemble_ckpt:
+        paths = [q.strip() for q in args.ensemble_ckpt.split(",") if q.strip()]
+        for q in paths:
+            assert os.path.exists(q), f"нет чекпойнта участника: {q}"
+            st = torch.load(q, map_location=device)
+            if region_bounds_for_mesh is not None:
+                st = {k: v for k, v in st.items()
+                      if not k.startswith("_processing_edge_features")}
+            own = model.state_dict()
+            st = {k: v for k, v in st.items()
+                  if not (k in own and hasattr(v, "shape") and own[k].shape != v.shape)}
+            member_states.append(st)
+        assert getattr(args, "assim_method", "none") in (None, "none"), (
+            "ансамбль вместе с усвоением не поддержан: непонятно, поправлять ли "
+            "участников общим состоянием или каждого своим. Считай их порознь.")
+        print(f"[ансамбль] участников: {len(member_states)}")
+        for q in paths:
+            print(f"    {q}")
 
     if getattr(meta, 'flat_grid', False):
         G = meta.num_grid_nodes
@@ -603,34 +631,51 @@ def main():
                 else:
                     # AR-rollout: модель одношаговая, прогоняем несколько раз
                     # curr_state: [1, G, OBS, C]
-                    curr_state = X.view(1, G, OBS, C)
+                    # Ансамбль: у каждого участника СВОЯ траектория, в метрики
+                    # идёт среднее их выходов на каждом сроке. Это обычное
+                    # ансамблевое среднее; усреднять внутри контура (подавая
+                    # среднее обратно всем) — уже другой предиктор, и мы его тут
+                    # не считаем.
+                    _members = member_states if member_states else [None]
+                    curr_states = [X.view(1, G, OBS, C).clone() for _ in _members]
+                    curr_state = curr_states[0]
                     ar_outs = []
                     # Для forcing channels нужен ground truth
                     y_for_forcing = None
                     if forcing_ch:
                         y_for_forcing = y.view(y.shape[0], -1, C)  # [G, steps, C]
                     for ar_step in range(AR_STEPS):
-                        inp = curr_state.view(1, G, -1)
-                        delta_pred = model(inp, attention_threshold=0.0)  # [G, C] or [1, G, C]
-                        if delta_pred.dim() == 2:
-                            delta_pred = delta_pred.unsqueeze(0)
-                        
-                        # RESIDUAL LEARNING
-                        if args.no_residual:
-                            step_out = delta_pred
-                        else:
-                            step_x_last = curr_state[:, :, -1, :]
-                            step_out = step_x_last + delta_pred
+                        _step_outs = []
+                        for _mi, _sd in enumerate(_members):
+                            if _sd is not None:
+                                model.load_state_dict(_sd, strict=False)
+                            curr_state = curr_states[_mi]
+                            inp = curr_state.view(1, G, -1)
+                            delta_pred = model(inp, attention_threshold=0.0)  # [G, C] or [1, G, C]
+                            if delta_pred.dim() == 2:
+                                delta_pred = delta_pred.unsqueeze(0)
 
-                        # Carry-forward: статические каналы подставляем из последнего входного шага
-                        if static_ch:
-                            static_vals = curr_state[:, :, -1, :]  # [1, G, C]
-                            for ch in static_ch:
-                                step_out[:, :, ch] = static_vals[:, :, ch]
-                        # Forcing: подставляем из ground truth (known in advance)
-                        if forcing_ch and y_for_forcing is not None and ar_step < y_for_forcing.shape[1]:
-                            for ch in forcing_ch:
-                                step_out[:, :, ch] = y_for_forcing[:, ar_step, ch].unsqueeze(0)
+                            # RESIDUAL LEARNING
+                            if args.no_residual:
+                                m_out = delta_pred
+                            else:
+                                step_x_last = curr_state[:, :, -1, :]
+                                m_out = step_x_last + delta_pred
+
+                            # Carry-forward: статические каналы подставляем из последнего входного шага
+                            if static_ch:
+                                static_vals = curr_state[:, :, -1, :]  # [1, G, C]
+                                for ch in static_ch:
+                                    m_out[:, :, ch] = static_vals[:, :, ch]
+                            # Forcing: подставляем из ground truth (known in advance)
+                            if forcing_ch and y_for_forcing is not None and ar_step < y_for_forcing.shape[1]:
+                                for ch in forcing_ch:
+                                    m_out[:, :, ch] = y_for_forcing[:, ar_step, ch].unsqueeze(0)
+                            _step_outs.append(m_out)
+
+                        step_out = (_step_outs[0] if len(_step_outs) == 1
+                                    else torch.stack(_step_outs, 0).mean(0))
+                        curr_state = curr_states[0]
                         # Пошаговое усвоение для residual-моделей (ПОСЛЕ residual/static/forcing):
                         # ОИ или последовательный нуджинг корректируют состояние шага,
                         # исправленное состояние идёт и в метрики, и в следующий AR-шаг.
@@ -643,12 +688,20 @@ def main():
                                     step_out[0].detach().cpu(), _obs_steps[:, ar_step, :]
                                 )
                                 step_out = _corr.unsqueeze(0).to(step_out.device)
+                                # Исправленное состояние должно уйти и в следующий
+                                # шаг, иначе усвоение перестаёт работать. При одном
+                                # участнике это ровно прежнее поведение.
+                                _step_outs = [step_out] * len(_members)
                         # Сохраняем предсказание (ПОСЛЕ carry-forward, чтобы метрики были честными)
                         ar_outs.append(step_out.cpu())
-                        # Сдвигаем окно: [obs0, obs1] → [obs1, pred]
-                        curr_state = torch.cat(
-                            [curr_state[:, :, 1:, :], step_out.unsqueeze(2)], dim=2
-                        )
+                        # Сдвигаем окна: каждый участник идёт СВОИМ выходом, и только
+                        # усвоение (выше) может подменить его общим исправленным.
+                        for _mi in range(len(_members)):
+                            curr_states[_mi] = torch.cat(
+                                [curr_states[_mi][:, :, 1:, :], _step_outs[_mi].unsqueeze(2)],
+                                dim=2,
+                            )
+                        curr_state = curr_states[0]
                     # Склеиваем все шаги: [1, G, AR_STEPS*C]
                     out = torch.cat(ar_outs, dim=-1).squeeze(0)  # [G, AR_STEPS*C]
 
