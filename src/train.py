@@ -180,6 +180,9 @@ def train_epoch(
     # не используется.
     noise_vec=None,
     noise_apply_from_ar_step=1,
+    # Отцеплять состояние между шагами развёртки и делать градиент пошагово.
+    # Нужно для развёрток длиннее четырёх шагов: иначе не хватает памяти.
+    detach_ar=False,
     scheduler=None,
 ):
     """Один проход обучения. ТЕПЕРЬ С АВТОРЕГРЕССИЕЙ."""
@@ -221,8 +224,22 @@ def train_epoch(
 
         # bf16 autocast: активации идут в bfloat16 (range=fp32, ~40% экономии VRAM),
         # веса/Adam state остаются fp32. На H100 ещё и быстрее fp32 за счёт tensor cores.
-        with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=(device.type == 'cuda')):
-         for step in range(steps_to_run):
+        # Развёртка с отцеплением (pushforward). При ar_detach_steps=True вход
+        # каждого шага отцепляется от предыдущего, а градиент делается пошагово:
+        # память перестаёт расти с длиной развёртки и остаётся на уровне одного
+        # шага. Без этого на четырёх шагах занято 70 ГБ из 80, и двенадцать
+        # шагов на карту просто не влезают.
+        #
+        # Это же — правильная версия приёма, который провалился 23.08 с шумом:
+        # там мы подмешивали гауссов шум, изображая ошибки модели, а здесь
+        # модель получает на вход СВОИ НАСТОЯЩИЕ ошибки, накопленные развёрткой.
+        #
+        # Плата: градиент не течёт между шагами, то есть модель не учится
+        # «готовить» состояние для следующего шага. Для длинных развёрток это
+        # общепринятый размен, полный проброс на такой длине никто не делает.
+        step_backward = bool(detach_ar)
+        for step in range(steps_to_run):
+          with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=(device.type == 'cuda')):
             # Вход в модель (плоский)
             inp = curr_state.view(N, G, -1)
             
@@ -243,7 +260,7 @@ def train_epoch(
             target = y_steps[:, :, step, :]
             
             # Считаем лосс (channel_mask обнуляет градиент по static каналам)
-            loss_batch += weighted_mse_loss(out, target, lat_weights, channel_mask, spatial_mask)
+            step_loss = weighted_mse_loss(out, target, lat_weights, channel_mask, spatial_mask)
             
             # --- INPUT NOISE INJECTION (GraphCast-style) ---
             # Добавляем шум на выход ПЕРЕД тем, как он станет входом следующего AR-шага.
@@ -276,17 +293,28 @@ def train_epoch(
                     out[:, :, ch] = forcing_vals[:, :, ch]
             out_unsqueezed = out.unsqueeze(2)
             curr_state = torch.cat([curr_state[:, :, 1:, :], out_unsqueezed], dim=2)
-            
-        # Усредняем лосс и делаем шаг
+
+          # backward держим ВНЕ autocast — так предписывает документация torch.
+          if step_backward:
+            (step_loss / steps_to_run).backward()
+            loss_batch += float(step_loss.detach())
+            # Отцепляем состояние: следующий шаг стартует с числа, а не с графа.
+            curr_state = curr_state.detach()
+          else:
+            loss_batch = loss_batch + step_loss
+
+        # Усредняем лосс и делаем шаг. При пошаговом градиенте backward уже
+        # сделан внутри цикла, здесь остаётся только усреднить для отчёта.
         loss_batch = loss_batch / steps_to_run
-        loss_batch.backward()
+        if not step_backward:
+            loss_batch.backward()
         optimiser.step()
         # Шаг планировщика — ПОШАГОВЫЙ, а не поэпохный: разогрев меряется в
         # шагах (у GraphCast 1000), а эпоха у нас это около 12 800 шагов.
         if scheduler is not None:
             scheduler.step()
 
-        total_loss += loss_batch.detach().item()
+        total_loss += (loss_batch if step_backward else loss_batch.detach().item())
         # --- КОНЕЦ НОВОЙ ЛОГИКИ ---
 
     avg_loss = total_loss / len(train_dataloader)  
@@ -568,6 +596,10 @@ def train(
     use_residual = getattr(config, 'use_residual', True)
     noise_sigma = float(getattr(config, 'noise_sigma', 0.0))
     noise_apply_from = int(getattr(config, 'noise_apply_from_ar_step', 1))
+    detach_ar = bool(getattr(config, 'ar_detach_steps', False))
+    if detach_ar:
+        print("[Train] развёртка с отцеплением: градиент пошаговый, память не "
+              "растёт с длиной развёртки (проброс между шагами при этом теряется)")
     noise_vec = None
     ncs = getattr(config, 'noise_channel_sigmas', None)
     if ncs:
@@ -783,6 +815,7 @@ def train(
             noise_sigma=noise_sigma,
             noise_vec=noise_vec,
             noise_apply_from_ar_step=noise_apply_from,
+            detach_ar=detach_ar,
             scheduler=scheduler,
         )
 
