@@ -1,0 +1,11 @@
+[24.08 07:26:47] === АНСАМБЛЬ ИЗ ГОТОВЫХ МОДЕЛЕЙ ===
+[24.08 07:26:47] карта занята: 5434 python -u scripts/predict.py experiments/multires_krsk_33f_noisech03 --data-dir /data/datasets/multires_krsk_33f --split test_only --ar-steps 4 --max-samples 2000 --per-channel --no-save --region 50 60 83 98 --ckpt /data/paper_heavy/krsk_noisech03_last.pth --save-sample-metrics /workdir/paper_results/noisech03_krsk_roi_samples.npz — стоп
+[24.08 08:25:21] === АНСАМБЛЬ ИЗ ГОТОВЫХ МОДЕЛЕЙ ===
+[prep] /data/paper_heavy/ens_roiw30.pth эпоха 8
+[prep] /data/paper_heavy/ens_roiw10.pth эпоха 8
+[prep] /data/paper_heavy/ens_drop8.pth эпоха 8
+[24.08 08:25:25] нет experiments/multires_krsk_33f_roiw100/checkpoint.pth — участник multires_krsk_33f_roiw100 пропущен
+[24.08 08:25:25] нет experiments/multires_krsk_33f_chw/checkpoint.pth — участник multires_krsk_33f_chw пропущен
+[24.08 08:25:25] нет experiments/multires_krsk_33f_chwb/checkpoint.pth — участник multires_krsk_33f_chwb пропущен
+[24.08 08:25:25] участников найдено: 3 — multires_krsk_33f_roiw30 multires_krsk_33f_roiw10 multires_krsk_33f_drop8
+[24.08 08:25:25] START solo_roiw30
