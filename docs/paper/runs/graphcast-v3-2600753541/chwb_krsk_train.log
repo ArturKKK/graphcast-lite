@@ -88,3 +88,13 @@ Val loss reduced by 0.00024. Saving best model...
 
 
 Epoch 4 (AR=4) with attention threshold 0.0
+[Epoch 5] train_loss=0.00314  val_loss=0.00330  val_ACC=0.9919  raw_RMSE=0.1141
+Val loss reduced by 9e-05. Saving best model... 
+
+
+Epoch 5 (AR=4) with attention threshold 0.0
+[Epoch 6] train_loss=0.00303  val_loss=0.00323  val_ACC=0.9919  raw_RMSE=0.1137
+Val loss reduced by 7e-05. Saving best model... 
+
+
+Epoch 6 (AR=4) with attention threshold 0.005424
