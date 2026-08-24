@@ -1,0 +1,8 @@
+=== Training started: 2026-08-24T11:53:19.658262 ===
+# commit: 37b4924309589ed5f06f5798977fd4498da875da  (есть незакоммиченные изменения!)
+# config md5: 22f8fa7e68063ec590097335c1ba5836
+# dataset: /data/datasets/multires_krsk_33f
+#   n_time=16072 n_feat=33 nodes=133279
+epochs=4  max_ar=12  epochs_per_stage=4
+epoch  ar  train_loss    val_loss   val_ACC     best_vl  patience  timestamp
+------------------------------------------------------------------------------------------
