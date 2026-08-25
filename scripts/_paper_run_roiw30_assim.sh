@@ -172,9 +172,21 @@ for SEED in 42 43 44; do
       --oi-corr-len 100000 --oi-sigma-o 0.5
 done
 
+# Те же два режима, но в метрику пишется ФОН — прогноз до коррекции. Состояние
+# при этом продвигается исправленным, то есть меряется шестичасовой прогноз из
+# предыдущего анализа. Это и есть честная проверка циклической системы: без
+# флага в метрику идёт анализ, куда вошли наблюдения на тот же срок, и прогнозом
+# это называть нельзя (разобрались 25.08.2026).
+run "a_${TAG}_test_oi10_bg" --split test_only --ar-steps 4 --max-samples $N_TEST --region $ROI \
+    --assim-method oi --obs-sparsity 0.1 --obs-roi-only --obs-seed 42 \
+    --oi-corr-len 100000 --oi-sigma-o 0.5 --assim-metrics-background
+
 run a_${TAG}_test_oi1 --split test_only --ar-steps 4 --max-samples $N_TEST --region $ROI \
     --assim-method oi --obs-sparsity 0.01 --obs-roi-only --obs-seed 42 \
     --oi-corr-len 200000 --oi-sigma-o 0.5
+run "a_${TAG}_test_oi1_bg" --split test_only --ar-steps 4 --max-samples $N_TEST --region $ROI \
+    --assim-method oi --obs-sparsity 0.01 --obs-roi-only --obs-seed 42 \
+    --oi-corr-len 200000 --oi-sigma-o 0.5 --assim-metrics-background
 
 # ── 5. Длинная развёртка: 14 суток ────────────────────────────────────
 run a_${TAG}_long_noda --split test_only --ar-steps $AR_LONG --max-samples $N_LONG --region $ROI

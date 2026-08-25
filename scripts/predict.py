@@ -157,6 +157,13 @@ def main():
 
     # --- УСВОЕНИЕ ---
     ap.add_argument("--assim-method", default="none", choices=["none", "nudging", "oi"])
+    ap.add_argument("--assim-metrics-background", action="store_true",
+                    help="В метрики писать поле ДО коррекции, а не после. Состояние "
+                         "при этом всё равно продвигается исправленным, то есть "
+                         "меряется шестичасовой прогноз из предыдущего анализа — "
+                         "стандартная проверка циклической системы усвоения. Без "
+                         "флага меряется анализ, в который вошли наблюдения на тот "
+                         "же срок, и прогнозом это называть нельзя.")
     ap.add_argument("--obs-path", type=str, default=None)
     ap.add_argument("--nudging-alpha", type=float, default=0.25)
     ap.add_argument("--nudging-mode", default="sequential", choices=["sequential", "offline"])
@@ -676,6 +683,8 @@ def main():
                         step_out = (_step_outs[0] if len(_step_outs) == 1
                                     else torch.stack(_step_outs, 0).mean(0))
                         curr_state = curr_states[0]
+                        # Что уйдёт в метрику: None — то же, что и вперёд.
+                        _for_metric = None
                         # Пошаговое усвоение для residual-моделей (ПОСЛЕ residual/static/forcing):
                         # ОИ или последовательный нуджинг корректируют состояние шага,
                         # исправленное состояние идёт и в метрики, и в следующий AR-шаг.
@@ -684,16 +693,24 @@ def main():
                         ):
                             _obs_steps = obs_i.view(obs_i.shape[0], -1, C)
                             if ar_step < _obs_steps.shape[1]:
+                                _bg = step_out          # фон: прогноз ДО коррекции
                                 _corr = _ar_assim.apply(
                                     step_out[0].detach().cpu(), _obs_steps[:, ar_step, :]
                                 )
                                 step_out = _corr.unsqueeze(0).to(step_out.device)
+                                if args.assim_metrics_background:
+                                    # Вперёд уходит исправленное состояние (цикл
+                                    # усвоения работает), а в метрику — фон.
+                                    _for_metric = _bg
+                                else:
+                                    _for_metric = step_out
                                 # Исправленное состояние должно уйти и в следующий
                                 # шаг, иначе усвоение перестаёт работать. При одном
                                 # участнике это ровно прежнее поведение.
                                 _step_outs = [step_out] * len(_members)
                         # Сохраняем предсказание (ПОСЛЕ carry-forward, чтобы метрики были честными)
-                        ar_outs.append(step_out.cpu())
+                        ar_outs.append((step_out if _for_metric is None
+                                        else _for_metric).cpu())
                         # Сдвигаем окна: каждый участник идёт СВОИМ выходом, и только
                         # усвоение (выше) может подменить его общим исправленным.
                         for _mi in range(len(_members)):
