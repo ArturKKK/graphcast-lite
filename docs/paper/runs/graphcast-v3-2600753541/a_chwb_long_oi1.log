@@ -1,0 +1,77 @@
+### PROVENANCE ###############################################
+# tag: a_chwb_long_oi1 | started: 2026-08-25T09:27:43+00:00 | host: k8smr-macos-build--graphcast-v3-2600753541-task-0
+# git commit: 6bba8df | gpu: NVIDIA H100 80GB HBM3
+# dataset: /data/datasets/multires_krsk_33f
+# ckpt md5: 1ae10134e831b0674245d51be3ba0344 (эпоха 29)
+# COMMAND:
+#   python -u scripts/predict.py experiments/multires_krsk_33f_chwb --data-dir /data/datasets/multires_krsk_33f --ckpt /data/paper_heavy/krsk_chwb_assim.pth --per-channel --no-save --save-sample-metrics /workdir/paper_results/a_chwb_long_oi1_samples.npz --split test_only --ar-steps 56 --max-samples 200 --region 50 60 83 98 --assim-method oi --obs-sparsity 0.01 --obs-roi-only --obs-seed 42 --oi-corr-len 200000 --oi-sigma-o 0.5
+##############################################################
+
+[predict] data_dir=/data/datasets/multires_krsk_33f (chunked=True, pred_steps=56)
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] train: 12812 samples, flat_nodes=133279, feat=33, obs=2, pred=56
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] val: 1601 samples, flat_nodes=133279, feat=33, obs=2, pred=56
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] test_only: 1602 samples, flat_nodes=133279, feat=33, obs=2, pred=56
+[graph] уровни меша [4, 6], признаки рёбер: legacy
+[processor] InteractionNet: 12 шагов, агрегация 'mean'
+Encoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [174241, 72], [2, 207099]  | [174241, 256]  | 348,162  |
+| ├─(mlp)MLP                |                            | [174241, 256]  | 150,786  |
+| │    └─(MLP)ModuleList    | --                         | --             | 150,786  |
+| │    │    └─(0)Linear     | [174241, 72]               | [174241, 256]  | 18,688   |
+| │    │    └─(1)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(2)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(3)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(4)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(5)LayerNorm  | [174241, 256]              | [174241, 256]  | 512      |
+| ├─(graph_layer)GraphLayer |                            | [174241, 256]  | 197,376  |
+| │    └─(activation)SiLU   | [174241, 256]              | [174241, 256]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 197,376  |
+| │    │    └─(0)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
+| │    │    └─(1)SiLU       | [174241, 256]              | [174241, 256]  | --       |
+| │    │    └─(2)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
++---------------------------+----------------------------+----------------+----------+
+
+Processor summary: 
+  (summary skipped: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument mat1 in method wrapper_CUDA_addmm))
+
+Decoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [174241, 256], [2, 399837] | [174241, 33]   | 152,483  |
+| ├─(mlp)MLP                |                            | [174241, 128]  | 115,202  |
+| │    └─(MLP)ModuleList    | --                         | --             | 115,202  |
+| │    │    └─(0)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(1)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(2)Linear     | [174241, 256]              | [174241, 128]  | 32,896   |
+| │    │    └─(3)PReLU      | [174241, 128]              | [174241, 128]  | 1        |
+| │    │    └─(4)Linear     | [174241, 128]              | [174241, 128]  | 16,512   |
+| ├─(graph_layer)GraphLayer |                            | [174241, 33]   | 37,281   |
+| │    └─(activation)SiLU   | [174241, 128]              | [174241, 128]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 37,281   |
+| │    │    └─(0)GCNConv    | [174241, 128], [2, 399837] | [174241, 128]  | 16,512   |
+| │    │    └─(1)SiLU       | [174241, 128]              | [174241, 128]  | --       |
+| │    │    └─(2)GCNConv    | [174241, 128], [2, 399837] | [174241, 128]  | 16,512   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [174241, 128], [2, 399837] | [174241, 33]   | 4,257    |
++---------------------------+----------------------------+----------------+----------+
+
+[AR-rollout] Модель выдаёт 1 шаг(ов), но мы прогоним 56 шагов авторегрессионно.
+[static] Каналы [7, 8] — статика, carry-forward при AR
+[forcing] Каналы [29, 30, 31, 32] — форсинг (из ground truth при AR)
+[predict] device=cuda | grid=0x0 | 200/1602 test samples
+[Region] 2501 nodes (--region [50.0,60.0]N x [83.0,98.0]E)
+[OI] ROI mode: B matrix 2501×2501 (25 MB)
+[Inline-obs] 25 станций (1.0% от 2501 узлов, seed=42)
+[metrics] Исключены из aggregate метрик: каналы [7, 8, 29, 30, 31, 32] (static+forcing)
+[metrics] per-sample MSE будут сохранены в /workdir/paper_results/a_chwb_long_oi1_samples.npz
+[assim] Residual-модель: ОИ применяется пошагово в AR-цикле
+[Main] Инференс (200 samples, DA=oi)...
