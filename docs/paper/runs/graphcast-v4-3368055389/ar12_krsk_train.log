@@ -1,0 +1,85 @@
+Using device: cuda
+[seed] случайности синхронизированы, сид 42
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] train: 12847 samples, flat_nodes=133279, feat=33, obs=2, pred=12
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] val: 1606 samples, flat_nodes=133279, feat=33, obs=2, pred=12
+[ChunkDataset] склеиваем data.npy (19ch) + data_extra.npy (14ch) → 33ch
+[ChunkDataset] test_only: 1606 samples, flat_nodes=133279, feat=33, obs=2, pred=12
+[graph] уровни меша [4, 6], признаки рёбер: legacy
+[processor] InteractionNet: 12 шагов, агрегация 'mean'
+Encoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [174241, 72], [2, 207099]  | [174241, 256]  | 348,162  |
+| ├─(mlp)MLP                |                            | [174241, 256]  | 150,786  |
+| │    └─(MLP)ModuleList    | --                         | --             | 150,786  |
+| │    │    └─(0)Linear     | [174241, 72]               | [174241, 256]  | 18,688   |
+| │    │    └─(1)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(2)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(3)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(4)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(5)LayerNorm  | [174241, 256]              | [174241, 256]  | 512      |
+| ├─(graph_layer)GraphLayer |                            | [174241, 256]  | 197,376  |
+| │    └─(activation)SiLU   | [174241, 256]              | [174241, 256]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 197,376  |
+| │    │    └─(0)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
+| │    │    └─(1)SiLU       | [174241, 256]              | [174241, 256]  | --       |
+| │    │    └─(2)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
++---------------------------+----------------------------+----------------+----------+
+
+Processor summary: 
+  (summary skipped: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument mat1 in method wrapper_CUDA_addmm))
+
+Decoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [174241, 256], [2, 399837] | [174241, 33]   | 152,483  |
+| ├─(mlp)MLP                |                            | [174241, 128]  | 115,202  |
+| │    └─(MLP)ModuleList    | --                         | --             | 115,202  |
+| │    │    └─(0)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(1)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(2)Linear     | [174241, 256]              | [174241, 128]  | 32,896   |
+| │    │    └─(3)PReLU      | [174241, 128]              | [174241, 128]  | 1        |
+| │    │    └─(4)Linear     | [174241, 128]              | [174241, 128]  | 16,512   |
+| ├─(graph_layer)GraphLayer |                            | [174241, 33]   | 37,281   |
+| │    └─(activation)SiLU   | [174241, 128]              | [174241, 128]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 37,281   |
+| │    │    └─(0)GCNConv    | [174241, 128], [2, 399837] | [174241, 128]  | 16,512   |
+| │    │    └─(1)SiLU       | [174241, 128]              | [174241, 128]  | --       |
+| │    │    └─(2)GCNConv    | [174241, 128], [2, 399837] | [174241, 128]  | 16,512   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [174241, 128], [2, 399837] | [174241, 33]   | 4,257    |
++---------------------------+----------------------------+----------------+----------+
+
+
+>>> Загружаю pretrained веса: /data/paper_heavy/krsk_ar12_start.pth
+  Pretrained веса загружены.
+
+[Train] Включен Weighted Loss.
+[Train] static_channels=[7, 8], forcing_channels=[29, 30, 31, 32]
+[Train] → маска каналов: 27/33 dynamic (no-loss: [7, 8, 29, 30, 31, 32])
+[Train] roi_loss_weight=30 → 2501/133279 узлов области, их доля в целевой функции 36.5 % (при весе 1 было 1.9 %)
+[Train] развёртка с отцеплением: градиент пошаговый, память не растёт с длиной развёртки (проброс между шагами при этом теряется)
+[Init] val_loss=0.01492 val_acc=0.9922 raw_RMSE=0.1119
+
+Epoch 0 (AR=12) with attention threshold 0.0
+[Epoch 1] train_loss=0.05991  val_loss=0.06094  val_ACC=0.9914  raw_RMSE=0.1182
+Val loss reduced by inf. Saving best model... 
+
+
+Epoch 1 (AR=12) with attention threshold 0.0
+[Epoch 2] train_loss=0.05537  val_loss=0.05738  val_ACC=0.9917  raw_RMSE=0.1154
+Val loss reduced by 0.00357. Saving best model... 
+
+
+Epoch 2 (AR=12) with attention threshold 0.0
+[Epoch 3] train_loss=0.05073  val_loss=0.05535  val_ACC=0.9919  raw_RMSE=0.1140
+Val loss reduced by 0.00203. Saving best model... 
+
+
+Epoch 3 (AR=12) with attention threshold 0.0
