@@ -57,7 +57,17 @@ N_TEST=2000         # полный тест (фактически 1607)
 N_VAL=200           # для свипа гиперпараметров
 
 mkdir -p "$OUT" "$HEAVY"
-TAG=${EXP#multires_krsk_33f_}
+# Режим метрики для ВСЕХ прогонов с усвоением:
+#   bg (умолчание) — в метрику идёт прогноз ДО коррекции, состояние продвигается
+#                    исправленным. Меряется шестичасовой прогноз из предыдущего
+#                    анализа — то, что имеет смысл публиковать как прогноз.
+#   an             — в метрику идёт поле ПОСЛЕ коррекции, то есть анализ. Так
+#                    считалось до 25.08.2026; наблюдения при этом входят в
+#                    оценку того же срока, и прогнозом это называть нельзя.
+MODE=${2:-bg}
+ASSIM_BG=""
+[[ "$MODE" == "bg" ]] && ASSIM_BG="--assim-metrics-background"
+TAG=${EXP#multires_krsk_33f_}_$MODE
 MASTER="$OUT/a_${TAG}_master.log"
 
 # Сторож: серия идёт часов пятнадцать, запустить её поверх обучения
@@ -151,7 +161,7 @@ for L in 50000 100000 150000 200000; do
   for S in 0.3 0.5 1.0; do
     run "a_${TAG}_val_oi_L${L}_s${S}" --split val --ar-steps 4 --max-samples $N_VAL --region $ROI \
         --assim-method oi --obs-sparsity 0.1 --obs-roi-only --obs-seed 42 \
-        --oi-corr-len $L --oi-sigma-o $S
+        --oi-corr-len $L --oi-sigma-o $S $ASSIM_BG
   done
 done
 log "=== свип на val закончен, лучшую пару (L, sigma) выбрать по логам выше ==="
@@ -163,13 +173,13 @@ run a_${TAG}_test_baseline_inner --split test_only --ar-steps 4 --max-samples $N
 for A in 0.5 0.7 0.9; do
   run "a_${TAG}_test_nudge_a${A}" --split test_only --ar-steps 4 --max-samples $N_TEST --region $ROI \
       --assim-method nudging --nudging-mode sequential --nudging-alpha $A \
-      --obs-sparsity 0.1 --obs-roi-only --obs-seed 42
+      --obs-sparsity 0.1 --obs-roi-only --obs-seed 42 $ASSIM_BG
 done
 
 for SEED in 42 43 44; do
   run "a_${TAG}_test_oi10_seed${SEED}" --split test_only --ar-steps 4 --max-samples $N_TEST --region $ROI \
       --assim-method oi --obs-sparsity 0.1 --obs-roi-only --obs-seed $SEED \
-      --oi-corr-len 100000 --oi-sigma-o 0.5
+      --oi-corr-len 100000 --oi-sigma-o 0.5 $ASSIM_BG
 done
 
 # Те же два режима, но в метрику пишется ФОН — прогноз до коррекции. Состояние
@@ -177,31 +187,25 @@ done
 # предыдущего анализа. Это и есть честная проверка циклической системы: без
 # флага в метрику идёт анализ, куда вошли наблюдения на тот же срок, и прогнозом
 # это называть нельзя (разобрались 25.08.2026).
-run "a_${TAG}_test_oi10_bg" --split test_only --ar-steps 4 --max-samples $N_TEST --region $ROI \
-    --assim-method oi --obs-sparsity 0.1 --obs-roi-only --obs-seed 42 \
-    --oi-corr-len 100000 --oi-sigma-o 0.5 --assim-metrics-background
 
 run a_${TAG}_test_oi1 --split test_only --ar-steps 4 --max-samples $N_TEST --region $ROI \
     --assim-method oi --obs-sparsity 0.01 --obs-roi-only --obs-seed 42 \
-    --oi-corr-len 200000 --oi-sigma-o 0.5
-run "a_${TAG}_test_oi1_bg" --split test_only --ar-steps 4 --max-samples $N_TEST --region $ROI \
-    --assim-method oi --obs-sparsity 0.01 --obs-roi-only --obs-seed 42 \
-    --oi-corr-len 200000 --oi-sigma-o 0.5 --assim-metrics-background
+    --oi-corr-len 200000 --oi-sigma-o 0.5 $ASSIM_BG
 
 # ── 5. Длинная развёртка: 14 суток ────────────────────────────────────
 run a_${TAG}_long_noda --split test_only --ar-steps $AR_LONG --max-samples $N_LONG --region $ROI
 
 run a_${TAG}_long_oi10 --split test_only --ar-steps $AR_LONG --max-samples $N_LONG --region $ROI \
     --assim-method oi --obs-sparsity 0.1 --obs-roi-only --obs-seed 42 \
-    --oi-corr-len 100000 --oi-sigma-o 0.5
+    --oi-corr-len 100000 --oi-sigma-o 0.5 $ASSIM_BG
 
 run a_${TAG}_long_oi10_first4 --split test_only --ar-steps $AR_LONG --max-samples $N_LONG --region $ROI \
     --assim-method oi --obs-sparsity 0.1 --obs-roi-only --obs-seed 42 \
-    --oi-corr-len 100000 --oi-sigma-o 0.5 --oi-first-k 4
+    --oi-corr-len 100000 --oi-sigma-o 0.5 $ASSIM_BG --oi-first-k 4
 
 run a_${TAG}_long_oi1 --split test_only --ar-steps $AR_LONG --max-samples $N_LONG --region $ROI \
     --assim-method oi --obs-sparsity 0.01 --obs-roi-only --obs-seed 42 \
-    --oi-corr-len 200000 --oi-sigma-o 0.5
+    --oi-corr-len 200000 --oi-sigma-o 0.5 $ASSIM_BG
 
 log "=== ALL DONE ==="
 grep -E "DONE " "$MASTER" | tail -25
