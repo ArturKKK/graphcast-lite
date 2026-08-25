@@ -65,3 +65,16 @@ Decoder summary:
 [Train] → маска каналов: 27/33 dynamic (no-loss: [7, 8, 29, 30, 31, 32])
 [Train] roi_loss_weight=30 → 2501/133279 узлов области, их доля в целевой функции 36.5 % (при весе 1 было 1.9 %)
 [Train] развёртка с отцеплением: градиент пошаговый, память не растёт с длиной развёртки (проброс между шагами при этом теряется)
+[Init] val_loss=0.01492 val_acc=0.9922 raw_RMSE=0.1119
+
+Epoch 0 (AR=12) with attention threshold 0.0
+[Epoch 1] train_loss=0.05991  val_loss=0.06094  val_ACC=0.9914  raw_RMSE=0.1182
+Val loss reduced by inf. Saving best model... 
+
+
+Epoch 1 (AR=12) with attention threshold 0.0
+[Epoch 2] train_loss=0.05537  val_loss=0.05738  val_ACC=0.9917  raw_RMSE=0.1154
+Val loss reduced by 0.00357. Saving best model... 
+
+
+Epoch 2 (AR=12) with attention threshold 0.0
