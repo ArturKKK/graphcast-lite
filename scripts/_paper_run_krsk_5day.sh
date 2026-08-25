@@ -10,7 +10,8 @@
 # Развёртка 20 шагов по 6 ч. Датасет пересобирать не нужно: predict.py строит
 # окно по --ar-steps.
 #
-# Запуск: bash scripts/_paper_run_krsk_5day.sh   (сам уходит в фон)
+# Запуск: bash scripts/_paper_run_krsk_5day.sh ["опыт:тег опыт:тег ..."]
+#   умолчание — chw, ar12, chwb; уже посчитанные main/w1/w10/w30 лежат в krsk5d_*
 set -uo pipefail
 if [[ "${DAEMONIZED:-}" != "1" ]]; then
   DAEMONIZED=1 setsid nohup bash "$0" "$@" </dev/null >/dev/null 2>&1 &
@@ -48,8 +49,11 @@ mkdir -p /data/paper_heavy
 
 # Веса берём из чекпойнтов в /workdir — он переживает перезапуск виртуалки,
 # в отличие от /data, где после рестарта пусто.
-for pair in "multires_krsk_33f:main" "multires_krsk_33f_drop8:w1" \
-            "multires_krsk_33f_roiw10:w10" "multires_krsk_33f_roiw30:w30"; do
+# Список моделей — аргументом, чтобы не плодить копии раннера. Умолчание
+# обновлено: основная модель статьи теперь chw, и длинная развёртка нужна
+# прежде всего для неё и для ar12, обученной на 12 шагов.
+PAIRS=${1:-"multires_krsk_33f_chw:chw multires_krsk_33f_ar12:ar12 multires_krsk_33f_chwb:chwb"}
+for pair in $PAIRS; do
   EXP=${pair%%:*}; TAG=${pair##*:}
   CKPT="experiments/$EXP/checkpoint.pth"
   DST=/data/paper_heavy/krsk5d_$TAG.pth
