@@ -56,3 +56,30 @@
 [08:01:52] START a_chwb_long_oi10_first4
 [09:27:43] DONE  a_chwb_long_oi10_first4 rc=0 | skill=7.13% |  t2m K 0.79°C 0.96°C 1.02°C 1.06°C 1.46°C 1.66°C 1.80°C 1.94°C
 [09:27:43] START a_chwb_long_oi1
+[11:01:31] DONE  a_chwb_long_oi1 rc=0 | skill=67.97% |  t2m K 1.08°C 1.34°C 1.44°C 1.51°C 1.60°C 1.66°C 1.69°C 1.73°C
+[11:01:31] === ALL DONE ===
+[19:53:01] DONE  a_chwb_val_oi_L50000_s0.5 rc=0 | skill=88.33% |  t2m K 0.83°C 0.96°C 1.00°C 1.03°C
+[20:01:25] DONE  a_chwb_val_oi_L50000_s1.0 rc=0 | skill=86.87% |  t2m K 0.92°C 1.06°C 1.10°C 1.13°C
+[20:09:45] DONE  a_chwb_val_oi_L100000_s0.3 rc=0 | skill=88.15% |  t2m K 0.84°C 0.99°C 1.04°C 1.08°C
+[20:18:07] DONE  a_chwb_val_oi_L100000_s0.5 rc=0 | skill=88.58% |  t2m K 0.82°C 0.97°C 1.01°C 1.04°C
+[20:26:29] DONE  a_chwb_val_oi_L100000_s1.0 rc=0 | skill=88.22% |  t2m K 0.86°C 1.00°C 1.04°C 1.06°C
+[20:34:46] DONE  a_chwb_val_oi_L150000_s0.3 rc=0 | skill=87.97% |  t2m K 0.88°C 1.04°C 1.07°C 1.11°C
+[20:43:03] DONE  a_chwb_val_oi_L150000_s0.5 rc=0 | skill=88.18% |  t2m K 0.87°C 1.02°C 1.06°C 1.09°C
+[20:51:24] DONE  a_chwb_val_oi_L150000_s1.0 rc=0 | skill=87.95% |  t2m K 0.89°C 1.04°C 1.08°C 1.10°C
+[20:59:54] DONE  a_chwb_val_oi_L200000_s0.3 rc=0 | skill=87.71% |  t2m K 0.91°C 1.06°C 1.10°C 1.13°C
+[21:08:27] DONE  a_chwb_val_oi_L200000_s0.5 rc=0 | skill=87.80% |  t2m K 0.90°C 1.06°C 1.09°C 1.13°C
+[21:16:59] DONE  a_chwb_val_oi_L200000_s1.0 rc=0 | skill=87.56% |  t2m K 0.92°C 1.08°C 1.11°C 1.15°C
+[21:54:09] DONE  a_chwb_test_baseline rc=0 | skill=76.29% |  t2m K 1.14°C 1.32°C 1.37°C 1.42°C
+[22:30:32] DONE  a_chwb_test_baseline_inner rc=0 | skill=76.96% |  t2m K 1.02°C 1.20°C 1.23°C 1.29°C
+[23:08:36] DONE  a_chwb_test_nudge_a0.5 rc=0 | skill=77.47% |  t2m K 1.10°C 1.27°C 1.31°C 1.36°C
+[23:46:45] DONE  a_chwb_test_nudge_a0.7 rc=0 | skill=77.72% |  t2m K 1.09°C 1.26°C 1.30°C 1.35°C
+[00:25:17] DONE  a_chwb_test_nudge_a0.9 rc=0 | skill=77.88% |  t2m K 1.09°C 1.25°C 1.29°C 1.34°C
+[01:31:50] DONE  a_chwb_test_oi10_seed42 rc=0 | skill=86.51% |  t2m K 0.77°C 0.87°C 0.88°C 0.89°C
+[02:39:07] DONE  a_chwb_test_oi10_seed43 rc=0 | skill=86.64% |  t2m K 0.78°C 0.89°C 0.88°C 0.90°C
+[03:44:48] DONE  a_chwb_test_oi10_seed44 rc=0 | skill=86.82% |  t2m K 0.76°C 0.87°C 0.87°C 0.88°C
+[04:26:44] DONE  a_chwb_test_oi1 rc=0 | skill=80.62% |  t2m K 1.04°C 1.21°C 1.23°C 1.26°C
+[05:49:46] DONE  a_chwb_long_noda rc=0 | skill=7.32% |  t2m K 1.20°C 1.47°C 1.59°C 1.68°C 1.80°C 1.89°C 1.97°C 2.07°C
+[08:01:51] DONE  a_chwb_long_oi10 rc=0 | skill=76.48% |  t2m K 0.79°C 0.96°C 1.02°C 1.06°C 1.13°C 1.17°C 1.19°C 1.20°C
+[09:27:43] DONE  a_chwb_long_oi10_first4 rc=0 | skill=7.13% |  t2m K 0.79°C 0.96°C 1.02°C 1.06°C 1.46°C 1.66°C 1.80°C 1.94°C
+[11:01:31] DONE  a_chwb_long_oi1 rc=0 | skill=67.97% |  t2m K 1.08°C 1.34°C 1.44°C 1.51°C 1.60°C 1.66°C 1.69°C 1.73°C
+[11:01:31] === ALL DONE ===
