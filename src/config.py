@@ -309,5 +309,10 @@ class ExperimentConfig(BaseModel):
     # пробросе четыре шага занимают 70 ГБ из 80, двенадцать не влезают вовсе.
     # Плата — градиент не течёт между шагами.
     ar_detach_steps: bool = False
+    # Загрузчик данных. Память растёт с длиной окна: при развёртке на 12 шагов
+    # одно окно весит вдвое с лишним больше, чем при четырёх, и четырёх
+    # процессов с предвыборкой 2 хватает, чтобы выйти за ОЗУ контейнера.
+    dataloader_workers: int = 4
+    dataloader_prefetch: int = 2
     channel_loss_weights: Dict[str, float] = {}  # Per-channel weights {"0": 2.0, "3": 2.0, ...}
                                                  # Применяется поверх static/forcing mask.

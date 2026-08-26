@@ -70,7 +70,12 @@ c['num_epochs'] = ep
 c['initial_ar_steps'] = 12         # сразу полная развёртка, без разгона
 c['max_ar_steps'] = 12
 c['val_ar_steps'] = 12             # отбор по среднему за трое суток, а не за сутки
-c['ar_detach_steps'] = True        # иначе не хватит памяти
+c['ar_detach_steps'] = True        # иначе не хватит памяти карты
+# Окно при 12 шагах вдвое с лишним тяжелее, чем при четырёх, и загрузчик с
+# четырьмя процессами выедал ОЗУ контейнера: прогон дважды убило сигналом без
+# трассировки. Два процесса с предвыборкой 1 снижают аппетит вчетверо.
+c['dataloader_workers'] = 2
+c['dataloader_prefetch'] = 1
 for k in ('wandb_name', 'experiment_name', 'name'):
     if isinstance(c.get(k), str):
         c[k] = c[k].replace('drop8', 'ar12')
@@ -102,6 +107,9 @@ PYEOF
 RESUME=""
 [[ -f "experiments/$EXP/checkpoint.pth" ]] && { RESUME="--resume --reset-patience"; log "нашёлся чекпойнт — продолжаю"; }
 log "коммит: $(git rev-parse --short HEAD 2>/dev/null)"
+# Расширяемые сегменты убирают фрагментацию распределителя — на длинных
+# прогонах это иногда решает, а вреда нет.
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 log "START обучения $EXP (эпоха примерно 8 ч) $RESUME"
 python -u -m src.main "experiments/$EXP" --pretrained "$PRETRAINED" $RESUME \
     >> "$OUT/ar12_krsk_train.log" 2>&1

@@ -137,11 +137,25 @@ def run_experiment(experiment_config: ExperimentConfig, results_save_dir: str,
 
     # shuffle в DataLoader — это «перемешивать ли порядок сэмплов при формировании батчей».
     use_cuda = device.type == "cuda"
+    # Число рабочих процессов и глубина предвыборки — из конфига.
+    #
+    # Оперативная память загрузчика растёт с длиной окна: при pred=4 одно окно
+    # весит около 250 МБ на пике распаковки, при pred=12 — уже 590 МБ. С
+    # четырьмя процессами и предвыборкой 2 это 4 ГБ против 9 ГБ, причём во
+    # время валидации живут два загрузчика сразу. Прогон ar12 дважды убило
+    # сигналом без трассировки — так выглядит нехватка ОЗУ, а не памяти карты
+    # (25-26.08.2026).
+    _nw = int(getattr(experiment_config, 'dataloader_workers', 4))
+    _pf = int(getattr(experiment_config, 'dataloader_prefetch', 2))
     loader_kwargs = dict(
-        num_workers=4 if use_cuda else 0,
+        num_workers=_nw if use_cuda else 0,
         pin_memory=True if use_cuda else False,
-        persistent_workers=True if use_cuda else False,
+        persistent_workers=(use_cuda and _nw > 0),
     )
+    if use_cuda and _nw > 0:
+        loader_kwargs['prefetch_factor'] = _pf
+    if use_cuda:
+        print(f"[data] загрузчик: {_nw} процессов, предвыборка {_pf}")
     train_dataloader = DataLoader(
         train_dataset, batch_size=experiment_config.batch_size, shuffle=True,
         **loader_kwargs,
