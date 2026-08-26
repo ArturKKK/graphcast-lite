@@ -1,0 +1,54 @@
+[11:09:52] === 33f ASSIM START (commit 6b057c3) ===
+[11:09:52] диск /data: 1.8T свободно
+[11:09:52] датасет на месте: 56G
+[prep] epoch=7 ar=4 -> /data/paper_heavy/krsk_chw_bg_assim.pth
+[11:09:53] SMOKE: 5 сроков без усвоения (ожидаем t2m 1-2 °C)
+    +18h: RMSE=0.089239 | base=0.390786 | skill=77.16% | ACC=0.9167 (base 0.6068)
+    +24h: RMSE=0.093221 | base=0.456318 | skill=79.57% | ACC=0.9084 (base 0.5456)
+           t2m      K    1.61°C    1.82°C    1.84°C    1.75°C
+[11:10:12] START a_chw_bg_val_oi_L50000_s0.3
+[11:18:37] DONE  a_chw_bg_val_oi_L50000_s0.3 rc=0 | skill=82.99% |  t2m K 1.24°C 1.35°C 1.38°C 1.42°C
+[11:18:37] START a_chw_bg_val_oi_L50000_s0.5
+[11:26:48] DONE  a_chw_bg_val_oi_L50000_s0.5 rc=0 | skill=82.92% |  t2m K 1.24°C 1.36°C 1.39°C 1.42°C
+[11:26:48] START a_chw_bg_val_oi_L50000_s1.0
+[11:35:07] DONE  a_chw_bg_val_oi_L50000_s1.0 rc=0 | skill=82.57% |  t2m K 1.24°C 1.39°C 1.42°C 1.46°C
+[11:35:07] START a_chw_bg_val_oi_L100000_s0.3
+[11:43:24] DONE  a_chw_bg_val_oi_L100000_s0.3 rc=0 | skill=82.90% |  t2m K 1.24°C 1.35°C 1.40°C 1.43°C
+[11:43:24] START a_chw_bg_val_oi_L100000_s0.5
+[11:51:51] DONE  a_chw_bg_val_oi_L100000_s0.5 rc=0 | skill=82.99% |  t2m K 1.24°C 1.36°C 1.39°C 1.42°C
+[11:51:51] START a_chw_bg_val_oi_L100000_s1.0
+[12:00:11] DONE  a_chw_bg_val_oi_L100000_s1.0 rc=0 | skill=82.91% |  t2m K 1.24°C 1.37°C 1.40°C 1.43°C
+[12:00:11] START a_chw_bg_val_oi_L150000_s0.3
+[12:08:28] DONE  a_chw_bg_val_oi_L150000_s0.3 rc=0 | skill=82.92% |  t2m K 1.24°C 1.37°C 1.40°C 1.43°C
+[12:08:28] START a_chw_bg_val_oi_L150000_s0.5
+[12:16:45] DONE  a_chw_bg_val_oi_L150000_s0.5 rc=0 | skill=82.97% |  t2m K 1.24°C 1.37°C 1.40°C 1.43°C
+[12:16:45] START a_chw_bg_val_oi_L150000_s1.0
+[12:25:07] DONE  a_chw_bg_val_oi_L150000_s1.0 rc=0 | skill=82.92% |  t2m K 1.24°C 1.38°C 1.41°C 1.44°C
+[12:25:07] START a_chw_bg_val_oi_L200000_s0.3
+[12:33:23] DONE  a_chw_bg_val_oi_L200000_s0.3 rc=0 | skill=82.91% |  t2m K 1.24°C 1.37°C 1.41°C 1.44°C
+[12:33:23] START a_chw_bg_val_oi_L200000_s0.5
+[12:41:34] DONE  a_chw_bg_val_oi_L200000_s0.5 rc=0 | skill=82.94% |  t2m K 1.24°C 1.38°C 1.41°C 1.44°C
+[12:41:34] START a_chw_bg_val_oi_L200000_s1.0
+[12:49:40] DONE  a_chw_bg_val_oi_L200000_s1.0 rc=0 | skill=82.90% |  t2m K 1.24°C 1.38°C 1.42°C 1.45°C
+[12:49:40] === свип на val закончен, лучшую пару (L, sigma) выбрать по логам выше ===
+[12:49:40] START a_chw_bg_test_baseline
+[13:26:26] DONE  a_chw_bg_test_baseline rc=0 | skill=76.42% |  t2m K 1.18°C 1.36°C 1.40°C 1.46°C
+[13:26:26] START a_chw_bg_test_baseline_inner
+[14:02:31] DONE  a_chw_bg_test_baseline_inner rc=0 | skill=77.08% |  t2m K 1.06°C 1.23°C 1.26°C 1.31°C
+[14:02:32] START a_chw_bg_test_nudge_a0.5
+[14:40:32] DONE  a_chw_bg_test_nudge_a0.5 rc=0 | skill=76.82% |  t2m K 1.18°C 1.35°C 1.38°C 1.43°C
+[14:40:32] START a_chw_bg_test_nudge_a0.7
+[15:18:32] DONE  a_chw_bg_test_nudge_a0.7 rc=0 | skill=76.92% |  t2m K 1.18°C 1.35°C 1.38°C 1.43°C
+[15:18:32] START a_chw_bg_test_nudge_a0.9
+[15:56:22] DONE  a_chw_bg_test_nudge_a0.9 rc=0 | skill=77.00% |  t2m K 1.18°C 1.34°C 1.38°C 1.43°C
+[15:56:22] START a_chw_bg_test_oi10_seed42
+[17:02:45] DONE  a_chw_bg_test_oi10_seed42 rc=0 | skill=79.38% |  t2m K 1.18°C 1.26°C 1.27°C 1.28°C
+[17:02:45] START a_chw_bg_test_oi10_seed43
+[18:08:41] DONE  a_chw_bg_test_oi10_seed43 rc=0 | skill=79.47% |  t2m K 1.18°C 1.26°C 1.27°C 1.28°C
+[18:08:41] START a_chw_bg_test_oi10_seed44
+[19:14:44] DONE  a_chw_bg_test_oi10_seed44 rc=0 | skill=79.46% |  t2m K 1.18°C 1.26°C 1.26°C 1.28°C
+[19:14:44] START a_chw_bg_test_oi1
+[19:56:54] DONE  a_chw_bg_test_oi1 rc=0 | skill=78.27% |  t2m K 1.18°C 1.34°C 1.37°C 1.40°C
+[19:56:54] START a_chw_bg_long_noda
+[21:20:57] DONE  a_chw_bg_long_noda rc=0 | skill=5.96% |  t2m K 1.24°C 1.52°C 1.64°C 1.72°C 1.84°C 1.93°C 2.01°C 2.10°C
+[21:20:57] START a_chw_bg_long_oi10

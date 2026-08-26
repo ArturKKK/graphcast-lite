@@ -1,0 +1,165 @@
+[INFO] multires: T=16072, N_nodes=133279, time_start=2010-01-01
+[INFO] node split: regional=2501, global=130778
+[INFO] extra: T=17532, lon=512, lat=256, time_start=2010-01-01
+[INFO] extra длиннее (17532 > 16072) → используем первые 16072 шагов (time_start совпадает: 2010-01-01)
+[INFO] region-extra: T=16072, lon=61, lat=41, time_start=2010-01-01
+[INFO] region-extra coverage: 2501/133279 nodes
+[INFO] allocating /data/datasets/multires_krsk_33f/data_extra.npy shape (16072,133279,14) float16 = 60.0 GB
+[INFO] plev routing: global-extra→130778 nodes, region-extra→2501 nodes
+[INFO] filling plev channels via bilinear, chunks of 200 time steps
+  [plev] t=0..199 done
+  [plev] t=200..399 done
+  [plev] t=400..599 done
+  [plev] t=600..799 done
+  [plev] t=800..999 done
+  [plev] t=1000..1199 done
+  [plev] t=1200..1399 done
+  [plev] t=1400..1599 done
+  [plev] t=1600..1799 done
+  [plev] t=1800..1999 done
+  [plev] t=2000..2199 done
+  [plev] t=2200..2399 done
+  [plev] t=2400..2599 done
+  [plev] t=2600..2799 done
+  [plev] t=2800..2999 done
+  [plev] t=3000..3199 done
+  [plev] t=3200..3399 done
+  [plev] t=3400..3599 done
+  [plev] t=3600..3799 done
+  [plev] t=3800..3999 done
+  [plev] t=4000..4199 done
+  [plev] t=4200..4399 done
+  [plev] t=4400..4599 done
+  [plev] t=4600..4799 done
+  [plev] t=4800..4999 done
+  [plev] t=5000..5199 done
+  [plev] t=5200..5399 done
+  [plev] t=5400..5599 done
+  [plev] t=5600..5799 done
+  [plev] t=5800..5999 done
+  [plev] t=6000..6199 done
+  [plev] t=6200..6399 done
+  [plev] t=6400..6599 done
+  [plev] t=6600..6799 done
+  [plev] t=6800..6999 done
+  [plev] t=7000..7199 done
+  [plev] t=7200..7399 done
+  [plev] t=7400..7599 done
+  [plev] t=7600..7799 done
+  [plev] t=7800..7999 done
+  [plev] t=8000..8199 done
+  [plev] t=8200..8399 done
+  [plev] t=8400..8599 done
+  [plev] t=8600..8799 done
+  [plev] t=8800..8999 done
+  [plev] t=9000..9199 done
+  [plev] t=9200..9399 done
+  [plev] t=9400..9599 done
+  [plev] t=9600..9799 done
+  [plev] t=9800..9999 done
+  [plev] t=10000..10199 done
+  [plev] t=10200..10399 done
+  [plev] t=10400..10599 done
+  [plev] t=10600..10799 done
+  [plev] t=10800..10999 done
+  [plev] t=11000..11199 done
+  [plev] t=11200..11399 done
+  [plev] t=11400..11599 done
+  [plev] t=11600..11799 done
+  [plev] t=11800..11999 done
+[INFO] multires: T=16072, N_nodes=133279, time_start=2010-01-01
+[INFO] node split: regional=2501, global=130778
+[INFO] extra: T=17532, lon=512, lat=256, time_start=2010-01-01
+[INFO] extra длиннее (17532 > 16072) → используем первые 16072 шагов (time_start совпадает: 2010-01-01)
+[INFO] region-extra: T=16072, lon=61, lat=41, time_start=2010-01-01
+[INFO] region-extra coverage: 2501/133279 nodes
+[INFO] allocating /data/datasets/multires_krsk_33f/data_extra.npy shape (16072,133279,14) float16 = 60.0 GB
+[INFO] plev routing: global-extra→130778 nodes, region-extra→2501 nodes
+[INFO] filling plev channels via bilinear, chunks of 200 time steps
+  [plev] t=0..199 done
+  [plev] t=200..399 done
+  [plev] t=400..599 done
+  [plev] t=600..799 done
+  [plev] t=800..999 done
+  [plev] t=1000..1199 done
+  [plev] t=1200..1399 done
+  [plev] t=1400..1599 done
+  [plev] t=1600..1799 done
+  [plev] t=1800..1999 done
+  [plev] t=2000..2199 done
+  [plev] t=2200..2399 done
+  [plev] t=2400..2599 done
+  [plev] t=2600..2799 done
+  [plev] t=2800..2999 done
+  [plev] t=3000..3199 done
+  [plev] t=3200..3399 done
+  [plev] t=3400..3599 done
+  [plev] t=3600..3799 done
+  [plev] t=3800..3999 done
+  [plev] t=4000..4199 done
+  [plev] t=4200..4399 done
+  [plev] t=4400..4599 done
+  [plev] t=4600..4799 done
+  [plev] t=4800..4999 done
+  [plev] t=5000..5199 done
+  [plev] t=5200..5399 done
+  [plev] t=5400..5599 done
+  [plev] t=5600..5799 done
+  [plev] t=5800..5999 done
+  [plev] t=6000..6199 done
+  [plev] t=6200..6399 done
+  [plev] t=6400..6599 done
+  [plev] t=6600..6799 done
+  [plev] t=6800..6999 done
+  [plev] t=7000..7199 done
+  [plev] t=7200..7399 done
+  [plev] t=7400..7599 done
+  [plev] t=7600..7799 done
+  [plev] t=7800..7999 done
+  [plev] t=8000..8199 done
+  [plev] t=8200..8399 done
+  [plev] t=8400..8599 done
+  [plev] t=8600..8799 done
+  [plev] t=8800..8999 done
+  [plev] t=9000..9199 done
+  [plev] t=9200..9399 done
+  [plev] t=9400..9599 done
+  [plev] t=9600..9799 done
+  [plev] t=9800..9999 done
+  [plev] t=10000..10199 done
+  [plev] t=10200..10399 done
+  [plev] t=10400..10599 done
+  [plev] t=10600..10799 done
+  [plev] t=10800..10999 done
+  [plev] t=11000..11199 done
+  [plev] t=11200..11399 done
+  [plev] t=11400..11599 done
+  [plev] t=11600..11799 done
+  [plev] t=11800..11999 done
+  [plev] t=12000..12199 done
+  [plev] t=12200..12399 done
+  [plev] t=12400..12599 done
+  [plev] t=12600..12799 done
+  [plev] t=12800..12999 done
+  [plev] t=13000..13199 done
+  [plev] t=13200..13399 done
+  [plev] t=13400..13599 done
+  [plev] t=13600..13799 done
+  [plev] t=13800..13999 done
+  [plev] t=14000..14199 done
+  [plev] t=14200..14399 done
+  [plev] t=14400..14599 done
+  [plev] t=14600..14799 done
+  [plev] t=14800..14999 done
+  [plev] t=15000..15199 done
+  [plev] t=15200..15399 done
+  [plev] t=15400..15599 done
+  [plev] t=15600..15799 done
+  [plev] t=15800..15999 done
+  [plev] t=16000..16071 done
+[INFO] filling time-forcing channels (broadcast)
+[INFO] symlink data.npy → /data/datasets/multires_krsk_19f_merge/data.npy
+[INFO] scalers.npz written (33,)
+[INFO] dataset_info.json written: n_feat=33 (19+14)
+
+[DONE] multires Russia 33f assembled at: /data/datasets/multires_krsk_33f
