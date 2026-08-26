@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/workdir/graphcast-lite/scripts/predict.py", line 895, in <module>
+    main()
+  File "/workdir/graphcast-lite/scripts/predict.py", line 192, in main
+    assert os.path.exists(ckpt_path), f"нет чекпойнта: {ckpt_path}"
+AssertionError: нет чекпойнта: /data/paper_heavy/frozen_last.pth
