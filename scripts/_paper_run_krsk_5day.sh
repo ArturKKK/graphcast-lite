@@ -67,6 +67,11 @@ e = ck.get("epoch")
 print("[prep]", dst, "эпоха", (e + 1) if isinstance(e, int) else e)
 PYEOF
   [[ -f "$DST" ]] || { log "ПРОПУСК $TAG: веса не извлеклись"; continue; }
+  # Готовое не пересчитываем: виртуалки за неделю падали трижды.
+  if [[ -f "$OUT/krsk5d_$TAG.log" ]] && grep -q "Per-channel region" "$OUT/krsk5d_$TAG.log" 2>/dev/null; then
+    log "ПРОПУСК $TAG — уже посчитан ($(grep -oE 'skill=[-0-9.]+%' "$OUT/krsk5d_$TAG.log" | tail -1))"
+    continue
+  fi
   log "START $TAG ($EXP)"
   python -u scripts/predict.py "experiments/$EXP" --data-dir "$D33R" --split test_only \
       --ar-steps "$STEPS" --max-samples "$MAXN" --per-channel --no-save \

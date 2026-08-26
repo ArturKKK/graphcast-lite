@@ -34,6 +34,13 @@
 # длинные горизонты ~4 ч. Итого около 10 ч GPU после сборки.
 set -uo pipefail
 
+# Уходим в фон сами, как все остальные раннеры. Без этого серия живёт ровно
+# столько, сколько сессия ssh: закрыл терминал — потерял тринадцать часов.
+if [[ "${DAEMONIZED:-}" != "1" ]]; then
+  DAEMONIZED=1 setsid nohup bash "$0" "$@" </dev/null >/dev/null 2>&1 &
+  echo "запущено в фоне. лог: /workdir/paper_results/a_<модель>_<режим>_master.log"; exit 0
+fi
+
 REPO=/workdir/graphcast-lite
 VENV=/data/venvs/graphcast
 OUT=/workdir/paper_results
@@ -145,6 +152,15 @@ CK_ARG=""
 run() {
   local tag="$1"; shift
   local lf="$OUT/${tag}.log" npz="$OUT/${tag}_samples.npz"
+  # Уже посчитанное не пересчитываем. Серия идёт часов тринадцать и за неделю
+  # дважды обрывалась на последних пунктах; без этого перезапуск заново тратил
+  # девять часов на свип и тесты, которые уже готовы. Признак завершённости —
+  # таблица по каналам в конце лога: оборванный лог до неё не доходит.
+  if [[ -f "$lf" ]] && grep -q "Per-channel region" "$lf" 2>/dev/null; then
+    local sk=$(grep -oE "skill=[-0-9.]+%" "$lf" | tail -1)
+    log "ПРОПУСК $tag — уже посчитан ($sk)"
+    return 0
+  fi
   local cmd="python -u scripts/predict.py experiments/$EXP --data-dir $D33 $CK_ARG --per-channel --no-save --save-sample-metrics $npz $*"
   {
     echo "### PROVENANCE ###############################################"
