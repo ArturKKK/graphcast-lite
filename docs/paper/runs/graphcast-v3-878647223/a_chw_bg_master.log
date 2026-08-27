@@ -57,3 +57,40 @@ scripts/_paper_run_roiw30_assim.sh: line 99: /data/venvs/graphcast/bin/activate:
 [21:57:46] диск /data: 2.4T свободно
 [21:57:46] датасета /data/datasets/multires_krsk_33f нет — собираю (часы CPU, ~60 ГБ)
 [21:57:46] НЕТ ИСХОДНИКА: /data/datasets/multires_krsk_19f_merge — сборка невозможна
+[07:50:31] подготовка окружения (venv и исходные датасеты из S3)
+[08:04:53] подготовка rc=0
+[08:04:53] === 33f ASSIM START (commit f34f05c) ===
+[08:04:53] диск /data: 2.3T свободно
+[08:04:53] датасета /data/datasets/multires_krsk_33f нет — собираю (часы CPU, ~60 ГБ)
+[08:25:18] сборка датасета rc=0, размер: 56G
+[prep] epoch=7 ar=4 -> /data/paper_heavy/krsk_chw_bg_assim.pth
+[08:25:19] SMOKE: 5 сроков без усвоения (ожидаем t2m 1-2 °C)
+    +18h: RMSE=0.089239 | base=0.390786 | skill=77.16% | ACC=0.9167 (base 0.6068)
+    +24h: RMSE=0.093221 | base=0.456318 | skill=79.57% | ACC=0.9084 (base 0.5456)
+           t2m      K    1.61°C    1.82°C    1.84°C    1.75°C
+[08:25:39] ПРОПУСК a_chw_bg_val_oi_L50000_s0.3 — уже посчитан (skill=82.99%)
+[08:25:39] ПРОПУСК a_chw_bg_val_oi_L50000_s0.5 — уже посчитан (skill=82.92%)
+[08:25:39] ПРОПУСК a_chw_bg_val_oi_L50000_s1.0 — уже посчитан (skill=82.57%)
+[08:25:39] ПРОПУСК a_chw_bg_val_oi_L100000_s0.3 — уже посчитан (skill=82.90%)
+[08:25:39] ПРОПУСК a_chw_bg_val_oi_L100000_s0.5 — уже посчитан (skill=82.99%)
+[08:25:39] ПРОПУСК a_chw_bg_val_oi_L100000_s1.0 — уже посчитан (skill=82.91%)
+[08:25:39] ПРОПУСК a_chw_bg_val_oi_L150000_s0.3 — уже посчитан (skill=82.92%)
+[08:25:39] ПРОПУСК a_chw_bg_val_oi_L150000_s0.5 — уже посчитан (skill=82.97%)
+[08:25:39] ПРОПУСК a_chw_bg_val_oi_L150000_s1.0 — уже посчитан (skill=82.92%)
+[08:25:39] ПРОПУСК a_chw_bg_val_oi_L200000_s0.3 — уже посчитан (skill=82.91%)
+[08:25:39] ПРОПУСК a_chw_bg_val_oi_L200000_s0.5 — уже посчитан (skill=82.94%)
+[08:25:39] ПРОПУСК a_chw_bg_val_oi_L200000_s1.0 — уже посчитан (skill=82.90%)
+[08:25:39] === свип на val закончен, лучшую пару (L, sigma) выбрать по логам выше ===
+[08:25:39] ПРОПУСК a_chw_bg_test_baseline — уже посчитан (skill=76.42%)
+[08:25:39] ПРОПУСК a_chw_bg_test_baseline_inner — уже посчитан (skill=77.08%)
+[08:25:39] ПРОПУСК a_chw_bg_test_nudge_a0.5 — уже посчитан (skill=76.82%)
+[08:25:39] ПРОПУСК a_chw_bg_test_nudge_a0.7 — уже посчитан (skill=76.92%)
+[08:25:39] ПРОПУСК a_chw_bg_test_nudge_a0.9 — уже посчитан (skill=77.00%)
+[08:25:39] ПРОПУСК a_chw_bg_test_oi10_seed42 — уже посчитан (skill=79.38%)
+[08:25:39] ПРОПУСК a_chw_bg_test_oi10_seed43 — уже посчитан (skill=79.47%)
+[08:25:39] ПРОПУСК a_chw_bg_test_oi10_seed44 — уже посчитан (skill=79.46%)
+[08:25:39] ПРОПУСК a_chw_bg_test_oi1 — уже посчитан (skill=78.27%)
+[08:25:39] ПРОПУСК a_chw_bg_long_noda — уже посчитан (skill=5.96%)
+[08:25:39] START a_chw_bg_long_oi10
+[10:25:39] DONE  a_chw_bg_long_oi10 rc=0 | skill=41.50% |  t2m K 1.24°C 1.35°C 1.40°C 1.43°C 1.48°C 1.52°C 1.54°C 1.57°C
+[10:25:39] START a_chw_bg_long_oi10_first4
