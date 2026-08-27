@@ -96,10 +96,18 @@ BUSY=$(pgrep -af "^python.*(src\.main|scripts/predict\.py)" | head -1)
 [[ -n "$BUSY" ]] && { echo "карта занята: $BUSY — стоп"; exit 1; }
 exec >>"$MASTER" 2>&1
 cd "$REPO" || exit 1
-source "$VENV/bin/activate"
+log() { echo "[$(date '+%H:%M:%S')] $*"; }
+# Установка окружения. Единственный раннер, где её не было: 26.08.2026 после
+# пересоздания виртуалки серия упала за секунду на отсутствующем venv, а
+# соседний раннер, где эта проверка есть, всё поднял и отработал.
+if [[ ! -x "$VENV/bin/python" || ! -f "$D33/data.npy" ]]; then
+  log "подготовка окружения (venv и исходные датасеты из S3)"
+  bash scripts/_paper_setup_vm.sh >> "$OUT/a_${TAG}_setup.log" 2>&1
+  log "подготовка rc=$?"
+fi
+source "$VENV/bin/activate" || { log "нет venv даже после подготовки — стоп"; exit 1; }
 export PYTHONPATH="$REPO"
 GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "?")
-log() { echo "[$(date '+%H:%M:%S')] $*"; }
 
 log "=== 33f ASSIM START (commit $GIT_COMMIT) ==="
 log "диск /data: $(df -h /data | tail -1 | awk '{print $4}') свободно"
