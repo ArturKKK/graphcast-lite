@@ -238,6 +238,15 @@ class MultiresInputBuilder:
         # 1. multires coords (defines node order). If absent, reconstruct from
         #    global+regional grids + ROI (same logic as build_multires_dataset.py).
         coords_path = multires_dir / "coords.npz"
+        # Порядок узлов одинаков у 33-канального датасета и у слитого 19-канального
+        # источника — 33-канальный собирается из него простым дописыванием каналов
+        # и копирует coords.npz как есть. Поэтому если в 33f координат нет
+        # (случалось после пересборки датасета), берём их у слитого источника.
+        if not coords_path.exists() and merged_base is not None:
+            alt = merged_base / "coords.npz"
+            if alt.exists():
+                print(f"[builder] в {multires_dir} нет coords.npz, беру из {alt}", flush=True)
+                coords_path = alt
         if coords_path.exists():
             coords = np.load(coords_path)
             self.node_lats = coords["latitude"].astype(np.float32)
@@ -254,6 +263,11 @@ class MultiresInputBuilder:
         else:
             print(f"[builder] no coords at {coords_path}; reconstructing from "
                   f"global+regional grids + ROI {ROI}", flush=True)
+            if global_base is None or regional_base is None:
+                raise SystemExit(
+                    "координат нет ни в multires-каталоге, ни в слитом источнике, "
+                    "а восстановить их не из чего: для этого нужны --global-base и "
+                    "--regional-base. Проверь, что в датасете есть coords.npz.")
             gc_tmp = np.load(global_base / "coords.npz")
             rc_tmp = np.load(regional_base / "coords.npz")
             g_lats_n = gc_tmp["latitude"].astype(np.float64)
@@ -288,7 +302,12 @@ class MultiresInputBuilder:
         self.n_regional = int(self.is_regional.sum())
 
         # 2. 33ch scalers
-        sc = np.load(multires_dir / "scalers.npz")
+        sc_path = multires_dir / "scalers.npz"
+        if not sc_path.exists():
+            raise SystemExit(
+                f"нет {sc_path} — без нормировок корпус собрать нельзя. "
+                f"Проверь, полностью ли собран {multires_dir}.")
+        sc = np.load(sc_path)
         self.s_mean = sc["mean"].astype(np.float32)
         self.s_std = sc["std"].astype(np.float32)
         assert self.s_mean.shape == (33,) and self.s_std.shape == (33,)

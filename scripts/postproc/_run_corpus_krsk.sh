@@ -32,13 +32,28 @@ log "=== КОРПУС ПОСТОБРАБОТКИ, годы $Y0-$Y1 ==="
 BUSY=$(pgrep -af "^python.*(src\.main|scripts/predict\.py|build_corpus\.py)" | head -1)
 [[ -n "$BUSY" ]] && { log "карта занята: $BUSY — стоп"; exit 1; }
 
-if [[ ! -x "$VENV/bin/python" || ! -f "$DATA/multires_krsk_33f/data.npy" ]]; then
+MERGE="$DATA/multires_krsk_19f_merge"
+GEXTRA="$DATA/global_512x256_extra_2010-2021_07deg"
+META="$DATA/multires_krsk_33f_meta"
+
+if [[ ! -x "$VENV/bin/python" || ! -f "$MERGE/data.npy" ]]; then
   log "подготовка окружения и датасетов"
   bash scripts/_paper_setup_vm.sh >> "$OUT/corpus_${TAG}_setup.log" 2>&1
   log "подготовка rc=$?"
 fi
 source "$VENV/bin/activate" || { log "нет venv — стоп"; exit 1; }
 export PYTHONPATH="$REPO"
+
+# Сборщику из multires-каталога нужны только coords.npz, scalers.npz и
+# variables.json — сам массив он не читает. Полный 33-канальный датасет весит
+# 56 ГБ и вместе со слитым источником на 81 ГБ упирается в лимит диска
+# платформы, поэтому собираем одни метаданные.
+if [[ ! -f "$META/scalers.npz" ]]; then
+  log "собираю метаданные 33-канального датасета"
+  python -u scripts/postproc/make_multires33f_meta.py \
+      --merged "$MERGE" --extra "$GEXTRA" --out "$META" 2>&1 | tail -14
+  [[ -f "$META/scalers.npz" ]] || { log "метаданные не собрались — стоп"; exit 1; }
+fi
 
 # Модель. Предпочитаем chw (основная в статье); если её веса не пережили
 # пересоздание виртуалки — падаем на базовую 33-канальную, она лежит в git.
@@ -73,9 +88,9 @@ mkdir -p data/postproc
 log "START сборки (развёртка до 120 ч, инициализации 00 и 12 UTC)"
 python -u scripts/postproc/build_corpus.py \
     --experiment-dir "experiments/$EXP" \
-    --multires-dir   "$DATA/multires_krsk_33f" \
-    --merged-base    "$DATA/multires_krsk_19f_merge" \
-    --global-extra   "$DATA/global_512x256_extra_2010-2021_07deg" \
+    --multires-dir   "$META" \
+    --merged-base    "$MERGE" \
+    --global-extra   "$GEXTRA" \
     --regional-extra "$DATA/region_krsk_61x41_extra_2010-2020_025deg" \
     --stations-json  data/krsk_postproc_stations.json \
     --isd-dir        "$ISD" \
