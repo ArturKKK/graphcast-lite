@@ -1,0 +1,171 @@
+### PROVENANCE ###############################################
+# tag: m5_val_oi_L100000_s0.5 | started: 2026-07-26T15:33:16+03:00 | host: k8smr-macos-build--graphcast-v3-750057806-task-0
+# git commit: d62475f | gpu: NVIDIA H100 80GB HBM3
+# dataset: /data/datasets/multires_krsk_19f_merge
+#   info: {"time_start":"2010-01-01","time_end":"2021-12-31","n_time":16072,"n_nodes":133279,"n_feat":19,"flat":true,"n_global_kept":130778,"n_regional":2501,"roi":[50.0,60.0,83.0,98.0],"variables":["t2m","10u","10v","msl","tp","sp","tcwv","z_surf","lsm","t@850","u@850"
+# experiment: experiments/multires_merge_freeze6_v2 (config md5 48fa48d6ff72346ef9ae4a9e7b2a5129)
+#   ckpt: 6ad5ade3178d63776ce79a12069270ad  experiments/multires_merge_freeze6_v2/best_model.pth
+# COMMAND:
+#   python -u scripts/predict.py experiments/multires_merge_freeze6_v2 --data-dir /data/datasets/multires_krsk_19f_merge --split val --ar-steps 4 --max-samples 200 --per-channel --no-save --region 50 60 83 98 --save-sample-metrics /workdir/paper_results/m5_val_oi_L100000_s0.5_samples.npz --assim-method oi --obs-sparsity 0.1 --obs-roi-only --obs-seed 42 --oi-corr-len 100000 --oi-sigma-o 0.5
+##############################################################
+
+[predict] data_dir=/data/datasets/multires_krsk_19f_merge (chunked=True, pred_steps=4)
+[ChunkDataset] train: 12853 samples, flat_nodes=133279, feat=19, obs=2, pred=4
+[ChunkDataset] val: 1607 samples, flat_nodes=133279, feat=19, obs=2, pred=4
+[ChunkDataset] val: 1607 samples, flat_nodes=133279, feat=19, obs=2, pred=4
+Encoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [174241, 44], [2, 207099]  | [174241, 256]  | 340,994  |
+| ├─(mlp)MLP                |                            | [174241, 256]  | 143,618  |
+| │    └─(MLP)ModuleList    | --                         | --             | 143,618  |
+| │    │    └─(0)Linear     | [174241, 44]               | [174241, 256]  | 11,520   |
+| │    │    └─(1)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(2)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(3)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(4)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(5)LayerNorm  | [174241, 256]              | [174241, 256]  | 512      |
+| ├─(graph_layer)GraphLayer |                            | [174241, 256]  | 197,376  |
+| │    └─(activation)SiLU   | [174241, 256]              | [174241, 256]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 197,376  |
+| │    │    └─(0)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
+| │    │    └─(1)SiLU       | [174241, 256]              | [174241, 256]  | --       |
+| │    │    └─(2)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
++---------------------------+----------------------------+----------------+----------+
+
+Processor summary: 
+  (summary skipped: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument mat1 in method wrapper_CUDA_addmm))
+
+Decoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [174241, 256], [2, 399837] | [174241, 19]   | 150,677  |
+| ├─(mlp)MLP                |                            | [174241, 128]  | 115,202  |
+| │    └─(MLP)ModuleList    | --                         | --             | 115,202  |
+| │    │    └─(0)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(1)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(2)Linear     | [174241, 256]              | [174241, 128]  | 32,896   |
+| │    │    └─(3)PReLU      | [174241, 128]              | [174241, 128]  | 1        |
+| │    │    └─(4)Linear     | [174241, 128]              | [174241, 128]  | 16,512   |
+| ├─(graph_layer)GraphLayer |                            | [174241, 19]   | 35,475   |
+| │    └─(activation)SiLU   | [174241, 128]              | [174241, 128]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 35,475   |
+| │    │    └─(0)GCNConv    | [174241, 128], [2, 399837] | [174241, 128]  | 16,512   |
+| │    │    └─(1)SiLU       | [174241, 128]              | [174241, 128]  | --       |
+| │    │    └─(2)GCNConv    | [174241, 128], [2, 399837] | [174241, 128]  | 16,512   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [174241, 128], [2, 399837] | [174241, 19]   | 2,451    |
++---------------------------+----------------------------+----------------+----------+
+
+[AR-rollout] Модель выдаёт 1 шаг(ов), но мы прогоним 4 шагов авторегрессионно.
+[predict] device=cuda | grid=0x0 | 200/1607 test samples
+[Region] 2501 nodes (--region [50.0,60.0]N x [83.0,98.0]E)
+[OI] ROI mode: B matrix 2501×2501 (25 MB)
+[Inline-obs] 250 станций (10.0% от 2501 узлов, seed=42)
+[metrics] per-sample MSE будут сохранены в /workdir/paper_results/m5_val_oi_L100000_s0.5_samples.npz
+[assim] Residual-модель: ОИ применяется пошагово в AR-цикле
+[Main] Инференс (200 samples, DA=oi)...
+  [50/200] RMSE=0.176123 ACC=0.9837
+  [100/200] RMSE=0.174349 ACC=0.9836
+  [150/200] RMSE=0.175829 ACC=0.9835
+  [200/200] RMSE=0.175519 ACC=0.9834
+[Save] per-sample metrics → /workdir/paper_results/m5_val_oi_L100000_s0.5_samples.npz (N=200, AR=4, C=19)
+
+============================================================
+=== Inference summary (200 samples) ===
+Grid: 0x0 (G=133279) | C=19 | AR=4 horizons
+Overall: MSE=0.030807 | RMSE=0.175519 | MAE=0.076135
+Baseline: RMSE=0.527832 | MAE=0.247843
+Skill: 66.75%
+ACC: 0.9834 | base: 0.8574 | Δ=+0.1260
+
+Per-horizon:
+  +06h: RMSE=0.118899 | base=0.358192 | skill=66.81% | ACC=0.9926 (base 0.9343)
+  +12h: RMSE=0.152534 | base=0.499293 | skill=69.45% | ACC=0.9877 (base 0.8723)
+  +18h: RMSE=0.193207 | base=0.580548 | skill=66.72% | ACC=0.9799 (base 0.8275)
+  +24h: RMSE=0.220215 | base=0.632293 | skill=65.17% | ACC=0.9735 (base 0.7956)
+
+Per-horizon per-channel RMSE (physical units):
+         var   unit      +6h     +12h     +18h     +24h
+         t2m      K    0.79°C    0.96°C    1.07°C    1.17°C
+         10u    m/s     0.72     0.88     1.02     1.16
+         10v    m/s     0.73     0.89     1.03     1.17
+         msl    hPa     0.62     0.81     1.05     1.27
+       t@850      K    0.61°C    0.75°C    0.85°C    0.94°C
+       u@850    m/s     1.03     1.27     1.48     1.67
+       v@850    m/s     1.03     1.27     1.48     1.67
+       z@850    gpm      4.8      6.1      8.4      9.9
+       z@500    gpm      5.6      7.6     10.4     12.8
+
+Per-channel metrics overall (physical units, avg over 4 horizons):
+    #        var      ACC  RMSE_norm    RMSE_phys     unit
+    0        t2m   0.9987     0.0477       1.0079        K  (≈1.01 °C)
+    1        10u   0.9846     0.1722       0.9580      m/s
+    2        10v   0.9778     0.2035       0.9703      m/s
+    3        msl   0.9979     0.0716       0.9695      hPa
+    4         tp   0.8545     0.5152       0.0010        m
+    5         sp   0.9999     0.0120       1.1442      hPa
+    6       tcwv   0.9963     0.0848       1.4101    kg/m²
+    7     z_surf   0.9999     0.0033       2.8165      gpm
+    8        lsm   1.0000     0.0041       0.0019        -
+    9      t@850   0.9985     0.0514       0.7965        K  (≈0.80 °C)
+   10      u@850   0.9856     0.1676       1.3818      m/s
+   11      v@850   0.9739     0.2202       1.3820      m/s
+   12      z@850   0.9990     0.0496       7.5613      gpm
+   13      q@850   0.9885     0.1504       0.0006    kg/kg
+   14      t@500   0.9987     0.0514       0.6703        K  (≈0.67 °C)
+   15      u@500   0.9863     0.1640       1.9729      m/s
+   16      v@500   0.9757     0.2175       2.0029      m/s
+   17      z@500   0.9996     0.0276       9.4937      gpm
+   18      q@500   0.9698     0.2283       0.0003    kg/kg
+
+--- Region [50.0,60.0]N x [83.0,98.0]E (2501 nodes) ---
+RMSE=0.068553 | base=0.456140 | skill=84.97%
+ACC=0.9688 | base=0.6403
+
+  Per-horizon (region):
+    +06h: RMSE=0.057618 | base=0.283533 | skill=79.68% | ACC=0.9769 (base 0.8183)
+    +12h: RMSE=0.067178 | base=0.421250 | skill=84.05% | ACC=0.9697 (base 0.6642)
+    +18h: RMSE=0.072323 | base=0.507277 | skill=85.74% | ACC=0.9656 (base 0.5681)
+    +24h: RMSE=0.075728 | base=0.563100 | skill=86.55% | ACC=0.9631 (base 0.5103)
+
+  Per-horizon per-channel RMSE — REGION (2501 nodes):
+           var   unit      +6h     +12h     +18h     +24h
+           t2m      K    0.87°C    1.02°C    1.05°C    1.08°C
+           10u    m/s     0.42     0.49     0.53     0.55
+           10v    m/s     0.42     0.50     0.54     0.57
+           msl    hPa     0.54     0.69     0.79     0.87
+         t@850      K    0.49°C    0.61°C    0.67°C    0.71°C
+         u@850    m/s     0.81     0.99     1.08     1.15
+         v@850    m/s     0.70     0.84     0.92     0.97
+         z@850    gpm      2.3      3.4      4.3      5.0
+         z@500    gpm      3.4      4.8      5.9      6.8
+
+  Per-channel region (physical units, avg over 4 horizons):
+      #        var      ACC  RMSE_norm    RMSE_phys     unit
+      0        t2m   0.9781     0.0477       1.0076        K  (≈1.01 °C)
+      1        10u   0.9509     0.0902       0.5019      m/s
+      2        10v   0.9307     0.1068       0.5095      m/s
+      3        msl   0.9865     0.0540       0.7311      hPa
+      4         tp   0.7625     0.0613       0.0001        m
+      5         sp   1.0000     0.0070       0.6710      hPa
+      6       tcwv   0.9796     0.0180       0.2998    kg/m²
+      7     z_surf   1.0000     0.0008       0.6678      gpm
+      8        lsm   1.0000     0.0010       0.0004        -
+      9      t@850   0.9820     0.0404       0.6264        K  (≈0.63 °C)
+     10      u@850   0.9844     0.1232       1.0160      m/s
+     11      v@850   0.9706     0.1376       0.8637      m/s
+     12      z@850   0.9955     0.0254       3.8766      gpm
+     13      q@850   0.9596     0.0293       0.0001    kg/kg
+     14      t@500   0.9908     0.0269       0.3515        K  (≈0.35 °C)
+     15      u@500   0.9844     0.0910       1.0950      m/s
+     16      v@500   0.9839     0.1128       1.0386      m/s
+     17      z@500   0.9968     0.0156       5.3794      gpm
+     18      q@500   0.9715     0.0343       0.0000    kg/kg
+============================================================
+
+### finished: 2026-07-26T15:38:19+03:00, exit=0 ###
