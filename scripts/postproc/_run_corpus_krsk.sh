@@ -11,13 +11,13 @@
 # 19-канальная часть у неё уже слита в один плоский массив, поэтому сборщику
 # передаётся --merged-base вместо пары глобальная/региональная сетка.
 #
-# Годы делим между двумя виртуалками, потом сливаем:
-#   виртуалка 1:  bash scripts/postproc/_run_corpus_krsk.sh 2016 2018
-#   виртуалка 2:  bash scripts/postproc/_run_corpus_krsk.sh 2019 2020
+# Годы задаются аргументами. На одной машине весь диапазон сразу:
+#   bash scripts/postproc/_run_corpus_krsk.sh 2016 2020
+# либо, если хочется поделить между двумя картами, по половине и потом слить.
 #
 # Сам уходит в фон. Лог: /workdir/paper_results/corpus_<годы>_master.log
 set -uo pipefail
-Y0=${1:-2016}; Y1=${2:-2018}; EXP=${3:-}
+Y0=${1:-2016}; Y1=${2:-2020}; EXP=${3:-}
 TAG="${Y0}_${Y1}"
 if [[ "${DAEMONIZED:-}" != "1" ]]; then
   DAEMONIZED=1 setsid nohup bash "$0" "$@" </dev/null >/dev/null 2>&1 &
@@ -55,13 +55,19 @@ fi
   || { log "нет весов у $EXP — стоп"; exit 1; }
 log "модель: $EXP"
 
-# Наблюдения: 12 МБ, качаются за двадцать секунд, в репозитории их нет.
-if [[ ! -d data/isd_lite_krsk ]] || [[ $(ls data/isd_lite_krsk 2>/dev/null | wc -l) -lt 300 ]]; then
-  log "качаю наблюдения ISD-Lite"
-  python -u scripts/download_russia_isd_lite.py --stations data/krsk_postproc_stations.json \
-      --years 2016-2020 --out-dir data/isd_lite_krsk --workers 12 >> "$OUT/corpus_${TAG}_isd.log" 2>&1
-  log "наблюдений: $(ls data/isd_lite_krsk | wc -l) файлов"
+# Наблюдения. На виртуалке интернета нет, но общероссийский набор ISD-Lite уже
+# лежит в /data/datasets — наши станции внутри него, отдельная выборка не
+# нужна: сборщик ищет файлы по номеру станции и году.
+ISD=""
+for cand in "$DATA/isd_lite_russia" data/isd_lite_krsk data/isd_lite_russia; do
+  if [[ -d "$cand" ]] && [[ $(ls "$cand" 2>/dev/null | wc -l) -gt 100 ]]; then ISD="$cand"; break; fi
+done
+if [[ -z "$ISD" ]]; then
+  log "наблюдений нет ни в $DATA/isd_lite_russia, ни в data/isd_lite_*"
+  log "  без интернета их надо закинуть на машину — 12 МБ по 71 станции за 2016-2020"
+  exit 1
 fi
+log "наблюдения: $ISD ($(ls "$ISD" | wc -l) файлов)"
 
 mkdir -p data/postproc
 log "START сборки (развёртка до 120 ч, инициализации 00 и 12 UTC)"
@@ -72,7 +78,7 @@ python -u scripts/postproc/build_corpus.py \
     --global-extra   "$DATA/global_512x256_extra_2010-2021_07deg" \
     --regional-extra "$DATA/region_krsk_61x41_extra_2010-2020_025deg" \
     --stations-json  data/krsk_postproc_stations.json \
-    --isd-dir        data/isd_lite_krsk \
+    --isd-dir        "$ISD" \
     --top-stations   71 \
     --years "$Y0" "$Y1" \
     --out-parquet    "data/postproc/corpus_krsk_${TAG}.parquet" \
