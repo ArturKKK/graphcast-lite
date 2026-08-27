@@ -409,58 +409,64 @@ class MultiresInputBuilder:
         self.glob_node_lon = self.node_lons[self.glob_node_idx].astype(np.float64)
         self.glob_node_lat = self.node_lats[self.glob_node_idx].astype(np.float64)
 
-        # Per-node index tables into the native global / regional base grids.
-        # Robust to whatever node order was used at multires build time —
-        # snaps each node to its exact source cell by coordinate match.
-        self._gb_lon_idx = np.array([
-            int(np.argmin(np.abs(self.gb_lons_native - lon)))
-            for lon in self.glob_node_lon
-        ], dtype=np.int64)
-        self._gb_lat_idx = np.array([
-            int(np.argmin(np.abs(self.gb_lats_native - lat)))
-            for lat in self.glob_node_lat
-        ], dtype=np.int64)
-        rb_coords = np.load(regional_base / "coords.npz")
-        self.rb_lats_native = rb_coords["latitude"].astype(np.float64)
-        self.rb_lons_native = rb_coords["longitude"].astype(np.float64)
-        self._rb_lon_idx = np.array([
-            int(np.argmin(np.abs(self.rb_lons_native - lon)))
-            for lon in self.reg_node_lon
-        ], dtype=np.int64)
-        self._rb_lat_idx = np.array([
-            int(np.argmin(np.abs(self.rb_lats_native - lat)))
-            for lat in self.reg_node_lat
-        ], dtype=np.int64)
-        # Sanity: max snap error must be within one cell.
-        gb_dlon = float(np.abs(self.gb_lons_native[1] - self.gb_lons_native[0]))
-        gb_dlat = float(np.abs(self.gb_lats_native[1] - self.gb_lats_native[0]))
-        e_glon = float(np.max(np.abs(
-            self.gb_lons_native[self._gb_lon_idx] - self.glob_node_lon
-        )))
-        e_glat = float(np.max(np.abs(
-            self.gb_lats_native[self._gb_lat_idx] - self.glob_node_lat
-        )))
-        assert e_glon < gb_dlon and e_glat < gb_dlat, (
-            f"global node snap error: lon={e_glon} (cell={gb_dlon}), "
-            f"lat={e_glat} (cell={gb_dlat})"
-        )
-        if self.reg_node_idx.size > 0:
-            rb_dlon = float(np.abs(self.rb_lons_native[1] - self.rb_lons_native[0]))
-            rb_dlat = float(np.abs(self.rb_lats_native[1] - self.rb_lats_native[0]))
-            e_rlon = float(np.max(np.abs(
-                self.rb_lons_native[self._rb_lon_idx] - self.reg_node_lon
+        # Таблицы соответствия узлов исходным сеткам нужны только тогда,
+        # когда базовые каналы собираются из двух сеток. При слитом источнике
+        # кадр уже в порядке узлов, и сеток этих на машине может не быть вовсе.
+        if merged_base is None:
+            # Per-node index tables into the native global / regional base grids.
+            # Robust to whatever node order was used at multires build time —
+            # snaps each node to its exact source cell by coordinate match.
+            self._gb_lon_idx = np.array([
+                int(np.argmin(np.abs(self.gb_lons_native - lon)))
+                for lon in self.glob_node_lon
+            ], dtype=np.int64)
+            self._gb_lat_idx = np.array([
+                int(np.argmin(np.abs(self.gb_lats_native - lat)))
+                for lat in self.glob_node_lat
+            ], dtype=np.int64)
+            rb_coords = np.load(regional_base / "coords.npz")
+            self.rb_lats_native = rb_coords["latitude"].astype(np.float64)
+            self.rb_lons_native = rb_coords["longitude"].astype(np.float64)
+            self._rb_lon_idx = np.array([
+                int(np.argmin(np.abs(self.rb_lons_native - lon)))
+                for lon in self.reg_node_lon
+            ], dtype=np.int64)
+            self._rb_lat_idx = np.array([
+                int(np.argmin(np.abs(self.rb_lats_native - lat)))
+                for lat in self.reg_node_lat
+            ], dtype=np.int64)
+            # Sanity: max snap error must be within one cell.
+            gb_dlon = float(np.abs(self.gb_lons_native[1] - self.gb_lons_native[0]))
+            gb_dlat = float(np.abs(self.gb_lats_native[1] - self.gb_lats_native[0]))
+            e_glon = float(np.max(np.abs(
+                self.gb_lons_native[self._gb_lon_idx] - self.glob_node_lon
             )))
-            e_rlat = float(np.max(np.abs(
-                self.rb_lats_native[self._rb_lat_idx] - self.reg_node_lat
+            e_glat = float(np.max(np.abs(
+                self.gb_lats_native[self._gb_lat_idx] - self.glob_node_lat
             )))
-            assert e_rlon < rb_dlon and e_rlat < rb_dlat, (
-                f"regional node snap error: lon={e_rlon} (cell={rb_dlon}), "
-                f"lat={e_rlat} (cell={rb_dlat})"
+            assert e_glon < gb_dlon and e_glat < gb_dlat, (
+                f"global node snap error: lon={e_glon} (cell={gb_dlon}), "
+                f"lat={e_glat} (cell={gb_dlat})"
             )
+            if self.reg_node_idx.size > 0:
+                rb_dlon = float(np.abs(self.rb_lons_native[1] - self.rb_lons_native[0]))
+                rb_dlat = float(np.abs(self.rb_lats_native[1] - self.rb_lats_native[0]))
+                e_rlon = float(np.max(np.abs(
+                    self.rb_lons_native[self._rb_lon_idx] - self.reg_node_lon
+                )))
+                e_rlat = float(np.max(np.abs(
+                    self.rb_lats_native[self._rb_lat_idx] - self.reg_node_lat
+                )))
+                assert e_rlon < rb_dlon and e_rlat < rb_dlat, (
+                    f"regional node snap error: lon={e_rlon} (cell={rb_dlon}), "
+                    f"lat={e_rlat} (cell={rb_dlat})"
+                )
 
+        # base_T есть только у раздельных сеток; у слитого источника — mb_T.
+        _bt = self.mb_T if merged_base is not None else self.gb_T
         print(
             f"[builder] N={self.N}  global_kept={self.n_global_kept}  "
-            f"regional={self.n_regional}  base_T={self.gb_T}",
+            f"regional={self.n_regional}  base_T={_bt}",
             flush=True,
         )
 
