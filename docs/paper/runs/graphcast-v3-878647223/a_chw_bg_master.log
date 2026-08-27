@@ -94,3 +94,5 @@ scripts/_paper_run_roiw30_assim.sh: line 99: /data/venvs/graphcast/bin/activate:
 [08:25:39] START a_chw_bg_long_oi10
 [10:25:39] DONE  a_chw_bg_long_oi10 rc=0 | skill=41.50% |  t2m K 1.24°C 1.35°C 1.40°C 1.43°C 1.48°C 1.52°C 1.54°C 1.57°C
 [10:25:39] START a_chw_bg_long_oi10_first4
+[11:38:52] DONE  a_chw_bg_long_oi10_first4 rc=0 | skill=7.38% |  t2m K 1.24°C 1.35°C 1.40°C 1.43°C 1.48°C 1.70°C 1.84°C 1.97°C
+[11:38:52] START a_chw_bg_long_oi1
