@@ -260,3 +260,8 @@ experiments/*/data/
 
 # Выгрузки диалогов с ассистентом — могут содержать токены и ключи из переписки
 docs/paper/dialog_*.md
+
+# Наблюдения ISD-Lite для постобработки: 12 МБ архивов, качаются за 20 секунд
+# скриптом download_russia_isd_lite.py — в репозитории им не место.
+data/isd_lite_krsk/
+data/isd_lite_russia/
