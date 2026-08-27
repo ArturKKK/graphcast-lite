@@ -231,8 +231,10 @@ class MultiresInputBuilder:
     """Builds a normalized (N, 33) frame for a given timestep on the fly."""
 
     def __init__(self, multires_dir: Path,
-                 global_base: Path, regional_base: Path,
-                 global_extra: Path, regional_extra: Path):
+                 global_base: Path | None, regional_base: Path | None,
+                 global_extra: Path, regional_extra: Path,
+                 merged_base: Path | None = None):
+        self.merged_base = merged_base
         # 1. multires coords (defines node order). If absent, reconstruct from
         #    global+regional grids + ROI (same logic as build_multires_dataset.py).
         coords_path = multires_dir / "coords.npz"
@@ -291,37 +293,58 @@ class MultiresInputBuilder:
         self.s_std = sc["std"].astype(np.float32)
         assert self.s_mean.shape == (33,) and self.s_std.shape == (33,)
 
-        # 3. base global (T, n_lon, n_lat, 19) memmap
-        g_info = json.loads((global_base / "dataset_info.json").read_text())
-        self.gb_T = g_info["n_time"]
-        self.gb_nlon = g_info["n_lon"]
-        self.gb_nlat = g_info["n_lat"]
-        assert g_info["n_feat"] == 19, f"global base must be 19f, got {g_info['n_feat']}"
-        self.gb_time_start = datetime.fromisoformat(g_info["time_start"])
-        self.gb_data = np.memmap(
-            global_base / "data.npy", dtype=np.float16, mode="r",
-            shape=(self.gb_T, self.gb_nlon, self.gb_nlat, 19),
-        )
-        gc = np.load(global_base / "coords.npz")
-        # Native orientation of base global (order in data.npy)
-        self.gb_lats_native = gc["latitude"].astype(np.float64)
-        self.gb_lons_native = gc["longitude"].astype(np.float64)
+        # 3-4. Базовые 19 каналов.
+        #
+        # Красноярская линия: 19-канальная часть уже слита в один плоский
+        # массив (multires_krsk_19f_merge) в порядке узлов, поэтому кадр
+        # читается напрямую. Общероссийская собиралась из отдельных
+        # глобальной и региональной сеток — для неё прежний путь.
+        if merged_base is not None:
+            m_info = json.loads((merged_base / "dataset_info.json").read_text())
+            assert m_info.get("flat", False), f"{merged_base} не плоский датасет"
+            self.mb_T = m_info["n_time"]
+            mb_N = m_info["n_nodes"]
+            mb_F = m_info.get("n_feat_base", m_info["n_feat"])
+            assert mb_N == self.N, (
+                f"узлов в слитом источнике {mb_N}, в координатах multires {self.N}")
+            self.mb_data = np.memmap(merged_base / "data.npy", dtype=np.float16,
+                                     mode="r", shape=(self.mb_T, mb_N, mb_F))
+            self.mb_time_start = datetime.fromisoformat(
+                str(m_info.get("time_start", "2010-01-01"))[:19].replace(" ", "T"))
+            print(f"[builder] слитый источник: {self.mb_T} сроков x {mb_N} узлов "
+                  f"x {mb_F} каналов, начало {self.mb_time_start:%Y-%m-%d}", flush=True)
+        else:
+            # 3. base global (T, n_lon, n_lat, 19) memmap
+            g_info = json.loads((global_base / "dataset_info.json").read_text())
+            self.gb_T = g_info["n_time"]
+            self.gb_nlon = g_info["n_lon"]
+            self.gb_nlat = g_info["n_lat"]
+            assert g_info["n_feat"] == 19, f"global base must be 19f, got {g_info['n_feat']}"
+            self.gb_time_start = datetime.fromisoformat(g_info["time_start"])
+            self.gb_data = np.memmap(
+                global_base / "data.npy", dtype=np.float16, mode="r",
+                shape=(self.gb_T, self.gb_nlon, self.gb_nlat, 19),
+            )
+            gc = np.load(global_base / "coords.npz")
+            # Native orientation of base global (order in data.npy)
+            self.gb_lats_native = gc["latitude"].astype(np.float64)
+            self.gb_lons_native = gc["longitude"].astype(np.float64)
 
-        # 4. base regional (T, n_lon, n_lat, 19) memmap
-        r_info = json.loads((regional_base / "dataset_info.json").read_text())
-        self.rb_T = r_info["n_time"]
-        self.rb_nlon = r_info["n_lon"]
-        self.rb_nlat = r_info["n_lat"]
-        assert r_info["n_feat"] == 19, f"regional base must be 19f, got {r_info['n_feat']}"
-        self.rb_time_start = datetime.fromisoformat(r_info["time_start"])
-        self.rb_data = np.memmap(
-            regional_base / "data.npy", dtype=np.float16, mode="r",
-            shape=(self.rb_T, self.rb_nlon, self.rb_nlat, 19),
-        )
-        assert self.rb_nlat * self.rb_nlon == self.n_regional, (
-            f"regional flat size {self.rb_nlat * self.rb_nlon} != "
-            f"coords.npz n_regional {self.n_regional}"
-        )
+            # 4. base regional (T, n_lon, n_lat, 19) memmap
+            r_info = json.loads((regional_base / "dataset_info.json").read_text())
+            self.rb_T = r_info["n_time"]
+            self.rb_nlon = r_info["n_lon"]
+            self.rb_nlat = r_info["n_lat"]
+            assert r_info["n_feat"] == 19, f"regional base must be 19f, got {r_info['n_feat']}"
+            self.rb_time_start = datetime.fromisoformat(r_info["time_start"])
+            self.rb_data = np.memmap(
+                regional_base / "data.npy", dtype=np.float16, mode="r",
+                shape=(self.rb_T, self.rb_nlon, self.rb_nlat, 19),
+            )
+            assert self.rb_nlat * self.rb_nlon == self.n_regional, (
+                f"regional flat size {self.rb_nlat * self.rb_nlon} != "
+                f"coords.npz n_regional {self.n_regional}"
+            )
 
         # 5. global extra (T, n_lon, n_lat, 10) memmap + scalers + coords
         ge_info_path = global_extra / "dataset_info_extra.json"
@@ -434,6 +457,10 @@ class MultiresInputBuilder:
 
     def base_frame(self, dt: datetime) -> np.ndarray:
         """Return (N, 19) physical-units base channels, in multires node order."""
+        if self.merged_base is not None:
+            # Слитый источник уже в порядке узлов — ни выборки, ни склейки.
+            mi = self._time_idx(self.mb_time_start, dt, self.mb_T)
+            return np.asarray(self.mb_data[mi], dtype=np.float32)
         gi = self._time_idx(self.gb_time_start, dt, self.gb_T)
         ri = self._time_idx(self.rb_time_start, dt, self.rb_T)
         # global: gb_data[gi] is (n_lon, n_lat, 19)
@@ -505,8 +532,10 @@ def main():
     ap.add_argument("--experiment-dir", required=True)
     ap.add_argument("--multires-dir", required=True,
                     help="Path with coords.npz + scalers.npz (33ch). data.npy not needed.")
-    ap.add_argument("--global-base", required=True)
-    ap.add_argument("--regional-base", required=True)
+    ap.add_argument("--merged-base", default=None,
+                    help="плоский multires 19f (T, N, 19); заменяет --global-base/--regional-base")
+    ap.add_argument("--global-base", default=None)
+    ap.add_argument("--regional-base", default=None)
     ap.add_argument("--global-extra", required=True)
     ap.add_argument("--regional-extra", required=True)
     ap.add_argument("--stations-json", required=True)
@@ -537,12 +566,15 @@ def main():
     print(f"[cfg] device={device}", flush=True)
 
     # 1. multires builder
+    if not args.merged_base and not (args.global_base and args.regional_base):
+        raise SystemExit("нужен либо --merged-base, либо пара --global-base/--regional-base")
     builder = MultiresInputBuilder(
         multires_dir=Path(args.multires_dir),
-        global_base=Path(args.global_base),
-        regional_base=Path(args.regional_base),
+        global_base=Path(args.global_base) if args.global_base else None,
+        regional_base=Path(args.regional_base) if args.regional_base else None,
         global_extra=Path(args.global_extra),
         regional_extra=Path(args.regional_extra),
+        merged_base=Path(args.merged_base) if args.merged_base else None,
     )
 
     # 2. variables.json (33ch)
