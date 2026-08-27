@@ -136,6 +136,15 @@ __MATHCSS__
     .wrap { max-width:none; padding:0; }
     h2, h3 { page-break-after:avoid; }
     table, figure, .mf { page-break-inside:avoid; }
+    /* Журнальный набор: абзац задаётся отступом первой строки, а не пустой
+       строкой между абзацами. Отбивка поверх полуторного интервала при полутора
+       сотнях абзацев съедала около двух страниц. */
+    p { margin:0; text-indent:1.25em; text-align:justify; }
+    h2 + p, h3 + p, table + p, figure + p, .mf + p, ul + p, ol + p { text-indent:0; }
+    p + table, p + figure, p + .mf, p + ul, p + ol { margin-top:.7em; }
+    table + p, figure + p, .mf + p, ul + p, ol + p { margin-top:.7em; }
+    h2 { margin:1.2em 0 .4em; }
+    h3 { margin:1em 0 .3em; }
   }
 </style>
 <div class="bar">
