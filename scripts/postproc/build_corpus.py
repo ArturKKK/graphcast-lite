@@ -523,6 +523,41 @@ class MultiresInputBuilder:
                 )
         return out
 
+    def check_node_order(self, frame: np.ndarray, ch: int) -> None:
+        """Убедиться, что значения легли на свои узлы.
+
+        Координаты узлов здесь восстановлены построением, а не прочитаны из
+        слитого набора, поэтому стоит проверить, что порядок совпал. Опираемся
+        на то, что метеорологическое поле гладкое: у настоящего кадра значение
+        в узле почти совпадает со средним по соседям, у перемешанного связь
+        пропадает. Вставку проверяем отдельно — она занимает 1,9% узлов, и на
+        общей связи её порча незаметна.
+        """
+        from scipy.spatial import cKDTree
+
+        phi, lam = np.radians(self.node_lats), np.radians(self.node_lons)
+        xyz = np.c_[np.cos(phi) * np.cos(lam), np.cos(phi) * np.sin(lam), np.sin(phi)]
+        _, nb = cKDTree(xyz).query(xyz, k=6)
+        f = np.asarray(frame[:, ch], dtype=np.float64)
+        nbm = f[nb[:, 1:]].mean(1)
+
+        def coh(sel):
+            a, b = f[sel], nbm[sel]
+            if a.size < 100 or a.std() < 1e-9 or b.std() < 1e-9:
+                return float("nan")
+            return float(np.corrcoef(a, b)[0, 1])
+
+        whole = coh(slice(None))
+        reg = coh(self.is_regional) if self.n_regional else float("nan")
+        print(f"[порядок узлов] связь с соседями: по всей сетке {whole:+.3f}, "
+              f"во вставке {reg:+.3f}", flush=True)
+        bad = whole < 0.85 or (self.n_regional and not np.isnan(reg) and reg < 0.60)
+        if bad:
+            raise SystemExit(
+                "[порядок узлов] поле не выглядит гладким: значения легли не на "
+                "те узлы. Скорее всего, разошёлся порядок между координатами и "
+                "данными. Останавливаюсь, чтобы не считать корпус впустую.")
+
     def build_input(self, dt: datetime) -> np.ndarray:
         """Return (N, 33) NORMALIZED frame ready for the model."""
         base = self.base_frame(dt)            # (N, 19)
@@ -742,6 +777,7 @@ def main():
     rows = []
     t_start = time.time()
     n_skipped = 0
+    _order_checked = False
 
     with torch.no_grad():
         for i_init, init_dt in enumerate(init_times):
@@ -751,6 +787,9 @@ def main():
                 for k in range(OBS - 1, -1, -1):
                     fdt = init_dt - timedelta(hours=6 * k)
                     frames_norm.append(builder.build_input(fdt))  # (N, 33)
+                if i_init == 0 and not _order_checked:
+                    builder.check_node_order(frames_norm[-1], var_names.index("t2m"))
+                    _order_checked = True
             except (IndexError, ValueError) as e:
                 n_skipped += 1
                 if n_skipped <= 3:
