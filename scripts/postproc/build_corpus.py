@@ -642,6 +642,10 @@ def check_writable(out_path: Path) -> None:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--experiment-dir", required=True)
+    ap.add_argument("--neighbours", type=int, default=0,
+                    help="сколько ближайших узлов брать вокруг станции для "
+                         "признаков окрестности (0 — не брать). Даёт модели "
+                         "местный градиент поля и изрезанность рельефа")
     ap.add_argument("--from-partial", action="store_true",
                     help="не считать развёртку заново, а взять строки из "
                          "черновика <out>.partial.pkl и досшить с наблюдениями")
@@ -756,7 +760,18 @@ def main():
         d2 = (builder.node_lats - lat) ** 2 + (builder.node_lons - lon) ** 2
         gidx = int(np.argmin(d2))
         dist_km = float(np.sqrt(d2[gidx]) * 111.0)
+        # Окрестность. Ближайший узел выбираем прежним правилом, чтобы корпус
+        # остался сравнимым со старым; а вот НАБОР соседей берём по честному
+        # расстоянию, со сжатием долготы на косинус широты — на 55° градус
+        # долготы вдвое короче градуса широты, и без поправки в соседи попадал
+        # бы вытянутый по долготе ряд вместо круга.
+        nb_idx = []
+        if args.neighbours > 0:
+            kx = np.cos(np.radians(lat)) ** 2
+            d2c = (builder.node_lats - lat) ** 2 + kx * (builder.node_lons - lon) ** 2
+            nb_idx = np.argsort(d2c)[: args.neighbours].astype(int).tolist()
         station_meta.append({
+            "nb_idx": nb_idx,
             "usaf": usaf,
             "wban": info.get("wban", "99999"),
             "name": info.get("name", ""),
@@ -902,6 +917,22 @@ def main():
                             rec[RENAME_FOR_PARQUET[v]] = float(
                                 pred_phys[gidx, var_names.index(v)]
                             )
+                        # Признаки окрестности: местный разброс поля и рельефа.
+                        # Разбор по станциям показал, что поправка почти целиком
+                        # чинит несоответствие площадки ячейке сетки, а сама
+                        # изрезанность рельефа вокруг станции в корпусе до сих
+                        # пор не была представлена ничем.
+                        nb = s["nb_idx"]
+                        if nb:
+                            for v, nm in (("t2m", "t2m"), ("10u", "u10"), ("10v", "v10")):
+                                col = pred_phys[nb, var_names.index(v)]
+                                rec[f"nb_{nm}_mean"] = float(col.mean())
+                                rec[f"nb_{nm}_std"] = float(col.std())
+                                rec[f"nb_{nm}_dev"] = float(
+                                    pred_phys[gidx, var_names.index(v)] - col.mean())
+                            zs = static_phys[nb, 7] / 9.80665
+                            rec["nb_z_surf_std"] = float(zs.std())
+                            rec["nb_z_surf_range"] = float(zs.max() - zs.min())
                         # add z@1000 + q@1000 + t@1000 for derived features later
                         for extra in ("z@1000", "t@1000", "q@1000"):
                             rec[f"gnn_{extra.replace('@', '').lower()}"] = float(

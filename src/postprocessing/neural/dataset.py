@@ -169,7 +169,8 @@ class StationCorpusDataset(Dataset):
                 # Приблизительный сдвиг температуры из-за этой разности высот.
                 df["dz_lapse"] = (df["dz_station"]
                                   * df["lapse_t850_1000"].astype("float32") / 1000.0)
-            for c in ("dz_station", "dz_lapse"):
+            nb_cols = sorted(x for x in df.columns if x.startswith("nb_"))
+            for c in ("dz_station", "dz_lapse", *nb_cols):
                 # Условие — «мы на обучении», а не auto_obs_features: тот флаг
                 # выключает наблюдения станции, а высота к ним не относится, и
                 # абляция по наблюдениям не должна заодно лишаться рельефа.

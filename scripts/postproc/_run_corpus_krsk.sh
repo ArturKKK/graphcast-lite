@@ -29,7 +29,10 @@
 # Сам уходит в фон. Лог: /workdir/paper_results/corpus_<годы>_master.log
 set -uo pipefail
 Y0=${1:-2016}; Y1=${2:-2020}; EXP=${3:-}
-TAG="${Y0}_${Y1}"
+# NB=6 — собирать признаки окрестности станции (местный разброс поля и рельефа).
+# Такой корпус кладётся отдельно и не затирает прежний: их надо сравнивать.
+NB=${NB:-0}
+TAG="${Y0}_${Y1}"; [[ "$NB" -gt 0 ]] && TAG="${TAG}_nb${NB}"
 if [[ "${DAEMONIZED:-}" != "1" ]]; then
   DAEMONIZED=1 setsid nohup bash "$0" "$@" </dev/null >/dev/null 2>&1 &
   echo "запущено в фоне, годы $Y0-$Y1. лог: /workdir/paper_results/corpus_${TAG}_master.log"; exit 0
@@ -164,6 +167,7 @@ ARGS=(scripts/postproc/build_corpus.py
     --stations-json  data/krsk_postproc_stations.json
     --isd-dir        "$ISD"
     --top-stations   71
+    --neighbours     "$NB"
     --years "$Y0" "$Y1"
     --out-parquet    "$CORPUS_DIR/corpus_krsk_${TAG}.parquet")
 # Подробности уходят в build-лог, а вехи — сюда, в master. Раньше проверка
