@@ -265,11 +265,26 @@ def test_last_step_reaches_the_floor(lr):
                                                                                    abs=1e-12)
 
 
-def test_factor_stays_within_bounds(lr):
-    """Множитель никогда не выходит за [min_factor, 1] — включая шаги за концом."""
-    for s in range(0, 2000, 7):
+def test_factor_stays_within_bounds_after_warmup(lr):
+    """После разогрева множитель не выходит за [min_factor, 1] даже за концом.
+
+    Шаги за пределом общего числа возможны: число шагов считается из длины
+    выборки, а она может измениться. Спад обязан упереться в нижнюю границу и
+    остаться там, а не уйти вниз или начать расти.
+    """
+    for s in range(100, 3000, 7):
         v = lr(s, warmup=100, total_steps=1000, min_factor=0.05)
         assert 0.05 - 1e-12 <= v <= 1.0 + 1e-12, (s, v)
+
+
+def test_warmup_deliberately_goes_below_the_decay_floor(lr):
+    """На разогреве множитель НИЖЕ нижней границы спада — и это правильно.
+
+    Нижняя граница задаёт, до чего опустится темп В КОНЦЕ обучения. Разогрев же
+    начинается почти с нуля независимо от неё: его смысл в том, чтобы первые
+    шаги не разнесли ещё не устоявшиеся веса.
+    """
+    assert lr(0, warmup=100, total_steps=1000, min_factor=0.5) == pytest.approx(0.01)
 
 
 def test_half_way_is_about_half(lr):
