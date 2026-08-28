@@ -1,4 +1,9 @@
-# Только для разработки и тестов. На виртуалках для счёта не нужен:
-# обучение работает на requirements.txt.
+# Только для разработки, тестов и проверки кода. На виртуалках для счёта не
+# нужен: обучение работает на requirements.txt.
+#
+#   pip install -r requirements-dev.txt
+#   bash scripts/install_git_hooks.sh   # один раз на машине
+#   bash scripts/check.sh               # перед пушем
 pytest==9.1.1
 coverage==7.6.1
+ruff==0.16.5

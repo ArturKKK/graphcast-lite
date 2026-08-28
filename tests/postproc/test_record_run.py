@@ -30,7 +30,6 @@ def make_eval(path: Path, *, t_pp=2.297, t_raw=2.978, w_pp=1.727, w_raw=2.353,
 
 
 def run(ledger: Path, ev: Path, name: str, note: str = ""):
-    env = {"PATH": "/usr/bin:/bin", "HOME": str(ledger.parent)}
     r = subprocess.run(
         [sys.executable, str(SCRIPT), "--eval-json", str(ev), "--name", name,
          *(["--note", note] if note else [])],

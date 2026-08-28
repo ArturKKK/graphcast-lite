@@ -68,7 +68,9 @@ def test_too_small_a_grid_is_a_hard_failure(unet_cls):
     """
     import torch
     m = unet_cls(in_channels=2, out_channels=1, base_filters=4).eval()
-    with pytest.raises(Exception), torch.no_grad():
+    # Именно RuntimeError: torch отказывается свернуть тензор нулевого размера.
+    # Ловить голое Exception нельзя — так тест прошёл бы и на опечатке в вызове.
+    with pytest.raises(RuntimeError), torch.no_grad():
         m(torch.randn(1, 2, 6, 6))
 
 

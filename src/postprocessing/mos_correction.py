@@ -17,7 +17,7 @@ import numpy as np
 
 def load_mos_table(path: str | Path) -> dict:
     """Load MOS bias table from JSON file."""
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -540,7 +540,7 @@ _MONTH_KEYS = ["jan", "feb", "mar", "apr", "may", "jun",
 
 def load_wind_scaling(path: str | Path) -> dict:
     """Load wind monthly scaling table from JSON file."""
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 

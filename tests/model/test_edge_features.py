@@ -90,7 +90,8 @@ def test_unit_log_spreads_scales_better_than_legacy(feats):
         i = len(lats)
         lats += [0.0, d]
         lons += [0.0, 0.0]
-        senders.append(i); receivers.append(i + 1)
+        senders.append(i)
+        receivers.append(i + 1)
     edges = np.array([senders, receivers])
     lats, lons = np.array(lats), np.array(lons)
     leg = feats(lats, lons, edges, mode="legacy").numpy()[:, 0]

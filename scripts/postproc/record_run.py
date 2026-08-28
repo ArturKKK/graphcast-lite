@@ -84,7 +84,9 @@ def main() -> None:
     o = ev["overall"]
     t_pp, t_raw = o["pp_rmse_t2m"], o["gnn_rmse_t2m"]
     w_pp, w_raw = o["pp_vec_rmse_wind"], o["gnn_vec_rmse_wind"]
-    gain = lambda raw, pp: (raw - pp) / raw * 100 if raw else float("nan")
+    def gain(raw, pp):
+        """Выигрыш в процентах от сырого прогноза."""
+        return (raw - pp) / raw * 100 if raw else float("nan")
 
     row = ("| `{name}` | {date} | `{commit}` | {feat} | {epoch} | "
            "{t:.3f} | {tg:.1f} % | {w:.3f} | {wg:.1f} % | {note} |").format(

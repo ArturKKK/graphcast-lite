@@ -123,7 +123,9 @@ def test_optimiser_moments_are_restored(helpers, tmp_path):
     o1 = torch.optim.Adam(m1.parameters(), lr=1e-3)
     o2 = torch.optim.Adam(m2.parameters(), lr=1e-3)
     for _ in range(3):
-        o1.zero_grad(); m1(torch.randn(5, 4)).sum().backward(); o1.step()
+        o1.zero_grad()
+        m1(torch.randn(5, 4)).sum().backward()
+        o1.step()
     p = tmp_path / "c.pth"
     helpers["save"](p, m1, o1, 1, 1, 0.0, 0, [], [])
     helpers["load"](p, m2, o2, torch.device("cpu"))
