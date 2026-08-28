@@ -51,6 +51,7 @@ import argparse
 import gzip
 import json
 import math
+import pickle
 import sys
 import time
 from datetime import datetime, timedelta
@@ -606,6 +607,25 @@ def save_table(df, out_path: Path) -> Path:
         return alt
 
 
+def load_partial(part_path: Path) -> list:
+    """Собрать строки из черновика, дописанного кусками во время развёртки."""
+    rows = []
+    with open(part_path, "rb") as f:
+        while True:
+            try:
+                rows.extend(pickle.load(f))
+            except EOFError:
+                break
+            except pickle.UnpicklingError:
+                # Обрыв посреди куска: машину могли выключить прямо на сбросе.
+                # Целые куски уже прочитаны, их и берём — терять всё из-за
+                # хвоста в пару килобайт незачем.
+                print("[part] последний кусок оборван, беру прочитанное",
+                      flush=True)
+                break
+    return rows
+
+
 def check_writable(out_path: Path) -> None:
     """Проверяет запись ДО тяжёлого счёта, а не после."""
     probe = out_path.parent / (".write_probe" + out_path.suffix)
@@ -622,6 +642,9 @@ def check_writable(out_path: Path) -> None:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--experiment-dir", required=True)
+    ap.add_argument("--from-partial", action="store_true",
+                    help="не считать развёртку заново, а взять строки из "
+                         "черновика <out>.partial.pkl и досшить с наблюдениями")
     ap.add_argument("--multires-dir", required=True,
                     help="Path with coords.npz + scalers.npz (33ch). data.npy not needed.")
     ap.add_argument("--merged-base", default=None,
@@ -779,6 +802,40 @@ def main():
     n_skipped = 0
     _order_checked = False
 
+    # Промежуточный сброс. Развёртка идёт больше двух часов, и всё это время
+    # посчитанное живёт только в памяти: 27.08.2026 сбой на последней строке
+    # стоил полного пересчёта. Дописываем накопленное кусками, чтобы после
+    # любого обрыва можно было собрать корпус из того, что уже посчитано.
+    part_path = Path(args.out_parquet).with_suffix(".partial.pkl")
+    part_f, part_done = None, 0
+    if args.from_partial:
+        # Досбор после обрыва: развёртку не повторяем, берём посчитанное с диска
+        # и идём сразу к сшивке с наблюдениями. Черновик не трогаем — вдруг
+        # понадобится ещё раз.
+        rows.extend(load_partial(part_path))
+        init_times = []
+        print(f"[part] восстановлено строк: {len(rows):,} из {part_path}", flush=True)
+        if not rows:
+            raise SystemExit(f"в {part_path} нет строк — досбирать нечего")
+    else:
+        try:
+            part_path.parent.mkdir(parents=True, exist_ok=True)
+            part_f = open(part_path, "wb")
+        except OSError as e:
+            print(f"[part] сброс недоступен ({e}), считаю без него", flush=True)
+
+    def flush_partial():
+        """Дозаписать то, что появилось с прошлого раза. Никогда не роняет счёт."""
+        nonlocal part_done
+        if part_f is None or len(rows) == part_done:
+            return
+        try:
+            pickle.dump(rows[part_done:], part_f, protocol=4)
+            part_f.flush()
+            part_done = len(rows)
+        except Exception as e:  # сброс — страховка, а не цель счёта
+            print(f"[part] сброс не удался: {e}", flush=True)
+
     with torch.no_grad():
         for i_init, init_dt in enumerate(init_times):
             try:
@@ -866,6 +923,10 @@ def main():
                             [cur_state[:, :, 1:, :], pred_norm.unsqueeze(2)], dim=2
                         )
 
+            if (i_init + 1) % 500 == 0:
+                flush_partial()
+                print(f"[part] сброшено строк: {part_done:,}", flush=True)
+
             if (i_init + 1) % args.log_every == 0 or i_init == 0:
                 elapsed = time.time() - t_start
                 rate = (i_init + 1) / max(elapsed, 1e-3)
@@ -877,6 +938,9 @@ def main():
                     flush=True,
                 )
 
+    flush_partial()
+    if part_f is not None:
+        part_f.close()
     print(f"[inference] done. rows={len(rows)}  skipped_inits={n_skipped}", flush=True)
     df = pd.DataFrame(rows)
     if df.empty:
@@ -936,6 +1000,7 @@ def main():
     out_path = Path(args.out_parquet)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path = save_table(df, out_path)
+    part_path.unlink(missing_ok=True)  # корпус на диске, черновик больше не нужен
     print(f"[done] wrote {out_path} — {len(df)} rows  "
           f"({df['station_usaf'].nunique()} stations)", flush=True)
 

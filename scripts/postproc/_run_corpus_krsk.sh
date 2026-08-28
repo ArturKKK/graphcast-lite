@@ -120,25 +120,38 @@ if ! python -c "import pyarrow" 2>/dev/null; then
   fi
 fi
 log "START сборки (развёртка до 120 ч, инициализации 00 и 12 UTC)"
-python -u scripts/postproc/build_corpus.py \
-    --experiment-dir "experiments/$EXP" \
-    --multires-dir   "$META" \
-    --global-base    "$GBASE" \
-    --regional-base  "$RBASE" \
-    --global-extra   "$GEXTRA" \
-    --regional-extra "$REXTRA" \
-    --stations-json  data/krsk_postproc_stations.json \
-    --isd-dir        "$ISD" \
-    --top-stations   71 \
-    --years "$Y0" "$Y1" \
-    --out-parquet    "data/postproc/corpus_krsk_${TAG}.parquet" \
-    2>&1 | tee -a "$OUT/corpus_${TAG}_build.log" \
-    | grep --line-buffered -E "^(\[(порядок узлов|cfg|model|stations|inits|inference|join|done)\]|  \[[0-9])"
+ARGS=(scripts/postproc/build_corpus.py
+    --experiment-dir "experiments/$EXP"
+    --multires-dir   "$META"
+    --global-base    "$GBASE"
+    --regional-base  "$RBASE"
+    --global-extra   "$GEXTRA"
+    --regional-extra "$REXTRA"
+    --stations-json  data/krsk_postproc_stations.json
+    --isd-dir        "$ISD"
+    --top-stations   71
+    --years "$Y0" "$Y1"
+    --out-parquet    "data/postproc/corpus_krsk_${TAG}.parquet")
 # Подробности уходят в build-лог, а вехи — сюда, в master. Раньше проверка
 # порядка узлов печаталась только в build-лог, и в master её искали впустую.
 # Статус берём у python, а не у конвейера: grep вернёт 1, если вех не было.
+VEHI="^(\[(порядок узлов|part|cfg|model|stations|inits|inference|join|done|save)\]|  \[[0-9])"
+python -u "${ARGS[@]}" 2>&1 | tee -a "$OUT/corpus_${TAG}_build.log" \
+    | grep --line-buffered -E "$VEHI"
 RC=${PIPESTATUS[0]}
 log "DONE сборка rc=$RC"
+
+# Развёртка идёт больше двух часов и по ходу сбрасывает посчитанное в черновик.
+# Если упало уже после неё — на сшивке или записи — пересчитывать нечего:
+# досбираем из черновика.
+PART="data/postproc/corpus_krsk_${TAG}.partial.pkl"
+if [[ $RC -ne 0 && -s "$PART" ]]; then
+  log "упало (rc=$RC), но черновик на месте ($(du -h "$PART" | cut -f1)) — досбор без пересчёта"
+  python -u "${ARGS[@]}" --from-partial 2>&1 | tee -a "$OUT/corpus_${TAG}_build.log" \
+      | grep --line-buffered -E "$VEHI"
+  RC=${PIPESTATUS[0]}
+  log "DONE досбор rc=$RC"
+fi
 CORPUS=$(ls -1 data/postproc/corpus_krsk_${TAG}.parquet data/postproc/corpus_krsk_${TAG}.pkl.gz 2>/dev/null | head -1)
 if [[ -n "$CORPUS" ]]; then
   log "корпус: $CORPUS ($(du -h "$CORPUS" | cut -f1))"
