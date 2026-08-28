@@ -34,15 +34,17 @@ log "=== НОЧНОЙ ПРОГОН: окрестность станции ==="
 # зовём его уже «раздемонизированным», чтобы дождаться конца.
 TAG=2016_2020_nb6
 CORPUS=""
+# С break: без него цикл брал ПОСЛЕДНЕЕ совпадение, то есть копию в /workdir
+# вместо оригинала на /data, и все производные наборы уходили под квоту 8 ГБ.
 for c in /data/postproc/corpus_krsk_${TAG}.parquet data/postproc/corpus_krsk_${TAG}.parquet; do
-  [[ -f "$c" ]] && CORPUS="$c"
+  [[ -f "$c" ]] && { CORPUS="$c"; break; }
 done
 if [[ -z "$CORPUS" ]]; then
   log "шаг 1: корпус с окрестностью (около 2,5 часов)"
   DAEMONIZED=1 NB=6 bash scripts/postproc/_run_corpus_krsk.sh 2016 2020
   for c in /data/postproc/corpus_krsk_${TAG}.parquet data/postproc/corpus_krsk_${TAG}.parquet \
            /data/postproc/corpus_krsk_${TAG}.pkl.gz data/postproc/corpus_krsk_${TAG}.pkl.gz; do
-    [[ -f "$c" ]] && CORPUS="$c"
+    [[ -f "$c" ]] && { CORPUS="$c"; break; }
   done
   [[ -z "$CORPUS" ]] && { log "корпус не собрался — см. corpus_${TAG}_master.log"; exit 1; }
 fi
@@ -50,7 +52,7 @@ log "шаг 1 готов: $CORPUS ($(du -h "$CORPUS" | cut -f1))"
 
 source "$VENV/bin/activate" || { log "нет venv — стоп"; exit 1; }
 export PYTHONPATH="$REPO"
-DIR=$(dirname "$CORPUS")
+DIR=/data/postproc; mkdir -p "$DIR" 2>/dev/null || DIR=$(dirname "$CORPUS")
 
 # 2. Признаки-наблюдения. Климатическая норма — только по годам обучения.
 LAGS="$DIR/corpus_krsk_lags2_nb6.parquet"
