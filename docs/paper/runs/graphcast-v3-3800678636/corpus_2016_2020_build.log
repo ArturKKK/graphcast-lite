@@ -1,0 +1,290 @@
+[cfg] leads=[6, 12, 18, 24, 36, 48, 60, 72, 84, 96, 108, 120]  max_ar=20  init_hours=[0, 12]  years=[2016, 2020]
+[cfg] device=cuda
+[builder] no coords at /data/datasets/multires_krsk_33f/coords.npz; reconstructing from global+regional grids + ROI (41.0, 82.0, 19.0, 180.0)
+Traceback (most recent call last):
+  File "/workdir/graphcast-lite/scripts/postproc/build_corpus.py", line 847, in <module>
+    main()
+  File "/workdir/graphcast-lite/scripts/postproc/build_corpus.py", line 571, in main
+    builder = MultiresInputBuilder(
+  File "/workdir/graphcast-lite/scripts/postproc/build_corpus.py", line 257, in __init__
+    gc_tmp = np.load(global_base / "coords.npz")
+TypeError: unsupported operand type(s) for /: 'NoneType' and 'str'
+[cfg] leads=[6, 12, 18, 24, 36, 48, 60, 72, 84, 96, 108, 120]  max_ar=20  init_hours=[0, 12]  years=[2016, 2020]
+[cfg] device=cuda
+[builder] loaded coords from /data/datasets/multires_krsk_33f_meta/coords.npz
+[builder] слитый источник: 16072 сроков x 133279 узлов x 19 каналов, начало 2010-01-01
+Traceback (most recent call last):
+  File "/workdir/graphcast-lite/scripts/postproc/build_corpus.py", line 866, in <module>
+    main()
+  File "/workdir/graphcast-lite/scripts/postproc/build_corpus.py", line 590, in main
+    builder = MultiresInputBuilder(
+  File "/workdir/graphcast-lite/scripts/postproc/build_corpus.py", line 415, in __init__
+    self._gb_lon_idx = np.array([
+  File "/workdir/graphcast-lite/scripts/postproc/build_corpus.py", line 416, in <listcomp>
+    int(np.argmin(np.abs(self.gb_lons_native - lon)))
+AttributeError: 'MultiresInputBuilder' object has no attribute 'gb_lons_native'
+[cfg] leads=[6, 12, 18, 24, 36, 48, 60, 72, 84, 96, 108, 120]  max_ar=20  init_hours=[0, 12]  years=[2016, 2020]
+[cfg] device=cuda
+[builder] loaded coords from /data/datasets/multires_krsk_33f_meta/coords.npz
+[builder] слитый источник: 16072 сроков x 133279 узлов x 19 каналов, начало 2010-01-01
+[builder] N=133279  global_kept=130778  regional=2501  base_T=16072
+[cfg] sampling vars: ['t2m', '10u', '10v', 'msl', 'sp', 't@850', 'u@850', 'v@850', 't@500', 'q@850', 'z@500', 'u@1000', 'v@1000']  idx=[0, 1, 2, 3, 5, 9, 10, 11, 14, 13, 17, 26, 27]
+[cfg] OBS=2  use_residual=True
+[graph] уровни меша [4, 6], признаки рёбер: legacy
+[processor] InteractionNet: 12 шагов, агрегация 'mean'
+Encoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [174241, 72], [2, 207099]  | [174241, 256]  | 348,162  |
+| ├─(mlp)MLP                |                            | [174241, 256]  | 150,786  |
+| │    └─(MLP)ModuleList    | --                         | --             | 150,786  |
+| │    │    └─(0)Linear     | [174241, 72]               | [174241, 256]  | 18,688   |
+| │    │    └─(1)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(2)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(3)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(4)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(5)LayerNorm  | [174241, 256]              | [174241, 256]  | 512      |
+| ├─(graph_layer)GraphLayer |                            | [174241, 256]  | 197,376  |
+| │    └─(activation)SiLU   | [174241, 256]              | [174241, 256]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 197,376  |
+| │    │    └─(0)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
+| │    │    └─(1)SiLU       | [174241, 256]              | [174241, 256]  | --       |
+| │    │    └─(2)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [174241, 256], [2, 207099] | [174241, 256]  | 65,792   |
++---------------------------+----------------------------+----------------+----------+
+
+Processor summary: 
+  (summary skipped: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument mat1 in method wrapper_CUDA_addmm))
+
+Decoder summary: 
++---------------------------+----------------------------+----------------+----------+
+| Layer                     | Input Shape                | Output Shape   | #Param   |
+|---------------------------+----------------------------+----------------+----------|
+| Model                     | [174241, 256], [2, 399837] | [174241, 33]   | 152,483  |
+| ├─(mlp)MLP                |                            | [174241, 128]  | 115,202  |
+| │    └─(MLP)ModuleList    | --                         | --             | 115,202  |
+| │    │    └─(0)Linear     | [174241, 256]              | [174241, 256]  | 65,792   |
+| │    │    └─(1)PReLU      | [174241, 256]              | [174241, 256]  | 1        |
+| │    │    └─(2)Linear     | [174241, 256]              | [174241, 128]  | 32,896   |
+| │    │    └─(3)PReLU      | [174241, 128]              | [174241, 128]  | 1        |
+| │    │    └─(4)Linear     | [174241, 128]              | [174241, 128]  | 16,512   |
+| ├─(graph_layer)GraphLayer |                            | [174241, 33]   | 37,281   |
+| │    └─(activation)SiLU   | [174241, 128]              | [174241, 128]  | --       |
+| │    └─(layers)ModuleList | --                         | --             | 37,281   |
+| │    │    └─(0)GCNConv    | [174241, 128], [2, 399837] | [174241, 128]  | 16,512   |
+| │    │    └─(1)SiLU       | [174241, 128]              | [174241, 128]  | --       |
+| │    │    └─(2)GCNConv    | [174241, 128], [2, 399837] | [174241, 128]  | 16,512   |
+| │    │    └─(3)SiLU       | --                         | --             | --       |
+| │    │    └─(4)GCNConv    | [174241, 128], [2, 399837] | [174241, 33]   | 4,257    |
++---------------------------+----------------------------+----------------+----------+
+
+[model] params=6,031,525
+[stations] using top-71 (best obs/day = 23.40, worst = 5.40)
+[stations] mean station→node distance = 10.4 km
+[isd] loading observations for 71 stations…
+[inits] total = 3654
+  [1/3654] init=2016-01-01 00:00Z  rows=852  rate=0.41/s  eta=147.2m
+  [20/3654] init=2016-01-10 12:00Z  rows=17040  rate=0.44/s  eta=137.5m
+  [40/3654] init=2016-01-20 12:00Z  rows=34080  rate=0.44/s  eta=135.7m
+  [60/3654] init=2016-01-30 12:00Z  rows=51120  rate=0.45/s  eta=134.4m
+  [80/3654] init=2016-02-09 12:00Z  rows=68160  rate=0.45/s  eta=133.4m
+  [100/3654] init=2016-02-19 12:00Z  rows=85200  rate=0.45/s  eta=132.7m
+  [120/3654] init=2016-02-29 12:00Z  rows=102240  rate=0.45/s  eta=132.0m
+  [140/3654] init=2016-03-10 12:00Z  rows=119280  rate=0.45/s  eta=131.2m
+  [160/3654] init=2016-03-20 12:00Z  rows=136320  rate=0.45/s  eta=130.4m
+  [180/3654] init=2016-03-30 12:00Z  rows=153360  rate=0.45/s  eta=129.6m
+  [200/3654] init=2016-04-09 12:00Z  rows=170400  rate=0.45/s  eta=128.9m
+  [220/3654] init=2016-04-19 12:00Z  rows=187440  rate=0.45/s  eta=128.2m
+  [240/3654] init=2016-04-29 12:00Z  rows=204480  rate=0.45/s  eta=127.6m
+  [260/3654] init=2016-05-09 12:00Z  rows=221520  rate=0.45/s  eta=126.9m
+  [280/3654] init=2016-05-19 12:00Z  rows=238560  rate=0.45/s  eta=126.1m
+  [300/3654] init=2016-05-29 12:00Z  rows=255600  rate=0.45/s  eta=125.5m
+  [320/3654] init=2016-06-08 12:00Z  rows=272640  rate=0.45/s  eta=124.8m
+  [340/3654] init=2016-06-18 12:00Z  rows=289680  rate=0.45/s  eta=124.1m
+  [360/3654] init=2016-06-28 12:00Z  rows=306720  rate=0.45/s  eta=123.4m
+  [380/3654] init=2016-07-08 12:00Z  rows=323760  rate=0.44/s  eta=122.7m
+  [400/3654] init=2016-07-18 12:00Z  rows=340800  rate=0.44/s  eta=122.0m
+  [420/3654] init=2016-07-28 12:00Z  rows=357840  rate=0.44/s  eta=121.2m
+  [440/3654] init=2016-08-07 12:00Z  rows=374880  rate=0.44/s  eta=120.5m
+  [460/3654] init=2016-08-17 12:00Z  rows=391920  rate=0.44/s  eta=119.8m
+  [480/3654] init=2016-08-27 12:00Z  rows=408960  rate=0.44/s  eta=119.0m
+  [500/3654] init=2016-09-06 12:00Z  rows=426000  rate=0.44/s  eta=118.3m
+  [520/3654] init=2016-09-16 12:00Z  rows=443040  rate=0.44/s  eta=117.6m
+  [540/3654] init=2016-09-26 12:00Z  rows=460080  rate=0.44/s  eta=116.9m
+  [560/3654] init=2016-10-06 12:00Z  rows=477120  rate=0.44/s  eta=116.2m
+  [580/3654] init=2016-10-16 12:00Z  rows=494160  rate=0.44/s  eta=115.4m
+  [600/3654] init=2016-10-26 12:00Z  rows=511200  rate=0.44/s  eta=114.7m
+  [620/3654] init=2016-11-05 12:00Z  rows=528240  rate=0.44/s  eta=113.9m
+  [640/3654] init=2016-11-15 12:00Z  rows=545280  rate=0.44/s  eta=113.2m
+  [660/3654] init=2016-11-25 12:00Z  rows=562320  rate=0.44/s  eta=112.5m
+  [680/3654] init=2016-12-05 12:00Z  rows=579360  rate=0.44/s  eta=111.7m
+  [700/3654] init=2016-12-15 12:00Z  rows=596400  rate=0.44/s  eta=111.0m
+  [720/3654] init=2016-12-25 12:00Z  rows=613440  rate=0.44/s  eta=110.2m
+  [740/3654] init=2017-01-04 12:00Z  rows=630480  rate=0.44/s  eta=109.5m
+  [760/3654] init=2017-01-14 12:00Z  rows=647520  rate=0.44/s  eta=108.7m
+  [780/3654] init=2017-01-24 12:00Z  rows=664560  rate=0.44/s  eta=108.0m
+  [800/3654] init=2017-02-03 12:00Z  rows=681600  rate=0.44/s  eta=107.2m
+  [820/3654] init=2017-02-13 12:00Z  rows=698640  rate=0.44/s  eta=106.4m
+  [840/3654] init=2017-02-23 12:00Z  rows=715680  rate=0.44/s  eta=105.6m
+  [860/3654] init=2017-03-05 12:00Z  rows=732720  rate=0.44/s  eta=104.9m
+  [880/3654] init=2017-03-15 12:00Z  rows=749760  rate=0.44/s  eta=104.1m
+  [900/3654] init=2017-03-25 12:00Z  rows=766800  rate=0.44/s  eta=103.4m
+  [920/3654] init=2017-04-04 12:00Z  rows=783840  rate=0.44/s  eta=102.6m
+  [940/3654] init=2017-04-14 12:00Z  rows=800880  rate=0.44/s  eta=101.9m
+  [960/3654] init=2017-04-24 12:00Z  rows=817920  rate=0.44/s  eta=101.1m
+  [980/3654] init=2017-05-04 12:00Z  rows=834960  rate=0.44/s  eta=100.3m
+  [1000/3654] init=2017-05-14 12:00Z  rows=852000  rate=0.44/s  eta=99.6m
+  [1020/3654] init=2017-05-24 12:00Z  rows=869040  rate=0.44/s  eta=98.8m
+  [1040/3654] init=2017-06-03 12:00Z  rows=886080  rate=0.44/s  eta=98.0m
+  [1060/3654] init=2017-06-13 12:00Z  rows=903120  rate=0.44/s  eta=97.3m
+  [1080/3654] init=2017-06-23 12:00Z  rows=920160  rate=0.44/s  eta=96.5m
+  [1100/3654] init=2017-07-03 12:00Z  rows=937200  rate=0.44/s  eta=95.8m
+  [1120/3654] init=2017-07-13 12:00Z  rows=954240  rate=0.44/s  eta=95.0m
+  [1140/3654] init=2017-07-23 12:00Z  rows=971280  rate=0.44/s  eta=94.3m
+  [1160/3654] init=2017-08-02 12:00Z  rows=988320  rate=0.44/s  eta=93.5m
+  [1180/3654] init=2017-08-12 12:00Z  rows=1005360  rate=0.44/s  eta=92.7m
+  [1200/3654] init=2017-08-22 12:00Z  rows=1022400  rate=0.44/s  eta=92.0m
+  [1220/3654] init=2017-09-01 12:00Z  rows=1039440  rate=0.44/s  eta=91.3m
+  [1240/3654] init=2017-09-11 12:00Z  rows=1056480  rate=0.44/s  eta=90.5m
+  [1260/3654] init=2017-09-21 12:00Z  rows=1073520  rate=0.44/s  eta=89.8m
+  [1280/3654] init=2017-10-01 12:00Z  rows=1090560  rate=0.44/s  eta=89.0m
+  [1300/3654] init=2017-10-11 12:00Z  rows=1107600  rate=0.44/s  eta=88.3m
+  [1320/3654] init=2017-10-21 12:00Z  rows=1124640  rate=0.44/s  eta=87.6m
+  [1340/3654] init=2017-10-31 12:00Z  rows=1141680  rate=0.44/s  eta=86.8m
+  [1360/3654] init=2017-11-10 12:00Z  rows=1158720  rate=0.44/s  eta=86.1m
+  [1380/3654] init=2017-11-20 12:00Z  rows=1175760  rate=0.44/s  eta=85.3m
+  [1400/3654] init=2017-11-30 12:00Z  rows=1192800  rate=0.44/s  eta=84.6m
+  [1420/3654] init=2017-12-10 12:00Z  rows=1209840  rate=0.44/s  eta=83.8m
+  [1440/3654] init=2017-12-20 12:00Z  rows=1226880  rate=0.44/s  eta=83.1m
+  [1460/3654] init=2017-12-30 12:00Z  rows=1243920  rate=0.44/s  eta=82.3m
+  [1480/3654] init=2018-01-09 12:00Z  rows=1260960  rate=0.44/s  eta=81.6m
+  [1500/3654] init=2018-01-19 12:00Z  rows=1278000  rate=0.44/s  eta=80.8m
+  [1520/3654] init=2018-01-29 12:00Z  rows=1295040  rate=0.44/s  eta=80.1m
+  [1540/3654] init=2018-02-08 12:00Z  rows=1312080  rate=0.44/s  eta=79.3m
+  [1560/3654] init=2018-02-18 12:00Z  rows=1329120  rate=0.44/s  eta=78.6m
+  [1580/3654] init=2018-02-28 12:00Z  rows=1346160  rate=0.44/s  eta=77.8m
+  [1600/3654] init=2018-03-10 12:00Z  rows=1363200  rate=0.44/s  eta=77.1m
+  [1620/3654] init=2018-03-20 12:00Z  rows=1380240  rate=0.44/s  eta=76.3m
+  [1640/3654] init=2018-03-30 12:00Z  rows=1397280  rate=0.44/s  eta=75.6m
+  [1660/3654] init=2018-04-09 12:00Z  rows=1414320  rate=0.44/s  eta=74.8m
+  [1680/3654] init=2018-04-19 12:00Z  rows=1431360  rate=0.44/s  eta=74.1m
+  [1700/3654] init=2018-04-29 12:00Z  rows=1448400  rate=0.44/s  eta=73.3m
+  [1720/3654] init=2018-05-09 12:00Z  rows=1465440  rate=0.44/s  eta=72.6m
+  [1740/3654] init=2018-05-19 12:00Z  rows=1482480  rate=0.44/s  eta=71.8m
+  [1760/3654] init=2018-05-29 12:00Z  rows=1499520  rate=0.44/s  eta=71.1m
+  [1780/3654] init=2018-06-08 12:00Z  rows=1516560  rate=0.44/s  eta=70.3m
+  [1800/3654] init=2018-06-18 12:00Z  rows=1533600  rate=0.44/s  eta=69.5m
+  [1820/3654] init=2018-06-28 12:00Z  rows=1550640  rate=0.44/s  eta=68.8m
+  [1840/3654] init=2018-07-08 12:00Z  rows=1567680  rate=0.44/s  eta=68.1m
+  [1860/3654] init=2018-07-18 12:00Z  rows=1584720  rate=0.44/s  eta=67.3m
+  [1880/3654] init=2018-07-28 12:00Z  rows=1601760  rate=0.44/s  eta=66.5m
+  [1900/3654] init=2018-08-07 12:00Z  rows=1618800  rate=0.44/s  eta=65.8m
+  [1920/3654] init=2018-08-17 12:00Z  rows=1635840  rate=0.44/s  eta=65.1m
+  [1940/3654] init=2018-08-27 12:00Z  rows=1652880  rate=0.44/s  eta=64.3m
+  [1960/3654] init=2018-09-06 12:00Z  rows=1669920  rate=0.44/s  eta=63.6m
+  [1980/3654] init=2018-09-16 12:00Z  rows=1686960  rate=0.44/s  eta=62.8m
+  [2000/3654] init=2018-09-26 12:00Z  rows=1704000  rate=0.44/s  eta=62.1m
+  [2020/3654] init=2018-10-06 12:00Z  rows=1721040  rate=0.44/s  eta=61.3m
+  [2040/3654] init=2018-10-16 12:00Z  rows=1738080  rate=0.44/s  eta=60.6m
+  [2060/3654] init=2018-10-26 12:00Z  rows=1755120  rate=0.44/s  eta=59.8m
+  [2080/3654] init=2018-11-05 12:00Z  rows=1772160  rate=0.44/s  eta=59.1m
+  [2100/3654] init=2018-11-15 12:00Z  rows=1789200  rate=0.44/s  eta=58.3m
+  [2120/3654] init=2018-11-25 12:00Z  rows=1806240  rate=0.44/s  eta=57.6m
+  [2140/3654] init=2018-12-05 12:00Z  rows=1823280  rate=0.44/s  eta=56.8m
+  [2160/3654] init=2018-12-15 12:00Z  rows=1840320  rate=0.44/s  eta=56.1m
+  [2180/3654] init=2018-12-25 12:00Z  rows=1857360  rate=0.44/s  eta=55.3m
+  [2200/3654] init=2019-01-04 12:00Z  rows=1874400  rate=0.44/s  eta=54.6m
+  [2220/3654] init=2019-01-14 12:00Z  rows=1891440  rate=0.44/s  eta=53.8m
+  [2240/3654] init=2019-01-24 12:00Z  rows=1908480  rate=0.44/s  eta=53.1m
+  [2260/3654] init=2019-02-03 12:00Z  rows=1925520  rate=0.44/s  eta=52.3m
+  [2280/3654] init=2019-02-13 12:00Z  rows=1942560  rate=0.44/s  eta=51.6m
+  [2300/3654] init=2019-02-23 12:00Z  rows=1959600  rate=0.44/s  eta=50.8m
+  [2320/3654] init=2019-03-05 12:00Z  rows=1976640  rate=0.44/s  eta=50.0m
+  [2340/3654] init=2019-03-15 12:00Z  rows=1993680  rate=0.44/s  eta=49.3m
+  [2360/3654] init=2019-03-25 12:00Z  rows=2010720  rate=0.44/s  eta=48.5m
+  [2380/3654] init=2019-04-04 12:00Z  rows=2027760  rate=0.44/s  eta=47.8m
+  [2400/3654] init=2019-04-14 12:00Z  rows=2044800  rate=0.44/s  eta=47.0m
+  [2420/3654] init=2019-04-24 12:00Z  rows=2061840  rate=0.44/s  eta=46.3m
+  [2440/3654] init=2019-05-04 12:00Z  rows=2078880  rate=0.44/s  eta=45.5m
+  [2460/3654] init=2019-05-14 12:00Z  rows=2095920  rate=0.44/s  eta=44.8m
+  [2480/3654] init=2019-05-24 12:00Z  rows=2112960  rate=0.44/s  eta=44.0m
+  [2500/3654] init=2019-06-03 12:00Z  rows=2130000  rate=0.44/s  eta=43.3m
+  [2520/3654] init=2019-06-13 12:00Z  rows=2147040  rate=0.44/s  eta=42.5m
+  [2540/3654] init=2019-06-23 12:00Z  rows=2164080  rate=0.44/s  eta=41.8m
+  [2560/3654] init=2019-07-03 12:00Z  rows=2181120  rate=0.44/s  eta=41.0m
+  [2580/3654] init=2019-07-13 12:00Z  rows=2198160  rate=0.44/s  eta=40.3m
+  [2600/3654] init=2019-07-23 12:00Z  rows=2215200  rate=0.44/s  eta=39.5m
+  [2620/3654] init=2019-08-02 12:00Z  rows=2232240  rate=0.44/s  eta=38.8m
+  [2640/3654] init=2019-08-12 12:00Z  rows=2249280  rate=0.44/s  eta=38.0m
+  [2660/3654] init=2019-08-22 12:00Z  rows=2266320  rate=0.44/s  eta=37.3m
+  [2680/3654] init=2019-09-01 12:00Z  rows=2283360  rate=0.44/s  eta=36.5m
+  [2700/3654] init=2019-09-11 12:00Z  rows=2300400  rate=0.44/s  eta=35.8m
+  [2720/3654] init=2019-09-21 12:00Z  rows=2317440  rate=0.44/s  eta=35.0m
+  [2740/3654] init=2019-10-01 12:00Z  rows=2334480  rate=0.44/s  eta=34.3m
+  [2760/3654] init=2019-10-11 12:00Z  rows=2351520  rate=0.44/s  eta=33.5m
+  [2780/3654] init=2019-10-21 12:00Z  rows=2368560  rate=0.44/s  eta=32.8m
+  [2800/3654] init=2019-10-31 12:00Z  rows=2385600  rate=0.44/s  eta=32.0m
+  [2820/3654] init=2019-11-10 12:00Z  rows=2402640  rate=0.44/s  eta=31.3m
+  [2840/3654] init=2019-11-20 12:00Z  rows=2419680  rate=0.44/s  eta=30.5m
+  [2860/3654] init=2019-11-30 12:00Z  rows=2436720  rate=0.44/s  eta=29.8m
+  [2880/3654] init=2019-12-10 12:00Z  rows=2453760  rate=0.44/s  eta=29.0m
+  [2900/3654] init=2019-12-20 12:00Z  rows=2470800  rate=0.44/s  eta=28.3m
+  [2920/3654] init=2019-12-30 12:00Z  rows=2487840  rate=0.44/s  eta=27.5m
+  [2940/3654] init=2020-01-09 12:00Z  rows=2504880  rate=0.44/s  eta=26.8m
+  [2960/3654] init=2020-01-19 12:00Z  rows=2521920  rate=0.44/s  eta=26.0m
+  [2980/3654] init=2020-01-29 12:00Z  rows=2538960  rate=0.44/s  eta=25.3m
+  [3000/3654] init=2020-02-08 12:00Z  rows=2556000  rate=0.44/s  eta=24.5m
+  [3020/3654] init=2020-02-18 12:00Z  rows=2573040  rate=0.44/s  eta=23.8m
+  [3040/3654] init=2020-02-28 12:00Z  rows=2590080  rate=0.44/s  eta=23.0m
+  [3060/3654] init=2020-03-09 12:00Z  rows=2607120  rate=0.44/s  eta=22.3m
+  [3080/3654] init=2020-03-19 12:00Z  rows=2624160  rate=0.44/s  eta=21.5m
+  [3100/3654] init=2020-03-29 12:00Z  rows=2641200  rate=0.44/s  eta=20.8m
+  [3120/3654] init=2020-04-08 12:00Z  rows=2658240  rate=0.44/s  eta=20.0m
+  [3140/3654] init=2020-04-18 12:00Z  rows=2675280  rate=0.44/s  eta=19.3m
+  [3160/3654] init=2020-04-28 12:00Z  rows=2692320  rate=0.44/s  eta=18.5m
+  [3180/3654] init=2020-05-08 12:00Z  rows=2709360  rate=0.44/s  eta=17.8m
+  [3200/3654] init=2020-05-18 12:00Z  rows=2726400  rate=0.44/s  eta=17.0m
+  [3220/3654] init=2020-05-28 12:00Z  rows=2743440  rate=0.44/s  eta=16.3m
+  [3240/3654] init=2020-06-07 12:00Z  rows=2760480  rate=0.44/s  eta=15.5m
+  [3260/3654] init=2020-06-17 12:00Z  rows=2777520  rate=0.44/s  eta=14.8m
+  [3280/3654] init=2020-06-27 12:00Z  rows=2794560  rate=0.44/s  eta=14.0m
+  [3300/3654] init=2020-07-07 12:00Z  rows=2811600  rate=0.44/s  eta=13.3m
+  [3320/3654] init=2020-07-17 12:00Z  rows=2828640  rate=0.44/s  eta=12.5m
+  [3340/3654] init=2020-07-27 12:00Z  rows=2845680  rate=0.44/s  eta=11.8m
+  [3360/3654] init=2020-08-06 12:00Z  rows=2862720  rate=0.44/s  eta=11.0m
+  [3380/3654] init=2020-08-16 12:00Z  rows=2879760  rate=0.44/s  eta=10.3m
+  [3400/3654] init=2020-08-26 12:00Z  rows=2896800  rate=0.44/s  eta=9.5m
+  [3420/3654] init=2020-09-05 12:00Z  rows=2913840  rate=0.44/s  eta=8.8m
+  [3440/3654] init=2020-09-15 12:00Z  rows=2930880  rate=0.44/s  eta=8.0m
+  [3460/3654] init=2020-09-25 12:00Z  rows=2947920  rate=0.44/s  eta=7.3m
+  [3480/3654] init=2020-10-05 12:00Z  rows=2964960  rate=0.44/s  eta=6.5m
+  [3500/3654] init=2020-10-15 12:00Z  rows=2982000  rate=0.44/s  eta=5.8m
+  [3520/3654] init=2020-10-25 12:00Z  rows=2999040  rate=0.44/s  eta=5.0m
+  [3540/3654] init=2020-11-04 12:00Z  rows=3016080  rate=0.44/s  eta=4.3m
+  [3560/3654] init=2020-11-14 12:00Z  rows=3033120  rate=0.44/s  eta=3.5m
+  [3580/3654] init=2020-11-24 12:00Z  rows=3050160  rate=0.44/s  eta=2.8m
+  [3600/3654] init=2020-12-04 12:00Z  rows=3067200  rate=0.44/s  eta=2.0m
+  [3620/3654] init=2020-12-14 12:00Z  rows=3084240  rate=0.44/s  eta=1.3m
+  [3640/3654] init=2020-12-24 12:00Z  rows=3101280  rate=0.44/s  eta=0.5m
+[inference] done. rows=3113208  skipped_inits=0
+[join] rows after ISD join (with obs): 3083614
+Traceback (most recent call last):
+  File "/workdir/graphcast-lite/scripts/postproc/build_corpus.py", line 872, in <module>
+    main()
+  File "/workdir/graphcast-lite/scripts/postproc/build_corpus.py", line 866, in main
+    df.to_parquet(out_path, index=False)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/pandas/util/_decorators.py", line 333, in wrapper
+    return func(*args, **kwargs)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/pandas/core/frame.py", line 3124, in to_parquet
+    return to_parquet(
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/pandas/io/parquet.py", line 478, in to_parquet
+    impl = get_engine(engine)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/pandas/io/parquet.py", line 68, in get_engine
+    raise ImportError(
+ImportError: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'.
+A suitable version of pyarrow or fastparquet is required for parquet support.
+Trying to import the above resulted in these errors:
+ - Missing optional dependency 'pyarrow'. pyarrow is required for parquet support. Use pip or conda to install pyarrow.
+ - Missing optional dependency 'fastparquet'. fastparquet is required for parquet support. Use pip or conda to install fastparquet.
