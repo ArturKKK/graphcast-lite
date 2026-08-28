@@ -27,7 +27,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from src.postprocessing.neural.dataset import StationCorpusDataset
-from src.postprocessing.neural.models import StationLeadAwareResidualMLP
+from src.postprocessing.neural.models import (StationLeadAwareResidualMLP,
+                                              StationLeadBiasResidualMLP)
 
 
 def _rmse(a, b):
@@ -68,11 +69,22 @@ def main() -> None:
         args.val_parquet,
         feature_cols=feature_cols,
         scalers=scalers,
+        auto_obs_features=False,
         station_to_idx=station_to_idx,
     )
     loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False, num_workers=2)
 
-    model = StationLeadAwareResidualMLP(
+    # Какой класс обучали, такой и строим: у v3 есть добавочная голова
+    # смещения по станции, и веса v3 в модель v2 не лягут.
+    cls_name = ckpt.get("model_class")
+    if cls_name is None:
+        cls_name = ("StationLeadBiasResidualMLP"
+                    if any(k.startswith("bias_head.") for k in ckpt["model_state"])
+                    else "StationLeadAwareResidualMLP")
+    print(f"[eval] модель: {cls_name}", flush=True)
+
+    model = {"StationLeadAwareResidualMLP": StationLeadAwareResidualMLP,
+             "StationLeadBiasResidualMLP": StationLeadBiasResidualMLP}[cls_name](
         feature_dim=len(feature_cols),
         num_stations=len(station_to_idx),
         station_emb_dim=cfg["station_emb_dim"],

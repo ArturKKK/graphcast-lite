@@ -145,6 +145,12 @@ class StationCorpusDataset(Dataset):
         # Признаки-наблюдения добавляются сами, если они есть в корпусе:
         # иначе сравнение с базовыми линиями было бы нечестным — там они есть.
         feature_cols = list(feature_cols)
+        # Переданные нормировки задают набор признаков жёстко: они посчитаны на
+        # обучении, и добавлять к ним что-то — значит строить вход не той
+        # ширины, чем ждёт модель. Так 28.08.2026 упала оценка абляции: в
+        # чекпойнте 26 признаков, а датасет дополнил их до 60.
+        if scalers is not None:
+            auto_obs_features = False
         if auto_obs_features:
             extra = [c for c in observation_features(df) if c not in feature_cols]
             if extra:

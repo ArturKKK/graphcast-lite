@@ -70,16 +70,19 @@ python -u scripts/postproc/baselines.py --corpus "$LAGS" \
 # Без абляции неясно, за счёт чего выигрыш: линейная регрессия на тех же
 # признаках даёт 12,1%, а без них 0,5%, так что вклад самих наблюдений огромен,
 # и надо отделить его от вклада нелинейности и вложения станции.
+# Обучающий и отборочный наборы можно подменить: так проверяется настройка на
+# одном годе, которого сеть-прогнозист не видела.
+TR="$DIR/krsk_train.parquet"; VA="$DIR/krsk_val.parquet"
 train_and_eval() {
   local tag=$1; shift
   local exp="experiments/neural_postproc_krsk${tag}"
   if [[ -f "$exp/best_model.pth" ]]; then
     log "--- $exp: веса уже есть, обучение пропускаю"
   else
-    log "--- $exp: обучение, эпох $EPOCHS"
+    log "--- $exp: обучение, эпох $EPOCHS, обучающий $(basename "$TR")"
     python -u scripts/postproc/train_neural_postproc_v3.py \
-        --train-parquet "$DIR/krsk_train.parquet" \
-        --val-parquet   "$DIR/krsk_val.parquet" \
+        --train-parquet "$TR" \
+        --val-parquet   "$VA" \
         --out-dir       "$exp" \
         --epochs "$EPOCHS" --batch-size 4096 --station-emb-dim 32 \
         --hidden 192,192,128 "$@" 2>&1 \
@@ -94,4 +97,40 @@ train_and_eval() {
 
 train_and_eval ""
 train_and_eval "_noobs" --no-obs-features
+
+# Вероятностная настройка: сеть выдаёт не только поправку, но и разброс. Для
+# статьи это отдельная величина — прогноз с оценкой собственной надёжности.
+train_and_eval "_prob" --probabilistic
+
+# Настройка на одном 2019-м. У табличных поправок выбор лет не менял ничего,
+# но у сети втрое меньше данных, и это уже не очевидно. Отбор эпохи по 2018-му:
+# он тоже не проверочный год.
+if [[ ! -f "$DIR/krsk_train1y.parquet" ]]; then
+  log "готовлю набор на одном годе: обучение 2019, отбор 2018"
+  python -u - "$DIR" <<'SPLIT1Y'
+import sys, pandas as pd
+d = sys.argv[1]
+df = pd.concat([pd.read_parquet(f"{d}/krsk_train.parquet"),
+                pd.read_parquet(f"{d}/krsk_val.parquet")], ignore_index=True)
+y = pd.to_datetime(df["valid_time_utc"]).dt.year
+for name, years in (("train1y", [2019]), ("val1y", [2018])):
+    part = df[y.isin(years)]
+    part.to_parquet(f"{d}/krsk_{name}.parquet", index=False)
+    print(f"  {name}: {len(part):,} строк", flush=True)
+SPLIT1Y
+fi
+if [[ -f "$DIR/krsk_train1y.parquet" ]]; then
+  TR="$DIR/krsk_train1y.parquet"; VA="$DIR/krsk_val1y.parquet"
+  train_and_eval "_1y"
+  TR="$DIR/krsk_train.parquet"; VA="$DIR/krsk_val.parquet"
+fi
+
+# Разбор по станциям у основной модели: где поправка работает, а где нет.
+log "--- разбор по станциям (основная модель)"
+python -u scripts/postproc/eval_per_station_v2.py \
+    --val-parquet "$DIR/krsk_test.parquet" \
+    --ckpt experiments/neural_postproc_krsk/best_model.pth \
+    --out-dir experiments/neural_postproc_krsk/eval_stations \
+    --bbox 50 60 83 98 --label krsk 2>&1 | tail -25
+
 log "=== ALL DONE ==="

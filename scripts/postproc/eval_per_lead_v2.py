@@ -58,8 +58,9 @@ def main() -> None:
 
     ds = StationCorpusDataset(
         args.val_parquet,
-        feature_cols=feature_cols,
+        feature_cols=feature_cols,   # список из чекпойнта — единственно верный
         scalers=scalers,
+        auto_obs_features=False,
         station_to_idx=station_to_idx,
     )
     loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False, num_workers=2)
