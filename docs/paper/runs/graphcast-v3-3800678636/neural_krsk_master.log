@@ -215,3 +215,108 @@ Overall: t2m RMSE=2.297°C, wind vec=1.727m/s
 Done: {'best_val_combined': 4.029779589701436, 'epochs_run': 20}
 [28.08 14:41:04]     проверка на 2020
 [28.08 14:41:07] === ALL DONE ===
+[28.08 15:03:14] === НЕЙРОННЫЙ ПОСТПРОЦЕССОР ===
+[28.08 15:03:14] корпус: data/postproc/corpus_krsk_lags2_seen.parquet (438M)
+[28.08 15:03:14] базовые линии на выборке сети (только полные наблюдения)
+только полные наблюдения: 3,083,614 -> 2,388,455 строк (выборка нейронного постпроцессора)
+обучение 1,417,593 строк ([2016, 2017, 2018]), проверка 485,888 строк ([2020]), станций 71
+                     сырой прогноз    2.978    2.113   -0.470      0.0%
+                 станция×месяц×час    2.521    1.808   -0.139     15.4%
+              регрессия (8 призн.)    2.922    2.071   -0.232      1.9%
+регрессия + наблюдения (42 призн.)    2.617    1.894   -0.186     12.1%
+   таблица + регрессия (42 призн.)    2.498    1.800   -0.160     16.1%
+  по срокам, лучший способ — таблица + регрессия (42 призн.):
+                     сырой прогноз    1.740    1.357   +0.375      0.0%
+                 станция×месяц×час    1.635    1.255   +0.128      6.0%
+              регрессия (8 призн.)    1.496    1.128   +0.038     14.0%
+регрессия + наблюдения (42 призн.)    1.444    1.087   +0.032     17.0%
+   таблица + регрессия (42 призн.)    1.445    1.084   +0.066     17.0%
+  по срокам, лучший способ — регрессия + наблюдения (42 призн.):
+                     сырой прогноз    1.585    1.222   +0.233      0.0%
+                 станция×месяц×час    1.467    1.120   +0.026      7.4%
+              регрессия (8 призн.)    1.324    0.983   -0.009     16.5%
+регрессия + наблюдения (42 призн.)    1.264    0.937   -0.025     20.2%
+   таблица + регрессия (42 призн.)    1.259    0.937   -0.016     20.6%
+  по срокам, лучший способ — таблица + регрессия (42 призн.):
+[28.08 15:03:41] --- experiments/neural_postproc_krsk: веса уже есть, обучение пропускаю
+[28.08 15:03:41]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.297°C, wind vec=1.727m/s
+[28.08 15:03:56] --- experiments/neural_postproc_krsk_noobs: веса уже есть, обучение пропускаю
+[28.08 15:03:56]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.331°C, wind vec=1.718m/s
+[28.08 15:04:11] --- experiments/neural_postproc_krsk_prob: обучение, эпох 20, обучающий krsk_train.parquet
+[cfg] num_stations=71  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] пропусков в признаках: 5,792,039 (6.81%) — заменены средним
+[cfg] признаков: 26 -> 60 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,899,185 (6.53%) — заменены средним
+[model] StationLeadBiasResidualMLP params=108,347  (station_emb=32 hidden=[192, 192, 128] bias_head=Embedding(71,3))
+[ep 001] train loss=2.6452 val loss=2.5181 val rmse_t2m=2.393°C val bias_t2m=+0.003°C val vec_rmse_wind=1.739m/s
+[ep 002] train loss=2.4131 val loss=2.4622 val rmse_t2m=2.351°C val bias_t2m=-0.018°C val vec_rmse_wind=1.705m/s
+[ep 003] train loss=2.3622 val loss=2.4466 val rmse_t2m=2.348°C val bias_t2m=-0.021°C val vec_rmse_wind=1.696m/s
+[ep 004] train loss=2.3355 val loss=2.4381 val rmse_t2m=2.346°C val bias_t2m=-0.068°C val vec_rmse_wind=1.689m/s
+[ep 005] train loss=2.3166 val loss=2.4261 val rmse_t2m=2.332°C val bias_t2m=+0.007°C val vec_rmse_wind=1.686m/s
+[ep 006] train loss=2.3010 val loss=2.4194 val rmse_t2m=2.329°C val bias_t2m=-0.036°C val vec_rmse_wind=1.682m/s
+[ep 007] train loss=2.2931 val loss=2.4165 val rmse_t2m=2.321°C val bias_t2m=-0.045°C val vec_rmse_wind=1.683m/s
+[ep 008] train loss=2.2792 val loss=2.4159 val rmse_t2m=2.325°C val bias_t2m=-0.045°C val vec_rmse_wind=1.682m/s
+[ep 009] train loss=2.2738 val loss=2.4173 val rmse_t2m=2.332°C val bias_t2m=-0.075°C val vec_rmse_wind=1.680m/s
+[ep 010] train loss=2.2676 val loss=2.4161 val rmse_t2m=2.334°C val bias_t2m=-0.092°C val vec_rmse_wind=1.681m/s
+[ep 011] train loss=2.2604 val loss=2.4146 val rmse_t2m=2.335°C val bias_t2m=-0.011°C val vec_rmse_wind=1.678m/s
+[ep 012] train loss=2.2559 val loss=2.4176 val rmse_t2m=2.341°C val bias_t2m=-0.103°C val vec_rmse_wind=1.678m/s
+[ep 013] train loss=2.2516 val loss=2.4160 val rmse_t2m=2.339°C val bias_t2m=-0.035°C val vec_rmse_wind=1.676m/s
+[ep 014] train loss=2.2511 val loss=2.4152 val rmse_t2m=2.339°C val bias_t2m=-0.048°C val vec_rmse_wind=1.678m/s
+[ep 015] train loss=2.2439 val loss=2.4118 val rmse_t2m=2.332°C val bias_t2m=-0.012°C val vec_rmse_wind=1.678m/s
+[ep 016] train loss=2.2412 val loss=2.4144 val rmse_t2m=2.339°C val bias_t2m=-0.061°C val vec_rmse_wind=1.676m/s
+[ep 017] train loss=2.2419 val loss=2.4125 val rmse_t2m=2.336°C val bias_t2m=-0.060°C val vec_rmse_wind=1.676m/s
+[ep 018] train loss=2.2387 val loss=2.4114 val rmse_t2m=2.335°C val bias_t2m=-0.043°C val vec_rmse_wind=1.676m/s
+[ep 019] train loss=2.2385 val loss=2.4110 val rmse_t2m=2.333°C val bias_t2m=-0.040°C val vec_rmse_wind=1.676m/s
+[ep 020] train loss=2.2365 val loss=2.4106 val rmse_t2m=2.333°C val bias_t2m=-0.043°C val vec_rmse_wind=1.676m/s
+Done: {'best_val_combined': 4.004940243778941, 'epochs_run': 20}
+[28.08 15:14:55]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.289°C, wind vec=1.719m/s
+[28.08 15:15:15] готовлю набор на одном годе: обучение 2019, отбор 2018
+  train1y: 616,554 строк
+  val1y: 616,552 строк
+[28.08 15:15:20] --- experiments/neural_postproc_krsk_1y: обучение, эпох 20, обучающий krsk_train1y.parquet
+[cfg] num_stations=71  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] пропусков в признаках: 1,899,185 (6.53%) — заменены средним
+[cfg] признаков: 26 -> 60 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,917,874 (6.77%) — заменены средним
+[model] StationLeadBiasResidualMLP params=107,960  (station_emb=32 hidden=[192, 192, 128] bias_head=Embedding(71,3))
+[ep 001] train loss=5.6073 val loss=5.0837 val rmse_t2m=2.542°C val bias_t2m=+0.142°C val vec_rmse_wind=1.841m/s
+[ep 002] train loss=4.8133 val loss=4.8526 val rmse_t2m=2.463°C val bias_t2m=+0.122°C val vec_rmse_wind=1.798m/s
+[ep 003] train loss=4.5978 val loss=4.7304 val rmse_t2m=2.419°C val bias_t2m=+0.071°C val vec_rmse_wind=1.775m/s
+[ep 004] train loss=4.4100 val loss=4.6541 val rmse_t2m=2.392°C val bias_t2m=+0.059°C val vec_rmse_wind=1.759m/s
+[ep 005] train loss=4.2872 val loss=4.6313 val rmse_t2m=2.377°C val bias_t2m=-0.012°C val vec_rmse_wind=1.757m/s
+[ep 006] train loss=4.2616 val loss=4.6337 val rmse_t2m=2.381°C val bias_t2m=+0.060°C val vec_rmse_wind=1.757m/s
+[ep 007] train loss=4.2043 val loss=4.6159 val rmse_t2m=2.378°C val bias_t2m=+0.089°C val vec_rmse_wind=1.753m/s
+[ep 008] train loss=4.1529 val loss=4.6157 val rmse_t2m=2.375°C val bias_t2m=+0.120°C val vec_rmse_wind=1.754m/s
+[ep 009] train loss=4.1131 val loss=4.6216 val rmse_t2m=2.384°C val bias_t2m=+0.079°C val vec_rmse_wind=1.754m/s
+[ep 010] train loss=4.0808 val loss=4.6293 val rmse_t2m=2.387°C val bias_t2m=+0.064°C val vec_rmse_wind=1.755m/s
+[ep 011] train loss=4.0254 val loss=4.6144 val rmse_t2m=2.375°C val bias_t2m=+0.049°C val vec_rmse_wind=1.754m/s
+[ep 012] train loss=4.0106 val loss=4.6309 val rmse_t2m=2.382°C val bias_t2m=+0.067°C val vec_rmse_wind=1.757m/s
+[ep 013] train loss=3.9687 val loss=4.6324 val rmse_t2m=2.382°C val bias_t2m=+0.115°C val vec_rmse_wind=1.758m/s
+[ep 014] train loss=3.9748 val loss=4.6305 val rmse_t2m=2.381°C val bias_t2m=+0.096°C val vec_rmse_wind=1.758m/s
+[ep 015] train loss=3.9285 val loss=4.6231 val rmse_t2m=2.382°C val bias_t2m=+0.118°C val vec_rmse_wind=1.756m/s
+[ep 016] train loss=3.9382 val loss=4.6356 val rmse_t2m=2.381°C val bias_t2m=+0.085°C val vec_rmse_wind=1.759m/s
+[ep 017] train loss=3.9326 val loss=4.6345 val rmse_t2m=2.384°C val bias_t2m=+0.104°C val vec_rmse_wind=1.759m/s
+[ep 018] train loss=3.9249 val loss=4.6275 val rmse_t2m=2.383°C val bias_t2m=+0.105°C val vec_rmse_wind=1.757m/s
+[ep 019] train loss=3.9365 val loss=4.6307 val rmse_t2m=2.383°C val bias_t2m=+0.100°C val vec_rmse_wind=1.758m/s
+[ep 020] train loss=3.9090 val loss=4.6300 val rmse_t2m=2.383°C val bias_t2m=+0.098°C val vec_rmse_wind=1.758m/s
+Done: {'best_val_combined': 4.129471317680307, 'epochs_run': 20}
+[28.08 15:20:37]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.356°C, wind vec=1.757m/s
+[28.08 15:20:52] --- разбор по станциям (основная модель)
+[dataset] пропусков в признаках: 1,915,506 (6.57%) — заменены средним
+[eval] модель: StationLeadBiasResidualMLP
+Saved: experiments/neural_postproc_krsk/eval_stations/eval_per_station_krsk.json
+Saved: experiments/neural_postproc_krsk/eval_stations/eval_per_station_krsk.md
+Stations in box: 71 / 50; region n=485,888
+Region pp T2m RMSE = 2.297°C (GNN 2.978°C)
+Region pp wind vec-RMSE = 1.727m/s (GNN 2.353m/s)
+[28.08 15:21:08] === ALL DONE ===
