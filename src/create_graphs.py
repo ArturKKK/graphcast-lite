@@ -76,6 +76,13 @@ def _compute_mesh_edge_features(
     senders = edge_index[0]
     receivers = edge_index[1]
 
+    # Пустой набор рёбер. Дальше берётся максимум длины для нормировки, а на
+    # пустом массиве numpy отказывается: «zero-size array to reduction operation
+    # maximum». Сообщение невразумительное и уводит от настоящей причины —
+    # а она в том, что рёбер не получилось вовсе.
+    if len(senders) == 0:
+        return torch.zeros((0, 4), dtype=torch.float32)
+
     sender_phi, sender_theta = lat_lon_deg_to_spherical(
         mesh_node_lats[senders], mesh_node_longs[senders]
     )

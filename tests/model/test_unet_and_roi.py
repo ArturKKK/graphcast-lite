@@ -172,10 +172,32 @@ def test_empty_region_is_refused(roi_mod):
 
 
 def test_more_neighbours_than_nodes_is_survivable(roi_mod):
-    """Соседей просят больше, чем узлов в области — не падаем."""
+    """Соседей просят больше, чем узлов в области — берём сколько есть."""
     lats, lons = grid(n_lat=40, n_lon=40)
-    _, idx, ei, _ = roi_mod["graph"](lats, lons, (54.0, 55.0, 90.0, 91.0), k=100)
-    assert ei.shape[1] == len(idx) * min(100, len(idx) - 1)
+    _, idx, ei, _ = roi_mod["graph"](lats, lons, (50.0, 52.0, 90.0, 92.0), k=100)
+    assert len(idx) >= 2
+    assert ei.shape[1] == len(idx) * (len(idx) - 1)
+
+
+def test_single_node_region_is_refused_clearly(roi_mod):
+    """Область из одного узла — внятный отказ, а не ошибка numpy о пустом массиве.
+
+    Графа соседей на одном узле не бывает: рёбер выходит ноль, и всё дальше
+    разваливалось сообщением «zero-size array to reduction operation maximum»,
+    которое уводит от настоящей причины.
+    """
+    lats, lons = grid(n_lat=5, n_lon=5)
+    with pytest.raises(ValueError, match="узел сетки"):
+        roi_mod["graph"](lats, lons, (39.9, 40.1, 69.9, 70.1), k=4)
+
+
+def test_edge_features_survive_an_empty_edge_set():
+    """Пустой набор рёбер даёт пустую таблицу признаков, а не отказ."""
+    import numpy as np
+    from src.create_graphs import _compute_mesh_edge_features
+    got = _compute_mesh_edge_features(np.array([10.0, 20.0]), np.array([30.0, 40.0]),
+                                      np.zeros((2, 0), dtype=int))
+    assert tuple(got.shape) == (0, 4)
 
 
 def test_residual_head_starts_from_almost_zero(roi_mod):

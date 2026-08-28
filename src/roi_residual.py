@@ -28,6 +28,14 @@ def build_roi_knn_graph(
     roi_indices = np.where(roi_mask)[0]
     if len(roi_indices) == 0:
         raise ValueError(f"No grid points in ROI {roi}")
+    if len(roi_indices) < 2:
+        # На одном узле графа соседей не бывает: рёбер выйдет ноль, и дальше
+        # всё разваливалось невнятной ошибкой numpy о пустом массиве. Причина
+        # же простая — область задана слишком мелко для этой сетки.
+        raise ValueError(
+            f"В области {roi} всего {len(roi_indices)} узел сетки — графа "
+            f"соседей на нём не построить. Расширь область или возьми более "
+            f"частую сетку.")
 
     roi_lats = grid_lats[roi_indices]
     roi_lons = grid_lons[roi_indices]
