@@ -39,6 +39,11 @@ DATA=/data/datasets
 mkdir -p "$OUT"; exec >>"$OUT/corpus_${TAG}_master.log" 2>&1
 cd "$REPO" || exit 1
 log() { echo "[$(date '+%d.%m %H:%M:%S')] $*"; }
+# Замок на весь раннер целиком. Сторож ниже смотрит на процесс счёта, но
+# подготовка идёт минут пятнадцать, и в это окно 28.08.2026 проскочил второй
+# запуск — две установки затоптали друг друга, слияние вернуло код 4.
+exec 9>"$OUT/.corpus_${TAG}.lock"
+flock -n 9 || { log "уже работает другой раннер этих лет — стоп"; exit 1; }
 log "=== КОРПУС ПОСТОБРАБОТКИ, годы $Y0-$Y1 ==="
 BUSY=$(pgrep -af "^python.*(src\.main|scripts/predict\.py|build_corpus\.py)" | head -1)
 [[ -n "$BUSY" ]] && { log "карта занята: $BUSY — стоп"; exit 1; }
@@ -57,8 +62,18 @@ if [[ ! -x "$VENV/bin/python" || ! -f "$GBASE/data.npy" || ! -f "$RBASE/data.npy
   bash scripts/_paper_setup_vm.sh >> "$OUT/corpus_${TAG}_setup.log" 2>&1
   log "подготовка rc=$? (сбой на сборке слитого датасета не помеха — он не нужен)"
 fi
-for d in "$GBASE" "$RBASE" "$GEXTRA" "$REXTRA"; do
+# У базовых сеток массив зовётся data.npy, у каталогов *_extra_* —
+# data_extra.npy (его и открывает build_corpus.py). Проверка, требовавшая
+# data.npy от всех четырёх, останавливала запуск на файле, которого там
+# отродясь не было: 28.08.2026 на этом потеряно полдня.
+for d in "$GBASE" "$RBASE"; do
   [[ -f "$d/data.npy" ]] || { log "нет $d/data.npy — стоп"; exit 1; }
+done
+for d in "$GEXTRA" "$REXTRA"; do
+  [[ -f "$d/data_extra.npy" ]] || {
+    log "нет $d/data_extra.npy — стоп"
+    log "  в каталоге сейчас: $(ls "$d" 2>/dev/null | tr '\n' ' ' || echo 'каталога нет')"
+    exit 1; }
 done
 source "$VENV/bin/activate" || { log "нет venv — стоп"; exit 1; }
 export PYTHONPATH="$REPO"
@@ -67,9 +82,25 @@ export PYTHONPATH="$REPO"
 # variables.json — сам массив он не читает. Полный 33-канальный датасет весит
 # 56 ГБ и вместе со слитым источником на 81 ГБ упирается в лимит диска
 # платформы, поэтому собираем одни метаданные.
+# Слитый датасет не обязателен, но если он на диске — берём его: именно на
+# этом пути сборка досчитала до конца 27.08.2026, тогда как обход собран
+# позже и целиком ни разу не прогонялся. Координаты при этом берутся ровно те,
+# с которыми обучалась модель, а не восстановленные построением.
+MERGE="$DATA/multires_krsk_19f_merge"
+# Набор аргументов повторяет ровно тот, на котором сборка досчитала до конца:
+# при слитом источнике отдельные сетки не передаются вовсе.
+META_MERGE=()
+if [[ -f "$MERGE/data.npy" && -f "$MERGE/coords.npz" ]]; then
+  SRC_ARGS=(--merged-base "$MERGE"); META_MERGE=(--merged "$MERGE")
+  log "источник кадров: слитый $MERGE"
+else
+  SRC_ARGS=(--global-base "$GBASE" --regional-base "$RBASE")
+  log "слитого источника нет — читаю кадры из глобальной сетки и вставки"
+fi
+
 if [[ ! -f "$META/scalers.npz" ]]; then
   log "собираю метаданные 33-канального датасета"
-  python -u scripts/postproc/make_multires33f_meta.py \
+  python -u scripts/postproc/make_multires33f_meta.py "${META_MERGE[@]}" \
       --global-base "$GBASE" --region-base "$RBASE" --extra "$GEXTRA" \
       --roi 50 60 83 98 --expect-nodes 133279 --out "$META" 2>&1 | tail -16
   [[ -f "$META/scalers.npz" ]] || { log "метаданные не собрались — стоп"; exit 1; }
@@ -123,8 +154,7 @@ log "START сборки (развёртка до 120 ч, инициализац�
 ARGS=(scripts/postproc/build_corpus.py
     --experiment-dir "experiments/$EXP"
     --multires-dir   "$META"
-    --global-base    "$GBASE"
-    --regional-base  "$RBASE"
+    "${SRC_ARGS[@]}"
     --global-extra   "$GEXTRA"
     --regional-extra "$REXTRA"
     --stations-json  data/krsk_postproc_stations.json
