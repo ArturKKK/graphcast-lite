@@ -20,16 +20,35 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
+# Какой питон. На виртуалке в PATH стоит conda-питон, в котором нет ни pytest,
+# ни torch, ни зависимостей проекта, — а окружение лежит в /data/venvs/graphcast.
+# Без этого выбора команда падала с «No module named pytest», хотя всё на месте.
+PY=""
+for cand in "${VIRTUAL_ENV:-}/bin/python" /data/venvs/graphcast/bin/python \
+            "$(command -v python3 || true)"; do
+  [[ -x "$cand" ]] && { PY="$cand"; break; }
+done
+[[ -z "$PY" ]] && { echo "питон не найден"; exit 1; }
+
+if ! "$PY" -c "import pytest" 2>/dev/null; then
+  echo "pytest нет в $PY — ставлю (одна попытка, 120 секунд)"
+  timeout 120 "$PY" -m pip install -q pytest coverage \
+      --extra-index-url https://artifactory.tcsbank.ru/artifactory/api/pypi/python-all/simple \
+      2>&1 | tail -3
+  "$PY" -c "import pytest" 2>/dev/null || {
+    echo "не поставился. Вручную: $PY -m pip install -r requirements-dev.txt"; exit 1; }
+fi
+echo "питон: $PY"
+
 if [[ "${1:-}" == "--cov" ]]; then
   shift
-  command -v python3 >/dev/null || { echo "нет python3"; exit 1; }
-  python3 -c "import coverage" 2>/dev/null || {
+  "$PY" -c "import coverage" 2>/dev/null || {
     echo "coverage не установлен: pip install -r requirements-dev.txt"; exit 1; }
   rm -rf .coverage .coverage.*
   PYTHONPATH=. COVERAGE_PROCESS_START="$PWD/.coveragerc" \
-    python3 -m coverage run -m pytest tests/ -q "$@" || exit 1
-  python3 -m coverage combine -q 2>/dev/null
-  python3 -m coverage report --sort=cover
+    "$PY" -m coverage run -m pytest tests/ -q "$@" || exit 1
+  "$PY" -m coverage combine -q 2>/dev/null
+  "$PY" -m coverage report --sort=cover
 else
-  PYTHONPATH=. python3 -m pytest tests/ -q "$@"
+  PYTHONPATH=. "$PY" -m pytest tests/ -q "$@"
 fi
