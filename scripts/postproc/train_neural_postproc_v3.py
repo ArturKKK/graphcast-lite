@@ -73,6 +73,9 @@ class TrainConfigV3:
     w_wind: float = 1.0
     balanced_sampling: bool = True
     num_workers: int = 4
+    # Брать ли признаки-наблюдения станции. Выключается для абляции: без них
+    # видно, сколько даёт сама сеть, а сколько — то, чем её кормят.
+    obs_features: bool = True
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     grad_clip: float = 1.0
     seed: int = 42
@@ -190,6 +193,7 @@ def train_v3(cfg: TrainConfigV3) -> Dict[str, float]:
         cfg.train_parquet,
         feature_cols=cfg.feature_cols,
         station_to_idx=station_to_idx,
+        auto_obs_features=cfg.obs_features,
     )
     # Датасет мог дополнить список признаками-наблюдениями, которых не было в
     # cfg. Модель, проверочная выборка и чекпойнт обязаны знать ТОТ ЖЕ список,
@@ -207,6 +211,7 @@ def train_v3(cfg: TrainConfigV3) -> Dict[str, float]:
         feature_cols=cfg.feature_cols,
         scalers=train_ds.export_scalers(),
         station_to_idx=station_to_idx,
+        auto_obs_features=cfg.obs_features,
     )
     train_ds.save_scalers(out_dir / "scalers.json")
 
@@ -321,6 +326,10 @@ def _parse_args() -> TrainConfigV3:
     p.add_argument("--w-t2m", type=float, default=1.0)
     p.add_argument("--w-wind", type=float, default=1.0)
     p.add_argument("--no-balanced", action="store_true")
+    p.add_argument("--no-obs-features", action="store_true",
+                   help="не брать признаки-наблюдения станции. Нужно для "
+                        "абляции: отделить вклад нелинейности от вклада самих "
+                        "наблюдений, иначе непонятно, за счёт чего выигрыш")
     p.add_argument("--num-workers", type=int, default=4)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--device", default=None)
@@ -344,6 +353,7 @@ def _parse_args() -> TrainConfigV3:
         w_t2m=args.w_t2m,
         w_wind=args.w_wind,
         balanced_sampling=(not args.no_balanced),
+        obs_features=(not args.no_obs_features),
         num_workers=args.num_workers,
         seed=args.seed,
     )

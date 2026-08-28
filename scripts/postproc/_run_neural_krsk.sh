@@ -13,7 +13,7 @@
 # Запуск: bash scripts/postproc/_run_neural_krsk.sh [эпох]
 # Лог:    /workdir/paper_results/neural_krsk_master.log
 set -uo pipefail
-EPOCHS=${1:-40}
+EPOCHS=${1:-20}
 if [[ "${DAEMONIZED:-}" != "1" ]]; then
   DAEMONIZED=1 setsid nohup bash "$0" "$@" </dev/null >/dev/null 2>&1 &
   echo "запущено в фоне. лог: /workdir/paper_results/neural_krsk_master.log"; exit 0
@@ -66,21 +66,32 @@ python -u scripts/postproc/baselines.py --corpus "$LAGS" \
     --train-years 2016 2017 2018 --test-years 2020 --complete-obs 2>&1 \
     | grep -E "только полные|обучение |сырой прогноз|станция×месяц×час|регрессия|таблица \+"
 
-log "обучение, эпох $EPOCHS"
-python -u scripts/postproc/train_neural_postproc_v3.py \
-    --train-parquet "$DIR/krsk_train.parquet" \
-    --val-parquet   "$DIR/krsk_val.parquet" \
-    --out-dir       "$EXP" \
-    --epochs "$EPOCHS" --batch-size 4096 --station-emb-dim 32 \
-    --hidden 192,192,128 2>&1 | tail -60
-RC=${PIPESTATUS[0]}
-log "обучение rc=$RC"
-CKPT=$(ls -1 "$EXP"/best_model.pth "$EXP"/checkpoint.pth 2>/dev/null | head -1)
-[[ -z "$CKPT" ]] && { log "весов нет — см. лог выше"; exit 1; }
+# Две настройки. Основная видит признаки-наблюдения станции, абляция — нет.
+# Без абляции неясно, за счёт чего выигрыш: линейная регрессия на тех же
+# признаках даёт 12,1%, а без них 0,5%, так что вклад самих наблюдений огромен,
+# и надо отделить его от вклада нелинейности и вложения станции.
+train_and_eval() {
+  local tag=$1; shift
+  local exp="experiments/neural_postproc_krsk${tag}"
+  if [[ -f "$exp/best_model.pth" ]]; then
+    log "--- $exp: веса уже есть, обучение пропускаю"
+  else
+    log "--- $exp: обучение, эпох $EPOCHS"
+    python -u scripts/postproc/train_neural_postproc_v3.py \
+        --train-parquet "$DIR/krsk_train.parquet" \
+        --val-parquet   "$DIR/krsk_val.parquet" \
+        --out-dir       "$exp" \
+        --epochs "$EPOCHS" --batch-size 4096 --station-emb-dim 32 \
+        --hidden 192,192,128 "$@" 2>&1 \
+        | grep -E "^\[(cfg|model|dataset|ep )|^Done:"
+    [[ -f "$exp/best_model.pth" ]] || { log "    весов нет — пропускаю оценку"; return 1; }
+  fi
+  log "    проверка на 2020"
+  python -u scripts/postproc/eval_per_lead_v2.py \
+      --val-parquet "$DIR/krsk_test.parquet" --ckpt "$exp/best_model.pth" \
+      --out-dir "$exp/eval_test2020" 2>&1 | grep -E "^\[eval\]|^Overall"
+}
 
-# Проверка на 2020: тот же год, на котором мерились базовые линии.
-log "проверка на 2020"
-python -u scripts/postproc/eval_per_lead_v2.py \
-    --val-parquet "$DIR/krsk_test.parquet" --ckpt "$CKPT" \
-    --out-dir "$EXP/eval_test2020" 2>&1 | tail -40
+train_and_eval ""
+train_and_eval "_noobs" --no-obs-features
 log "=== ALL DONE ==="
