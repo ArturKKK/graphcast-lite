@@ -52,6 +52,11 @@ git add -Af docs/paper/runs || exit 1
 # Отслеживаемые логи в каталогах экспериментов дописываются прямо во время
 # обучения. Если их не заигнорить, rebase упирается в незакоммиченные изменения.
 git add -f experiments/*/training_log.txt 2>/dev/null
+# Итоги оценок — мелкие md/json, но в них весь результат прогона. Под .gitignore
+# они не попадают, однако и в индекс сами не встают: pushlog забирал только
+# логи, и разбивка по срокам нейронного постпроцессора осталась бы жить лишь на
+# виртуалке, то есть до её пересоздания.
+git add -f experiments/*/eval_*/*.md experiments/*/eval_*/*.json 2>/dev/null
 staged=$(git diff --cached --name-only | wc -l)
 echo "в индексе файлов: $staged"
 if [[ "$staged" -eq 0 ]]; then
