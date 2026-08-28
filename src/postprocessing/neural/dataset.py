@@ -156,6 +156,27 @@ class StationCorpusDataset(Dataset):
             if extra:
                 print(f"[dataset] признаков-наблюдений добавлено: {len(extra)}")
                 feature_cols += extra
+        # Несоответствие станции ячейке сетки — главный источник поправки.
+        # Разбор по станциям 28.08.2026: выигрыш связан с сырой ошибкой на 0,91,
+        # с модулем смещения на 0,85 и с высотой станции на 0,72; наибольший — у
+        # станций на 420-1850 м с холодным смещением до -4,7 °C. Двигает дело
+        # именно РАЗНОСТЬ высоты станции и рельефа модели, а не каждая по
+        # отдельности: в списке они есть, но по разным осям и в разных
+        # масштабах. Даём её явно, вместе с поправкой на вертикальный градиент.
+        if {"elev", "z_surf"} <= set(df.columns) and "dz_station" not in df.columns:
+            df["dz_station"] = df["elev"].astype("float32") - df["z_surf"].astype("float32")
+            if "lapse_t850_1000" in df.columns:
+                # Приблизительный сдвиг температуры из-за этой разности высот.
+                df["dz_lapse"] = (df["dz_station"]
+                                  * df["lapse_t850_1000"].astype("float32") / 1000.0)
+            for c in ("dz_station", "dz_lapse"):
+                # Условие — «мы на обучении», а не auto_obs_features: тот флаг
+                # выключает наблюдения станции, а высота к ним не относится, и
+                # абляция по наблюдениям не должна заодно лишаться рельефа.
+                if c in df.columns and c not in feature_cols and scalers is None:
+                    feature_cols = list(feature_cols) + [c]
+                    print(f"[dataset] добавлен признак {c}")
+
         missing = [c for c in feature_cols if c not in df.columns]
         if missing:
             raise ValueError(f"Parquet missing columns: {missing}")
