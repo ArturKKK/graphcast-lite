@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -78,6 +79,21 @@ DEFAULT_FEATURES: Tuple[str, ...] = (
 )
 
 
+# Признаки-наблюдения, которые строит scripts/postproc/add_obs_lags.py. Список
+# DEFAULT_FEATURES писался раньше него, поэтому сеть их не видела вовсе — тот же
+# пробел, что был в базовых линиях, где он стоил температуре 0,5% против 11,3%.
+# Отбираем по образцу имени; образец узкий, под него не попадают сами наблюдения
+# (obs_u10, obs_t2m_K), иначе цель оказалась бы среди признаков.
+OBS_FEATURE_RE = re.compile(r"^(obs|err)_[a-z0-9]+_(lag\d+|lag_mean|tend24|anom)$")
+
+
+def observation_features(df) -> List[str]:
+    cols = [c for c in df.columns if OBS_FEATURE_RE.match(c)]
+    if "obs_lag_age_h" in df.columns:
+        cols.append("obs_lag_age_h")
+    return cols
+
+
 COLUMN_ALIASES = {
     "lat": ("station_lat",),
     "lon": ("station_lon",),
@@ -98,6 +114,7 @@ class StationCorpusDataset(Dataset):
         parquet_path: str | Path,
         feature_cols: Sequence[str] = DEFAULT_FEATURES,
         target_cols: Sequence[str] = TARGET_COLS,
+        auto_obs_features: bool = True,
         scalers: Optional[Dict[str, Tuple[float, float]]] = None,
         filter_expr: Optional[str] = None,
         drop_obs_missing: bool = True,
@@ -125,6 +142,14 @@ class StationCorpusDataset(Dataset):
         if drop_obs_missing:
             df = df.dropna(subset=list(target_cols)).copy()
 
+        # Признаки-наблюдения добавляются сами, если они есть в корпусе:
+        # иначе сравнение с базовыми линиями было бы нечестным — там они есть.
+        feature_cols = list(feature_cols)
+        if auto_obs_features:
+            extra = [c for c in observation_features(df) if c not in feature_cols]
+            if extra:
+                print(f"[dataset] признаков-наблюдений добавлено: {len(extra)}")
+                feature_cols += extra
         missing = [c for c in feature_cols if c not in df.columns]
         if missing:
             raise ValueError(f"Parquet missing columns: {missing}")
@@ -144,8 +169,12 @@ class StationCorpusDataset(Dataset):
 
         # scaling: либо передан, либо считаем на лету (только для train!)
         if scalers is None:
-            mean = self.X.mean(axis=0)
-            std = self.X.std(axis=0)
+            # nan-версии: у ветровых лагов заполнено 65-87%, и обычное среднее
+            # обратило бы в NaN весь столбец, а за ним и всю выборку.
+            mean = np.nanmean(self.X, axis=0)
+            std = np.nanstd(self.X, axis=0)
+            mean = np.where(np.isfinite(mean), mean, 0.0)
+            std = np.where(np.isfinite(std), std, 1.0)
             std[std < 1e-6] = 1.0
             self.feature_mean = mean.astype(np.float32)
             self.feature_std = std.astype(np.float32)
@@ -158,6 +187,14 @@ class StationCorpusDataset(Dataset):
             )
 
         self.X_norm = (self.X - self.feature_mean) / self.feature_std
+        # Пропуск после нормировки становится нулём, то есть средним значением
+        # признака: нейтральное значение, не сдвигающее прогноз ни в какую
+        # сторону. Свежесть наблюдения сеть видит отдельно, в obs_lag_age_h.
+        n_miss = int((~np.isfinite(self.X_norm)).sum())
+        if n_miss:
+            print(f"[dataset] пропусков в признаках: {n_miss:,} "
+                  f"({n_miss / self.X_norm.size * 100:.2f}%) — заменены средним")
+        np.nan_to_num(self.X_norm, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
 
         # station→idx (for v2 station embedding); if mapping missing keys, raise.
         self.station_to_idx = station_to_idx
