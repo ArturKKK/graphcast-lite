@@ -1,5 +1,12 @@
-import argparse, torch, os, numpy as np
+import argparse, os, sys
+from pathlib import Path
+
+import numpy as np
+import torch
 import matplotlib.pyplot as plt
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src.plotting import error_panel, field_panel, shared_limits
 
 def main():
     p = argparse.ArgumentParser()
@@ -40,22 +47,13 @@ def main():
     pred = get_map(pred_tensor)
     diff = pred - truth
 
-    # Рисуем
+    # Рисуем. Порядок осей, общая шкала и симметрия шкалы ошибки — в src/plotting.
     fig, axs = plt.subplots(1, 3, figsize=(18, 5))
-    
-    # Общая шкала температур
-    vmin, vmax = min(truth.min(), pred.min()), max(truth.max(), pred.max())
-    # Шкала ошибки (симметричная)
-    lim = max(abs(diff.min()), abs(diff.max()))
+    vmin, vmax = shared_limits(truth, pred)
 
-    im0 = axs[0].imshow(truth.T, origin='lower', cmap='jet', vmin=vmin, vmax=vmax)
-    axs[0].set_title("Ground Truth (ERA5) [°C]"); plt.colorbar(im0, ax=axs[0])
-
-    im1 = axs[1].imshow(pred.T, origin='lower', cmap='jet', vmin=vmin, vmax=vmax)
-    axs[1].set_title("Prediction (Baseline)"); plt.colorbar(im1, ax=axs[1])
-
-    im2 = axs[2].imshow(diff.T, origin='lower', cmap='bwr', vmin=-lim, vmax=lim)
-    axs[2].set_title("Error Map (Pred - Truth)"); plt.colorbar(im2, ax=axs[2])
+    field_panel(axs[0], truth, vmin=vmin, vmax=vmax, title="Ground Truth (ERA5) [°C]")
+    field_panel(axs[1], pred, vmin=vmin, vmax=vmax, title="Prediction (Baseline)")
+    error_panel(axs[2], diff, title="Error Map (Pred - Truth)")
 
     os.makedirs(args.out, exist_ok=True)
     save_path = os.path.join(args.out, "slide5_baseline.png")
