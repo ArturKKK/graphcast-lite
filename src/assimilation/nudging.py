@@ -32,26 +32,43 @@ def build_feature_mask_from_indices(indices: Sequence[int], num_features: int, p
 # 2. ФУНКЦИИ ДЛЯ ГРАНИЦ (TAPERING)
 # ==========================================
 
-def cosine_taper_2d(lon: int, lat: int, border: int) -> torch.Tensor:
+def cosine_taper_2d(n_rows: int, n_cols: int, border: int) -> torch.Tensor:
+    """Косинусное окно (Ханна): единица в середине, спад до нуля у краёв.
+
+    Возвращает (n_rows, n_cols). Порядок осей важен: маска потом выпрямляется и
+    накладывается на узлы сетки, а те выпрямлены как (широта, долгота).
     """
-    Создает 2D косинусную маску (окно Ханна).
-    1.0 в центре, спад до 0.0 на краях.
-    """
-    if border <= 0: return torch.ones(lon, lat)
-    
-    def hann(N, b):
-        w = np.ones(N, dtype=np.float32)
+    if border <= 0:
+        return torch.ones(n_rows, n_cols)
+
+    def hann(n, b):
+        # Спад с двух сторон не должен перекрываться в середине: иначе вторая
+        # запись затрёт первую, и окно выйдет несимметричным и бессмысленным.
+        b = min(int(b), n // 2)
+        w = np.ones(n, dtype=np.float32)
+        if b <= 0:
+            return w
         t = np.linspace(0, 1, b)
         win = 0.5 * (1 - np.cos(np.pi * t))
-        w[:b] = win; w[-b:] = win[::-1]
+        w[:b] = win
+        w[-b:] = win[::-1]
         return w
-        
-    w_lon, w_lat = hann(lon, border), hann(lat, border)
-    return torch.from_numpy(np.outer(w_lon, w_lat)).float()
+
+    return torch.from_numpy(np.outer(hann(n_rows, border),
+                                     hann(n_cols, border))).float()
+
 
 def build_boundary_taper_mask(height, width, width_x, width_y):
-    """Возвращает плоскую маску [G] для сшивания границ."""
-    return cosine_taper_2d(width, height, max(width_x, width_y)).ravel()
+    """Плоская маска [G] для сшивания границ, в порядке узлов сетки.
+
+    Узлы выпрямлены как (широта, долгота): широта меняется медленно, долгота
+    быстро. Поэтому окно строится (высота, ширина) и в таком же порядке
+    выпрямляется. До 28.08.2026 оно строилось (ширина, высота) и выпрямлялось
+    поперёк: на сетке 4x6 треть узлов получала чужой вес, а на 512x256 маска
+    была бы бессмысленной целиком. Путь используется только при сшивании
+    границ, в прогонах статьи он не участвовал.
+    """
+    return cosine_taper_2d(height, width, max(width_x, width_y)).ravel()
 
 # ==========================================
 # 3. КЛАСС АССИМИЛЯТОРА (NUDGING)
@@ -70,10 +87,17 @@ class NudgingAssimilator:
         forecast: [G, Channels]
         observation: [G, Channels] (может содержать NaN)
         """
-        # Защита от несовпадения размерностей
+        # Несовпадение размерностей. Возвращаем прогноз как есть, чтобы не
+        # ронять счёт, но МОЛЧА этого делать нельзя: со стороны такой прогон
+        # выглядит как «усвоение применили, а выигрыша нет» — и вывод о
+        # бесполезности усвоения был бы ложным. Предупреждаем один раз.
         if forecast.shape != observation.shape:
-            # Если это несовпадение типа [15] vs [60] - мы не можем применить Nudging "в лоб"
-            # Просто возвращаем прогноз без изменений, чтобы не крашить программу
+            if not getattr(self, "_warned_shape", False):
+                print(f"[nudging] ВНИМАНИЕ: формы не совпали "
+                      f"({tuple(forecast.shape)} и {tuple(observation.shape)}) — "
+                      f"усвоение НЕ ПРИМЕНЯЕТСЯ, прогноз возвращён как есть",
+                      flush=True)
+                self._warned_shape = True
             return forecast
 
         # Маска валидных данных (где есть наблюдения)
@@ -84,6 +108,13 @@ class NudgingAssimilator:
             # mask_flat обычно [Channels]. broadcast если нужно
             if self.mask_flat.shape[0] == forecast.shape[-1]:
                 mask = mask & self.mask_flat.unsqueeze(0)
+            elif not getattr(self, "_warned_mask", False):
+                # Иначе маска каналов молча не применяется, и усваиваются ВСЕ
+                # переменные вместо выбранных — то есть считается не тот опыт.
+                print(f"[nudging] ВНИМАНИЕ: маска каналов длины "
+                      f"{self.mask_flat.shape[0]} не подходит к {forecast.shape[-1]} "
+                      f"каналам — усваиваются ВСЕ переменные", flush=True)
+                self._warned_mask = True
 
         analysis = forecast.clone()
         if mask.any():
