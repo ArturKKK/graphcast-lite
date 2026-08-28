@@ -191,6 +191,17 @@ def train_v3(cfg: TrainConfigV3) -> Dict[str, float]:
         feature_cols=cfg.feature_cols,
         station_to_idx=station_to_idx,
     )
+    # Датасет мог дополнить список признаками-наблюдениями, которых не было в
+    # cfg. Модель, проверочная выборка и чекпойнт обязаны знать ТОТ ЖЕ список,
+    # иначе размерность входа расходится: 28.08.2026 обучение падало сразу на
+    # первом батче — «mat1 and mat2 shapes cannot be multiplied (4096x92 и
+    # 58x192)». Приводим cfg к тому, что датасет собрал на самом деле.
+    if list(train_ds.feature_cols) != list(cfg.feature_cols):
+        was = len(cfg.feature_cols)
+        cfg.feature_cols = list(train_ds.feature_cols)
+        print(f"[cfg] признаков: {was} -> {len(cfg.feature_cols)} "
+              f"(датасет дополнил список)", flush=True)
+
     val_ds = StationCorpusDataset(
         cfg.val_parquet,
         feature_cols=cfg.feature_cols,
@@ -274,6 +285,10 @@ def train_v3(cfg: TrainConfigV3) -> Dict[str, float]:
             torch.save(
                 {
                     "model_state": model.state_dict(),
+                    # Класс модели пишем прямо в чекпойнт: оценка строила
+                    # только версию v2, и веса v3 в неё не ложились —
+                    # у v3 есть добавочная голова смещения по станции.
+                    "model_class": type(model).__name__,
                     "cfg": asdict(cfg),
                     "scalers": train_ds.export_scalers(),
                     "feature_cols": cfg.feature_cols,

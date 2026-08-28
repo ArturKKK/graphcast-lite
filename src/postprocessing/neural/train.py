@@ -137,6 +137,17 @@ def train(cfg: TrainConfig) -> Dict[str, float]:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     train_ds = StationCorpusDataset(cfg.train_parquet, feature_cols=cfg.feature_cols)
+    # Датасет мог дополнить список признаками-наблюдениями, которых не было в
+    # cfg. Модель, проверочная выборка и чекпойнт обязаны знать ТОТ ЖЕ список,
+    # иначе размерность входа расходится: 28.08.2026 обучение падало сразу на
+    # первом батче — «mat1 and mat2 shapes cannot be multiplied (4096x92 и
+    # 58x192)». Приводим cfg к тому, что датасет собрал на самом деле.
+    if list(train_ds.feature_cols) != list(cfg.feature_cols):
+        was = len(cfg.feature_cols)
+        cfg.feature_cols = list(train_ds.feature_cols)
+        print(f"[cfg] признаков: {was} -> {len(cfg.feature_cols)} "
+              f"(датасет дополнил список)", flush=True)
+
     val_ds = StationCorpusDataset(
         cfg.val_parquet,
         feature_cols=cfg.feature_cols,

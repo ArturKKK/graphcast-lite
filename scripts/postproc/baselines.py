@@ -101,9 +101,20 @@ def main() -> None:
     ap.add_argument("--shrink", type=float, default=10.0,
                     help="сила стягивания редких ячеек к родителю")
     ap.add_argument("--per-lead", action="store_true", help="таблица ещё и по срокам")
+    ap.add_argument("--complete-obs", action="store_true",
+                    help="оставить только строки, где есть ВСЕ три наблюдения — "
+                         "ровно та выборка, на которой считается нейронный "
+                         "постпроцессор (его датасет выбрасывает строку, если "
+                         "пропущена любая цель). Нужен для прямого сравнения.")
     a = ap.parse_args()
 
     df = add_time_features(pd.read_parquet(a.corpus))
+    if a.complete_obs:
+        need = [c for _, _, oc, _ in TARGETS for c in (oc,) if c in df.columns]
+        before = len(df)
+        df = df.dropna(subset=need).reset_index(drop=True)
+        print(f"только полные наблюдения: {before:,} -> {len(df):,} строк "
+              f"(выборка нейронного постпроцессора)")
     year = pd.to_datetime(df["valid_time_utc"]).dt.year
     tr_all, te_all = df[year.isin(a.train_years)], df[year.isin(a.test_years)]
     tr, te = tr_all, te_all
