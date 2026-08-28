@@ -174,7 +174,10 @@ def main() -> None:
             from sklearn.preprocessing import StandardScaler
             from sklearn.pipeline import make_pipeline
 
-            def ridge(feats, label):
+            def ridge(feats, label, target=None, offset=None):
+                """Регрессия невязки. target/offset — для настройки поверх таблицы."""
+                y = tr_r if target is None else target
+                add = 0.0 if offset is None else offset
                 X_tr = tr[feats].to_numpy(np.float64)
                 X_te = te[feats].to_numpy(np.float64)
                 # Пропуски заполняем медианой ОБУЧАЮЩЕЙ выборки: считать по
@@ -185,13 +188,27 @@ def main() -> None:
                 X_tr = np.where(np.isfinite(X_tr), X_tr, med)
                 X_te = np.where(np.isfinite(X_te), X_te, med)
                 m = make_pipeline(StandardScaler(), Ridge(alpha=1.0))
-                m.fit(X_tr, tr_r)
+                m.fit(X_tr, y)
                 rows.append((f"{label} ({len(feats)} призн.)",
-                             metrics(gnn + m.predict(X_te), obs)))
+                             metrics(gnn + add + m.predict(X_te), obs)))
 
             ridge(base_feats, "регрессия")
             if obs_feats:
                 ridge(base_feats + obs_feats, "регрессия + наблюдения")
+                # Таблица и регрессия ловят разное: таблица — постоянную
+                # поправку своей станции в этот месяц и час, регрессия — режим
+                # по свежим наблюдениям. Соединяем: сначала таблица, потом
+                # регрессия по тому, что от невязки осталось.
+                #
+                # Оговорка: таблица настроена на этих же обучающих строках,
+                # поэтому на обучении её остаток оптимистично мал и регрессия
+                # видит его заниженным. Проверочный год от этого не страдает —
+                # он не участвовал ни в том, ни в другом, — так что выигрыш
+                # ниже посчитан честно, но потенциал у связки, вероятно, выше.
+                c_smh_tr = apply_table(tr2, t_smh,
+                                       ["station_usaf", "month", "hour"], par_smh)
+                ridge(base_feats + obs_feats, "таблица + регрессия",
+                      target=tr_r - c_smh_tr, offset=c_smh)
         except Exception as e:  # pragma: no cover
             print(f"[{name}] регрессия не посчиталась: {e}")
 
