@@ -192,6 +192,21 @@ def create_encoding_graph(
             flat=flat_grid,
         )
 
+        # 2а) Узел сетки, у которого в радиусе не нашлось ни одной вершины меша,
+        #     остаётся без входящих рёбер: его данные в модель не попадают вовсе.
+        #     Ошибки при этом нет, обучение идёт, и заметить потерю нечем — а
+        #     радиус задаётся как доля наибольшего ребра меша, то есть при
+        #     неудачном множителе так и выйдет. Проверяем сразу.
+        n_grid_total = len(grid_node_lats) if flat_grid \
+            else len(grid_node_lats) * len(grid_node_longs)
+        n_covered = len(np.unique(grid_indices))
+        if n_covered < n_grid_total:
+            raise ValueError(
+                f"[граф] {n_grid_total - n_covered} из {n_grid_total} узлов сетки "
+                f"не получили ни одного ребра к мешу при радиусе {radius:.4f}. "
+                f"Их данные в модель не попали бы вовсе. Увеличь "
+                f"grid2mesh_radius_query или возьми более частый меш.")
+
         # 3) Собираем edge_index формы [2, E], где первая строка — индексы отправителей (Grid),
         #    вторая — получателей (Mesh). Пока индексы Mesh ещё «локальные» (0..M-1).
         edge_index = np.stack([grid_indices, mesh_indices], axis=0)

@@ -32,9 +32,19 @@ def _install_torch_stub() -> None:
     sys.modules.update({"torch": torch, "torch.utils": utils, "torch.utils.data": data})
 
 
+HAS_TORCH = True
 try:  # pragma: no cover — зависит от окружения
-    import torch  # noqa: F401
+    import torch as _real_torch  # noqa: F401
 except ModuleNotFoundError:
+    HAS_TORCH = False
+
+
+needs_torch = pytest.mark.skipif(
+    not HAS_TORCH,
+    reason="нужен настоящий torch: здесь его нет, эти тесты гоняются на виртуалке")
+
+
+if not HAS_TORCH:
     _install_torch_stub()
 
 
