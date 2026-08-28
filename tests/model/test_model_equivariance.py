@@ -82,7 +82,10 @@ def test_output_has_one_value_per_node_and_feature(built):
     x = torch.randn(1, len(lats), N_FEAT * OBS)
     with torch.no_grad():
         out = model(X=x, attention_threshold=0.0)
+    # Модель отдаёт (N, F) без размерности батча при батче в одну выборку —
+    # это и разбирает train_epoch, добавляя её обратно через unsqueeze(0).
     assert out.shape[-2:] == (len(lats), N_FEAT)
+    assert out.dim() in (2, 3)
 
 
 def test_no_learnable_weight_is_indexed_by_node(built):
@@ -131,8 +134,13 @@ def test_renumbering_nodes_permutes_the_forecast(built):
     with torch.no_grad():
         out = model(X=x, attention_threshold=0.0)
         out2 = model2(X=x[:, perm, :], attention_threshold=0.0)
-    assert torch.allclose(out2, out[:, perm, :], atol=1e-4), (
-        "прогноз зависит от нумерации узлов — довод о корпусе неверен")
+    # Модель может отдать как (N, F), так и (B, N, F) — приводим к узлам.
+    a = out.reshape(-1, N_FEAT)[perm]
+    b = out2.reshape(-1, N_FEAT)
+    diff = (a - b).abs().max().item()
+    assert diff < 1e-4, (
+        f"прогноз зависит от нумерации узлов (расхождение {diff:.2e}) — "
+        f"довод о корпусе неверен")
 
 
 def test_forward_is_deterministic(built):
