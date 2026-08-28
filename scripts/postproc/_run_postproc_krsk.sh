@@ -46,7 +46,11 @@ DIR=$(dirname "$CORPUS")
 run_variant() {   # имя, годы обучения (через запятую для имени файла), годы обучения списком
   local tag=$1; shift
   local -a years=("$@")
-  local lags="$DIR/corpus_krsk_lags_${tag}.parquet"
+  # lags2: в прежних файлах признаки ошибки звались err_lag* — без имени
+  # переменной. Теперь их три набора, по одному на переменную, поэтому имя файла
+  # тоже другое: иначе раннер молча взял бы старый и посчитал бы вчерашнее.
+  local lags="$DIR/corpus_krsk_lags2_${tag}.parquet"
+  rm -f "$DIR/corpus_krsk_lags_${tag}.parquet"
   log "--- настройка $tag: обучение ${years[*]}, проверка 2020"
   if [[ ! -f "$lags" ]]; then
     log "    признаки-наблюдения (климатология только по ${years[*]})"

@@ -28,6 +28,7 @@ b = (n·b_ячейки + k·b_родителя) / (n + k). Без этого т�
 from __future__ import annotations
 
 import argparse
+import re
 import numpy as np
 import pandas as pd
 
@@ -41,9 +42,17 @@ RIDGE_FEATS = ["gnn_t2m", "gnn_u10", "gnn_v10", "elev", "lat", "lon",
 # список выше писался раньше, — и потому не знала о станции ничего, кроме
 # координат. Ровно эти признаки различают режимы: инверсию в антициклоне от
 # адвекции, тогда как таблица «станция×месяц×час» их не различает никак.
-OBS_FEATS = ["obs_t2m_lag0", "obs_t2m_lag6", "obs_t2m_lag12", "obs_t2m_lag24",
-             "obs_t2m_tend24", "obs_t2m_anom", "obs_lag_age_h",
-             "err_lag0", "err_lag6", "err_lag12", "err_lag24", "err_lag_mean"]
+# Отбираем по образцу имени, а не списком: add_obs_lags.py строит признаки по
+# каждой переменной, и список пришлось бы править следом за ним. Образец нарочно
+# узкий — под него не должны попасть сами наблюдения (obs_u10, obs_t2m_K и
+# прочие), иначе цель окажется среди признаков и всё «улучшение» будет утечкой.
+OBS_RE = re.compile(r"^(obs|err)_[a-z0-9]+_(lag\d+|lag_mean|tend24|anom)$")
+OBS_EXTRA = ["obs_lag_age_h"]
+
+
+def obs_features(df) -> list:
+    return [c for c in df.columns if OBS_RE.match(c)] + \
+           [c for c in OBS_EXTRA if c in df.columns]
 
 
 def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -168,7 +177,7 @@ def main() -> None:
             rows.append(("станция×срок", metrics(gnn + c_sl, obs)))
 
         base_feats = [c for c in RIDGE_FEATS if c in df.columns]
-        obs_feats = [c for c in OBS_FEATS if c in df.columns]
+        obs_feats = obs_features(df)
         try:
             from sklearn.linear_model import Ridge
             from sklearn.preprocessing import StandardScaler
