@@ -36,6 +36,14 @@ TARGETS = [("t2m", "gnn_t2m", "obs_t2m_K", "°C"),
            ("10v", "gnn_v10", "obs_v10", "м/с")]
 RIDGE_FEATS = ["gnn_t2m", "gnn_u10", "gnn_v10", "elev", "lat", "lon",
                "sin_hour", "cos_hour", "sin_doy", "cos_doy", "lead_h"]
+# Признаки из наблюдений станции, известных к моменту выпуска прогноза
+# (их добавляет add_obs_lags.py). До 28.08.2026 регрессия их не брала вовсе —
+# список выше писался раньше, — и потому не знала о станции ничего, кроме
+# координат. Ровно эти признаки различают режимы: инверсию в антициклоне от
+# адвекции, тогда как таблица «станция×месяц×час» их не различает никак.
+OBS_FEATS = ["obs_t2m_lag0", "obs_t2m_lag6", "obs_t2m_lag12", "obs_t2m_lag24",
+             "obs_t2m_tend24", "obs_t2m_anom", "obs_lag_age_h",
+             "err_lag0", "err_lag6", "err_lag12", "err_lag24", "err_lag_mean"]
 
 
 def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -88,17 +96,47 @@ def main() -> None:
 
     df = add_time_features(pd.read_parquet(a.corpus))
     year = pd.to_datetime(df["valid_time_utc"]).dt.year
-    tr, te = df[year.isin(a.train_years)], df[year.isin(a.test_years)]
+    tr_all, te_all = df[year.isin(a.train_years)], df[year.isin(a.test_years)]
+    tr, te = tr_all, te_all
     print(f"обучение {len(tr):,} строк ({a.train_years}), "
           f"проверка {len(te):,} строк ({a.test_years}), "
           f"станций {df.station_usaf.nunique()}\n")
     if len(tr) == 0 or len(te) == 0:
         raise SystemExit("пустая выборка — проверь годы")
 
+    # Сырая ошибка по годам. Обучение сети хронологическое, последние 20%
+    # отданы под контроль, то есть примерно до октября 2018 годы «выученные».
+    # Если сеть их запомнила, ошибка там обязана быть заметно меньше. Это
+    # проверяется прямо, а не предполагается.
+    v = df[["gnn_t2m", "obs_t2m_K"]].to_numpy(np.float64)
+    ok = np.isfinite(v).all(1)
+    print("сырая ошибка приземной температуры по годам, °C:")
+    for y, idx in df[ok].groupby(year[ok]).groups.items():
+        d = df.loc[idx, "gnn_t2m"].to_numpy() - df.loc[idx, "obs_t2m_K"].to_numpy()
+        print(f"    {y}: RMSE {np.sqrt((d ** 2).mean()):5.3f}  "
+              f"смещение {d.mean():+5.3f}  строк {len(idx):,}")
+    print()
+
     for name, gcol, ocol, unit in TARGETS:
         if gcol not in df.columns or ocol not in df.columns:
             print(f"[{name}] нет столбцов {gcol}/{ocol} — пропускаю\n")
             continue
+        # У ветра направление в ISD-Lite сплошь и рядом отсутствует, а из него
+        # считаются obs_u10/obs_v10. Строки без наблюдения надо выбрасывать для
+        # каждой цели отдельно: без этого 28.08.2026 весь ветер вышел NaN, и
+        # таблица показывала «nan» во всех шести строках.
+        def finite(d):
+            return d[np.isfinite(d[gcol].to_numpy(np.float64))
+                     & np.isfinite(d[ocol].to_numpy(np.float64))]
+        tr, te = finite(tr_all), finite(te_all)
+        drop_tr, drop_te = len(tr_all) - len(tr), len(te_all) - len(te)
+        if drop_tr or drop_te:
+            print(f"[{name}] без наблюдения: обучение {drop_tr:,}, "
+                  f"проверка {drop_te:,} строк — выброшены")
+        if len(tr) < 1000 or len(te) < 1000:
+            print(f"[{name}] наблюдений почти нет — пропускаю\n")
+            continue
+
         tr_r = (tr[ocol] - tr[gcol]).to_numpy()          # что надо прибавить
         g_bias = float(tr_r.mean())
         tr2 = tr.assign(_resid=tr_r)
@@ -129,24 +167,40 @@ def main() -> None:
         if a.per_lead:
             rows.append(("станция×срок", metrics(gnn + c_sl, obs)))
 
-        feats = [c for c in RIDGE_FEATS if c in df.columns]
+        base_feats = [c for c in RIDGE_FEATS if c in df.columns]
+        obs_feats = [c for c in OBS_FEATS if c in df.columns]
         try:
             from sklearn.linear_model import Ridge
             from sklearn.preprocessing import StandardScaler
             from sklearn.pipeline import make_pipeline
-            m = make_pipeline(StandardScaler(), Ridge(alpha=1.0))
-            m.fit(tr[feats].to_numpy(np.float64), tr_r)
-            rows.append((f"регрессия ({len(feats)} призн.)",
-                         metrics(gnn + m.predict(te[feats].to_numpy(np.float64)), obs)))
+
+            def ridge(feats, label):
+                X_tr = tr[feats].to_numpy(np.float64)
+                X_te = te[feats].to_numpy(np.float64)
+                # Пропуски заполняем медианой ОБУЧАЮЩЕЙ выборки: считать по
+                # проверочной — значит подглядеть в неё. Признаки заполнены на
+                # 99%, так что это касается сотых долей строк.
+                med = np.nanmedian(X_tr, axis=0)
+                med = np.where(np.isfinite(med), med, 0.0)
+                X_tr = np.where(np.isfinite(X_tr), X_tr, med)
+                X_te = np.where(np.isfinite(X_te), X_te, med)
+                m = make_pipeline(StandardScaler(), Ridge(alpha=1.0))
+                m.fit(X_tr, tr_r)
+                rows.append((f"{label} ({len(feats)} призн.)",
+                             metrics(gnn + m.predict(X_te), obs)))
+
+            ridge(base_feats, "регрессия")
+            if obs_feats:
+                ridge(base_feats + obs_feats, "регрессия + наблюдения")
         except Exception as e:  # pragma: no cover
             print(f"[{name}] регрессия не посчиталась: {e}")
 
         raw = rows[0][1]["rmse"]
         print(f"=== {name}, {unit} ===")
-        print(f"{'способ':>26} {'RMSE':>8} {'MAE':>8} {'смещ.':>8} {'выигрыш':>9}")
+        print(f"{'способ':>34} {'RMSE':>8} {'MAE':>8} {'смещ.':>8} {'выигрыш':>9}")
         for label, m_ in rows:
             gain = (raw - m_["rmse"]) / raw * 100
-            print(f"{label:>26} {m_['rmse']:8.3f} {m_['mae']:8.3f} "
+            print(f"{label:>34} {m_['rmse']:8.3f} {m_['mae']:8.3f} "
                   f"{m_['bias']:+8.3f} {gain:8.1f}%")
         print()
 
