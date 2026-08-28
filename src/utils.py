@@ -401,8 +401,15 @@ def get_rotation_matrices_to_local_coordinates(
         ).as_matrix()
     elif rotate_longitude:
         # Just like the previous case, but applying only the azimuthal rotation.
-        azimuthal_rotation = -reference_phi
-        return transform.Rotation.from_euler("z", -reference_phi).as_matrix()
+        #
+        # Углы обязаны иметь форму (N, 1), а не (N,). Для последовательности из
+        # одной оси новые версии scipy понимают одномерный массив как ОДИН
+        # поворот с N углами и отказываются: «Expected last dimension of angles
+        # to match number of sequence axes specified». Старые понимали как N
+        # поворотов, поэтому на виртуалке (scipy 1.15) это работало, а на машине
+        # с новой scipy падало. Явная форма верна для обеих.
+        azimuthal_rotation = -np.asarray(reference_phi).reshape(-1, 1)
+        return transform.Rotation.from_euler("z", azimuthal_rotation).as_matrix()
     elif rotate_latitude:
         # Just like the first case, but after doing the polar rotation, undoing
         # the azimuthal rotation.
