@@ -186,3 +186,48 @@ def test_drier_air_gives_a_larger_depression():
 def test_impossible_input_gives_nan_not_a_crash(q, sp):
     """Мусор на входе даёт NaN, а не исключение посреди двухчасового счёта."""
     assert np.isnan(dewpoint_depression_K(283.15, q, sp))
+
+
+# --- заплатка на готовый корпус ---------------------------------------------
+
+def test_fix_calm_wind_recovers_rows(tmp_path):
+    """Заплатка возвращает штили, не трогая всё остальное."""
+    import importlib.util
+    import pandas as pd
+    from pathlib import Path as _P
+
+    spec = importlib.util.spec_from_file_location(
+        "fix_calm", _P(__file__).resolve().parents[2]
+        / "scripts" / "postproc" / "fix_calm_wind.py")
+    fx = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fx)
+
+    df = pd.DataFrame({
+        "obs_ws": [0.0, 3.0, 5.0, 0.0],
+        "obs_wd": [np.nan, 90.0, np.nan, 270.0],
+    })
+    df["obs_u10"] = -df["obs_ws"] * np.sin(np.deg2rad(df["obs_wd"]))
+    df["obs_v10"] = -df["obs_ws"] * np.cos(np.deg2rad(df["obs_wd"]))
+    assert df["obs_u10"].isna().sum() == 2         # оба штиля потеряны
+
+    out, stat = fx.fix_frame(df)
+    assert stat["возвращено строк"] == 1           # штиль с пропущенным направлением
+    assert stat["штилей"] == 2
+    assert out.loc[0, "obs_u10"] == 0.0 and out.loc[0, "obs_v10"] == 0.0
+    assert out.loc[1, "obs_u10"] == pytest.approx(-3.0)   # не тронуто
+    assert np.isnan(out.loc[2, "obs_u10"])         # настоящий ветер без направления
+    assert out.loc[3, "obs_u10"] == 0.0            # штиль с направлением тоже нуль
+
+
+def test_fix_calm_wind_refuses_without_raw_columns(tmp_path):
+    import importlib.util
+    import pandas as pd
+    from pathlib import Path as _P
+
+    spec = importlib.util.spec_from_file_location(
+        "fix_calm2", _P(__file__).resolve().parents[2]
+        / "scripts" / "postproc" / "fix_calm_wind.py")
+    fx = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fx)
+    with pytest.raises(SystemExit, match="пересобирать корпус"):
+        fx.fix_frame(pd.DataFrame({"obs_u10": [1.0]}))
