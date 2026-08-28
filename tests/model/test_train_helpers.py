@@ -153,3 +153,75 @@ def test_mismatched_optimiser_groups_warn_and_continue(helpers, tmp_path, capsys
     assert state["start_epoch"] == 5, "состояние обучения всё равно должно вернуться"
     for a, b in zip(m1.parameters(), m2.parameters()):
         assert torch.allclose(a, b), "веса должны загрузиться даже при несовпадении групп"
+
+
+# --- перенос каналов между шагами развёртки ---------------------------------
+
+@pytest.fixture
+def carry():
+    from src.train import carry_forward_channels
+    return carry_forward_channels
+
+
+def test_static_channels_come_from_the_input_frame(carry):
+    """Рельеф и маска суши берутся с последнего входа, а не из прогноза.
+
+    Оставь там предсказание сети — и рельеф поплывёт от шага к шагу развёртки.
+    """
+    import torch
+    out = torch.zeros(1, 4, 5)
+    prev = torch.arange(20, dtype=torch.float32).reshape(1, 4, 5)
+    carry(out, prev, None, static_channels=[1, 3])
+    assert torch.allclose(out[:, :, 1], prev[:, :, 1])
+    assert torch.allclose(out[:, :, 3], prev[:, :, 3])
+    assert torch.allclose(out[:, :, 0], torch.zeros(1, 4)), "тронут лишний канал"
+
+
+def test_forcing_channels_come_from_the_target(carry):
+    """Час и день года известны заранее — берутся из цели, а не из прогноза."""
+    import torch
+    out = torch.zeros(1, 4, 5)
+    tgt = torch.full((1, 4, 5), 9.0)
+    carry(out, None, tgt, forcing_channels=[4])
+    assert torch.allclose(out[:, :, 4], torch.full((1, 4), 9.0))
+    assert torch.allclose(out[:, :, :4], torch.zeros(1, 4, 4))
+
+
+def test_static_and_forcing_together(carry):
+    import torch
+    out = torch.zeros(1, 3, 6)
+    prev = torch.full((1, 3, 6), 1.0)
+    tgt = torch.full((1, 3, 6), 2.0)
+    carry(out, prev, tgt, static_channels=[0, 1], forcing_channels=[4, 5])
+    assert torch.allclose(out[:, :, :2], torch.ones(1, 3, 2))
+    assert torch.allclose(out[:, :, 2:4], torch.zeros(1, 3, 2))
+    assert torch.allclose(out[:, :, 4:], torch.full((1, 3, 2), 2.0))
+
+
+def test_missing_target_leaves_forcing_alone(carry):
+    """На последнем шаге цели уже нет — форсинг остаётся предсказанным.
+
+    Это штатный случай: подставлять нечего, а падать нельзя.
+    """
+    import torch
+    out = torch.full((1, 2, 3), 7.0)
+    carry(out, torch.zeros(1, 2, 3), None, static_channels=[0], forcing_channels=[2])
+    assert out[0, 0, 2] == pytest.approx(7.0), "форсинг зря затёрт"
+    assert out[0, 0, 0] == pytest.approx(0.0)
+
+
+def test_empty_channel_lists_change_nothing(carry):
+    import torch
+    out = torch.randn(1, 3, 4)
+    before = out.clone()
+    carry(out, torch.zeros(1, 3, 4), torch.ones(1, 3, 4), None, None)
+    assert torch.allclose(out, before)
+
+
+def test_carry_forward_is_idempotent(carry):
+    """Применённый дважды даёт то же самое — значит порядок вызовов безопасен."""
+    import torch
+    prev, tgt = torch.full((1, 2, 4), 3.0), torch.full((1, 2, 4), 5.0)
+    a = carry(torch.zeros(1, 2, 4), prev, tgt, [0], [3])
+    b = carry(a.clone(), prev, tgt, [0], [3])
+    assert torch.allclose(a, b)

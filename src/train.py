@@ -170,6 +170,33 @@ def update_attention_threshold(epoch, max_epochs=30, start_epoch=5, final_thresh
     if epoch > max_epochs + start_epoch: return final_threshold  
     return min(final_threshold, (epoch - start_epoch) * final_threshold / (max_epochs - start_epoch))
 
+def carry_forward_channels(out, prev_frame, target_frame,
+                           static_channels=None, forcing_channels=None):
+    """Подставить в прогноз каналы, которые сеть предсказывать не должна.
+
+    Статические — рельеф и маска суши — не меняются во времени, поэтому берутся
+    из последнего ВХОДНОГО кадра. Форсинговые — синусы и косинусы часа и дня
+    года — известны заранее, поэтому берутся из ЦЕЛИ.
+
+    Зачем вообще. Эти каналы входят в вектор состояния, и на следующем шаге
+    развёртки они станут входом. Оставь там предсказание сети — и рельеф начнёт
+    плыть от шага к шагу, а время суток разъедется с действительным. В целевую
+    функцию они не входят (их обнуляет маска каналов), так что порядок этой
+    подстановки относительно подсчёта потерь безразличен.
+
+    Изменяет ``out`` на месте и возвращает его. До 28.08.2026 этот код стоял
+    тремя одинаковыми копиями — в обучении, проверке и многошаговой проверке, —
+    и разойтись они могли незаметно.
+    """
+    if static_channels and prev_frame is not None:
+        for ch in static_channels:
+            out[:, :, ch] = prev_frame[:, :, ch]
+    if forcing_channels and target_frame is not None:
+        for ch in forcing_channels:
+            out[:, :, ch] = target_frame[:, :, ch]
+    return out
+
+
 def train_epoch(
     model: WeatherPrediction,
     train_dataloader: DataLoader,
@@ -293,15 +320,10 @@ def train_epoch(
             # САМОЕ ГЛАВНОЕ: Добавляем наш прогноз в историю для следующего шага
             # [1, 2, 3, 4] -> [2, 3, 4, out]
             # Для статических каналов подставляем значения из последнего входного шага
-            if static_channels:
-                static_vals = curr_state[:, :, -1, :]  # [N, G, C]
-                for ch in static_channels:
-                    out[:, :, ch] = static_vals[:, :, ch]
-            # Для forcing каналов подставляем значения из таргета (known in advance)
-            if forcing_channels and step < total_target_steps:
-                forcing_vals = y_steps[:, :, step, :]  # [N, G, C]
-                for ch in forcing_channels:
-                    out[:, :, ch] = forcing_vals[:, :, ch]
+            carry_forward_channels(
+                out, curr_state[:, :, -1, :],
+                y_steps[:, :, step, :] if step < total_target_steps else None,
+                static_channels, forcing_channels)
             out_unsqueezed = out.unsqueeze(2)
             curr_state = torch.cat([curr_state[:, :, 1:, :], out_unsqueezed], dim=2)
 
@@ -376,13 +398,8 @@ def test(model: WeatherPrediction, test_dataloader: DataLoader, loss_fn, device,
                 outs = pred
             
             # Carry-forward для static каналов (как при AR-инференсе)
-            if static_channels:
-                for ch in static_channels:
-                    outs[:, :, ch] = X_last[:, :, ch]
-            # Carry-forward для forcing каналов (из target — известны заранее)
-            if forcing_channels:
-                for ch in forcing_channels:
-                    outs[:, :, ch] = y_step0[:, :, ch]
+            carry_forward_channels(outs, X_last, y_step0,
+                                   static_channels, forcing_channels)
             
             # Используем тот же лосс
             loss = weighted_mse_loss(outs, y_step0, lat_weights, channel_mask=channel_mask, spatial_mask=spatial_mask)
@@ -451,12 +468,8 @@ def test_multistep(model, test_dataloader, loss_fn, device, ar_steps,
                 target = y_steps[:, :, h, :]
                 # Статика переносится со входа, форсинг известен из цели —
                 # ровно как в обучении и при инференсе.
-                if static_channels:
-                    for ch in static_channels:
-                        out[:, :, ch] = x_last[:, :, ch]
-                if forcing_channels:
-                    for ch in forcing_channels:
-                        out[:, :, ch] = target[:, :, ch]
+                carry_forward_channels(out, x_last, target,
+                                       static_channels, forcing_channels)
 
                 per_h_loss[h] += weighted_mse_loss(
                     out, target, lat_weights, channel_mask=channel_mask,
