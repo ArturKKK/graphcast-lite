@@ -40,7 +40,11 @@ log "корпус: $LAGS ($(du -h "$LAGS" | cut -f1))"
 source "$VENV/bin/activate" || { log "нет venv — стоп"; exit 1; }
 export PYTHONPATH="$REPO"
 
-DIR=$(dirname "$LAGS"); EXP=experiments/neural_postproc_krsk
+# Нарезки по годам кладём на /data, а не рядом с корпусом: в /workdir квота
+# 8 ГБ, а нарезок набирается несколько гигабайт — 28.08.2026 они её и съели.
+# Все они пересоздаются из корпуса за минуту, хранить их в /workdir незачем.
+DIR=/data/postproc; mkdir -p "$DIR" 2>/dev/null || DIR=$(dirname "$LAGS")
+EXP=experiments/neural_postproc_krsk
 if [[ ! -f "$DIR/krsk_test.parquet" ]]; then
   log "делю корпус по годам: обучение 2016-2018, отбор 2019, проверка 2020"
   python -u - "$LAGS" "$DIR" <<'PYEOF'
