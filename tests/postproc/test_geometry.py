@@ -10,7 +10,8 @@ import pytest
 
 from src.postprocessing.geometry import (COHERENCE_MIN_REGIONAL,
                                          COHERENCE_MIN_WHOLE,
-                                         field_coherence, neighbour_indices)
+                                         field_coherence, neighbour_indices,
+                                         snap_miss)
 
 
 def make_grid(lat0=50.0, lat1=60.0, lon0=83.0, lon1=98.0, step=0.25):
@@ -174,3 +175,38 @@ def test_too_few_nodes_gives_nan_not_a_verdict():
     lats, lons = make_grid(55, 56, 92, 93, step=0.25)
     assert len(lats) < 100
     assert np.isnan(field_coherence(lats, lons, smooth_field(lats, lons)))
+
+
+# --- привязка узлов к ячейкам сетки -----------------------------------------
+
+def test_exact_match_gives_no_miss():
+    grid = np.arange(0.0, 360.0, 0.703125)
+    assert snap_miss(grid, grid[[0, 5, 100, 511]]) == pytest.approx(0.0)
+
+
+def test_shifted_coordinates_are_caught():
+    """Сдвинутые координаты дают заметный промах, а не молчаливую подмену.
+
+    Поиск ближайшей ячейки всегда что-нибудь находит. Без замера промаха кадр
+    собрался бы из соседних ячеек, и понять это по метрикам было бы нельзя.
+    """
+    grid = np.arange(0.0, 360.0, 0.703125)
+    assert snap_miss(grid, grid[[10, 20]] + 0.3) == pytest.approx(0.3, abs=1e-9)
+
+
+def test_meridian_wrap_is_a_real_miss():
+    """Круг не замыкается — и это ровно тот случай, ради которого замер нужен.
+
+    Точка на 359,99° при сетке, кончающейся на 359,3°, географически рядом с
+    нулевой ячейкой, но поиск по модулю разности выберет 359,3° и промахнётся
+    на 0,69°. Проверка это увидит.
+    """
+    grid = np.arange(0.0, 360.0, 0.703125)
+    miss = snap_miss(grid, np.array([359.99]))
+    assert miss > 0.5
+
+
+def test_empty_input_is_not_an_error():
+    grid = np.arange(0.0, 10.0, 1.0)
+    assert snap_miss(grid, np.array([])) == 0.0
+    assert snap_miss(np.array([]), np.array([1.0])) == 0.0

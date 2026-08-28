@@ -67,10 +67,13 @@ if str(REPO_ROOT) not in sys.path:
 
 from src.config import ExperimentConfig
 from src.main import load_model_from_experiment_config
+from src.postprocessing.corpus_math import (bilinear_sample, compute_forcing,
+                                            dewpoint_depression_K,
+                                            solar_elevation, wind_components)
 from src.postprocessing.geometry import (COHERENCE_MIN_REGIONAL,
                                          COHERENCE_MIN_WHOLE,
                                          field_coherence,
-                                         neighbour_indices)
+                                         neighbour_indices, snap_miss)
 from src.utils import load_from_json_file
 
 
@@ -98,95 +101,6 @@ RENAME_FOR_PARQUET = {
 
 
 # ── small helpers ─────────────────────────────────────────────────────────────
-def bilinear_sample(grid_data_lonlat, g_lons, g_lats, q_lon, q_lat):
-    """Bilinear interpolation from a regular (n_lon, n_lat) grid at irregular
-    query points. ``g_lons``/``g_lats`` must be monotonically increasing.
-    Lon is treated cyclically only if the spacing closes (global grid)."""
-    n_lon = len(g_lons)
-    n_lat = len(g_lats)
-    lon_min = g_lons[0]
-    lon_max = g_lons[-1]
-    dlon = g_lons[1] - g_lons[0]
-    # Detect global vs regional by checking span ≈ 360°
-    if (lon_max - lon_min + dlon) > 359.0:
-        q_lon_n = np.mod(q_lon - lon_min, 360.0) + lon_min
-        di = (q_lon_n - lon_min) / dlon
-        i0 = np.floor(di).astype(np.int64) % n_lon
-        i1 = (i0 + 1) % n_lon
-        fx = di - np.floor(di)
-    else:
-        q_lon_c = np.clip(q_lon, lon_min, lon_max)
-        di = (q_lon_c - lon_min) / dlon
-        i0 = np.clip(np.floor(di).astype(np.int64), 0, n_lon - 2)
-        i1 = i0 + 1
-        fx = np.clip(di - i0, 0.0, 1.0)
-
-    dlat = g_lats[1] - g_lats[0]
-    dj = (q_lat - g_lats[0]) / dlat
-    j0 = np.clip(np.floor(dj).astype(np.int64), 0, n_lat - 2)
-    j1 = j0 + 1
-    fy = np.clip(dj - j0, 0.0, 1.0)
-
-    g = grid_data_lonlat.astype(np.float32)
-    v00 = g[i0, j0]
-    v10 = g[i1, j0]
-    v01 = g[i0, j1]
-    v11 = g[i1, j1]
-    v = (1 - fx) * (1 - fy) * v00 + fx * (1 - fy) * v10 + (1 - fx) * fy * v01 + fx * fy * v11
-    return v.astype(np.float32)
-
-
-def compute_forcing(dt: datetime) -> np.ndarray:
-    """Return (4,) array [sin_hour, cos_hour, sin_doy, cos_doy] for a UTC time."""
-    h = dt.hour + dt.minute / 60.0
-    doy = dt.timetuple().tm_yday
-    return np.array([
-        math.sin(2 * math.pi * h / 24.0),
-        math.cos(2 * math.pi * h / 24.0),
-        math.sin(2 * math.pi * doy / 365.25),
-        math.cos(2 * math.pi * doy / 365.25),
-    ], dtype=np.float32)
-
-
-def solar_elevation(lat_deg: float, lon_deg: float, dt: datetime) -> float:
-    """Approximate solar elevation (deg) — Spencer 1971 formula."""
-    doy = dt.timetuple().tm_yday
-    gamma = 2.0 * math.pi * (doy - 1 + (dt.hour - 12) / 24.0) / 365.0
-    decl = (
-        0.006918
-        - 0.399912 * math.cos(gamma) + 0.070257 * math.sin(gamma)
-        - 0.006758 * math.cos(2 * gamma) + 0.000907 * math.sin(2 * gamma)
-        - 0.002697 * math.cos(3 * gamma) + 0.00148 * math.sin(3 * gamma)
-    )
-    eq_time = 229.18 * (
-        0.000075
-        + 0.001868 * math.cos(gamma) - 0.032077 * math.sin(gamma)
-        - 0.014615 * math.cos(2 * gamma) - 0.040849 * math.sin(2 * gamma)
-    )
-    time_offset = eq_time + 4.0 * lon_deg
-    tst = dt.hour * 60 + dt.minute + dt.second / 60 + time_offset
-    ha = math.radians(tst / 4.0 - 180.0)
-    lat = math.radians(lat_deg)
-    elev = math.asin(
-        math.sin(lat) * math.sin(decl) + math.cos(lat) * math.cos(decl) * math.cos(ha)
-    )
-    return math.degrees(elev)
-
-
-def dewpoint_depression_K(t2m_K: float, q_kg_kg: float, sp_Pa: float) -> float:
-    """Magnus approximation of dewpoint depression (T - Td) in K from q + sp."""
-    if not np.isfinite(q_kg_kg) or q_kg_kg <= 0 or not np.isfinite(sp_Pa) or sp_Pa <= 0:
-        return float("nan")
-    e = q_kg_kg * sp_Pa / (0.622 + 0.378 * q_kg_kg)  # Pa
-    e_hPa = e / 100.0
-    if e_hPa <= 0:
-        return float("nan")
-    ln_term = math.log(max(e_hPa / 6.112, 1e-6))
-    td_C = 243.5 * ln_term / (17.67 - ln_term)
-    td_K = td_C + 273.15
-    return float(t2m_K - td_K)
-
-
 def load_isd_station(usaf: str, wban: str, isd_dir: Path,
                      years: range) -> pd.DataFrame:
     """Return DataFrame with valid_time, obs_t2m_C, obs_ws, obs_wd."""
@@ -429,6 +343,10 @@ class MultiresInputBuilder:
                 int(np.argmin(np.abs(self.gb_lats_native - lat)))
                 for lat in self.glob_node_lat
             ], dtype=np.int64)
+            self._check_snap(self.gb_lons_native, self.glob_node_lon, "долготе",
+                             "глобальной")
+            self._check_snap(self.gb_lats_native, self.glob_node_lat, "широте",
+                             "глобальной")
             rb_coords = np.load(regional_base / "coords.npz")
             self.rb_lats_native = rb_coords["latitude"].astype(np.float64)
             self.rb_lons_native = rb_coords["longitude"].astype(np.float64)
@@ -476,6 +394,18 @@ class MultiresInputBuilder:
         )
 
     # — per-timestep loaders —
+    @staticmethod
+    def _check_snap(native: np.ndarray, wanted: np.ndarray, axis: str,
+                    grid: str, tol_deg: float = 1e-3) -> None:
+        """Убедиться, что узлы легли на ячейки сетки, а не рядом с ними."""
+        worst = snap_miss(native, wanted)
+        if worst > tol_deg:
+            raise SystemExit(
+                f"[узлы] по {axis} узлы {grid} сетки не совпали с ячейками: "
+                f"наибольший промах {worst:.4f}° при допуске {tol_deg}°. "
+                f"Кадр собрался бы из соседних ячеек, и заметить это было бы "
+                f"нечем. Проверь, из той ли сетки взяты координаты.")
+
     def _time_idx(self, ds_time_start: datetime, dt: datetime, T_max: int) -> int:
         delta = dt - ds_time_start
         if delta.total_seconds() % (6 * 3600) != 0:
@@ -989,8 +919,10 @@ def main():
 
     # 9. derived/static/temporal features
     df["obs_t2m_K"] = df["obs_t2m_C"] + 273.15
-    df["obs_u10"] = -df["obs_ws"] * np.sin(np.deg2rad(df["obs_wd"]))
-    df["obs_v10"] = -df["obs_ws"] * np.cos(np.deg2rad(df["obs_wd"]))
+    # Штиль: скорость 0, направления нет и в ISD-Lite оно помечено пропуском.
+    # Прямая формула давала NaN, и штили целиком выпадали из оценки ветра —
+    # а это как раз случаи с наибольшей относительной ошибкой модели.
+    df["obs_u10"], df["obs_v10"] = wind_components(df["obs_ws"], df["obs_wd"])
     df["lapse_t850_1000"] = df["gnn_t850"] - df["gnn_t1000"]
     # gnn_sp is in hPa (see corpus_v1 stats: min 887, max 1063); formula needs Pa
     df["dewpoint_depression"] = [

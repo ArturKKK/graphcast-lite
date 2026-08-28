@@ -108,3 +108,116 @@ def test_time_features_are_periodic():
     assert out["cos_hour"][1] == pytest.approx(-1.0, abs=1e-6)
     # январь и июль должны быть на разных концах годового круга
     assert out["cos_doy"][0] > 0.9 and out["cos_doy"][2] < -0.9
+
+
+# --- прогон целиком ----------------------------------------------------------
+
+def _corpus_with_known_bias(path, *, n_st=6, years=(2016, 2017, 2018, 2020)):
+    """Корпус с известным смещением у каждой станции.
+
+    Прогноз занижен ровно на постоянную величину, своя у станции. Такое смещение
+    таблица «станция» обязана снять почти полностью — это самая простая проверка
+    того, что весь прогон считает то, что заявлено.
+    """
+    rng = np.random.default_rng(3)
+    rows = []
+    for st in range(n_st):
+        bias = 1.0 + st                       # 1..6 °C, разное у станций
+        for year in years:
+            for d in range(120):
+                for lead in (6, 24):
+                    vt = pd.Timestamp(f"{year}-01-01") + pd.Timedelta(days=d, hours=lead)
+                    obs = 273.15 + 10 * np.cos(2 * np.pi * vt.dayofyear / 365.25) \
+                        + rng.normal(0, 1.0)
+                    rows.append({
+                        "station_usaf": f"2000{st}", "lead_h": lead,
+                        "init_time_utc": vt - pd.Timedelta(hours=lead),
+                        "valid_time_utc": vt,
+                        "obs_t2m_K": obs, "gnn_t2m": obs - bias,
+                        "obs_u10": rng.normal(0, 3), "gnn_u10": rng.normal(0, 3),
+                        "obs_v10": rng.normal(0, 3), "gnn_v10": rng.normal(0, 3),
+                        "lat": 55.0 + st, "lon": 90.0 + st, "elev": 100.0 * st,
+                    })
+    df = pd.DataFrame(rows)
+    df.to_parquet(path, index=False)
+    return df
+
+
+def _run(corpus, *extra):
+    import subprocess
+    import sys
+    r = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "postproc" / "baselines.py"),
+         "--corpus", str(corpus), "--train-years", "2016", "2017", "2018",
+         "--test-years", "2020", *extra],
+        capture_output=True, text=True, cwd=ROOT)
+    assert r.returncode == 0, r.stdout + r.stderr
+    return r.stdout
+
+
+def _rmse_of(out, label):
+    for line in out.splitlines():
+        if line.strip().startswith(label):
+            return float(line.split()[-4])
+    raise AssertionError(f"в выводе нет строки «{label}»:\n{out}")
+
+
+def test_station_table_removes_a_station_bias(tmp_path):
+    """Постоянное смещение станции снимается таблицей «станция» почти нацело."""
+    c = tmp_path / "c.parquet"
+    _corpus_with_known_bias(c)
+    out = _run(c)
+    raw = _rmse_of(out, "сырой прогноз")
+    fixed = _rmse_of(out, "станция ")
+    assert raw > 3.0, "в корпусе заложено смещение 1..6 °C, ошибка должна быть большой"
+    assert fixed < 1.2, "таблица «станция» не сняла постоянное смещение"
+
+
+def test_richer_tables_do_not_lose_to_coarser_ones(tmp_path):
+    """Дробление таблицы не должно ухудшать результат.
+
+    Если ухудшает — значит стягивание к родителю сломано, и таблица
+    переобучается на редких ячейках. Ровно это и было причиной, по которой
+    стягивание вводилось.
+    """
+    c = tmp_path / "c.parquet"
+    _corpus_with_known_bias(c)
+    out = _run(c)
+    st = _rmse_of(out, "станция ")
+    smh = _rmse_of(out, "станция×месяц×час")
+    assert smh <= st * 1.05, "подробная таблица заметно хуже грубой"
+
+
+def test_per_year_error_is_reported(tmp_path):
+    c = tmp_path / "c.parquet"
+    _corpus_with_known_bias(c)
+    out = _run(c)
+    assert "сырая ошибка приземной температуры по годам" in out
+    for year in (2016, 2020):
+        assert f"    {year}:" in out
+
+
+def test_complete_obs_shrinks_the_sample(tmp_path):
+    """Флаг --complete-obs оставляет строки, где есть все три наблюдения."""
+    c = tmp_path / "c.parquet"
+    df = _corpus_with_known_bias(c)
+    df.loc[df.index[:len(df) // 4], "obs_v10"] = np.nan
+    df.to_parquet(c, index=False)
+    out = _run(c, "--complete-obs")
+    assert "только полные наблюдения" in out
+    kept = int(out.split("->")[1].split("строк")[0].replace(",", "").strip())
+    assert kept == pytest.approx(len(df) * 0.75, rel=0.01)
+
+
+def test_empty_year_selection_is_refused(tmp_path):
+    """Пустая выборка — отказ, а не таблица из NaN."""
+    import subprocess
+    import sys
+    c = tmp_path / "c.parquet"
+    _corpus_with_known_bias(c)
+    r = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "postproc" / "baselines.py"),
+         "--corpus", str(c), "--train-years", "1999", "--test-years", "2020"],
+        capture_output=True, text=True, cwd=ROOT)
+    assert r.returncode != 0
+    assert "пустая выборка" in r.stdout + r.stderr
