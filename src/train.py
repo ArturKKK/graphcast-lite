@@ -144,8 +144,19 @@ def spatial_corr(pred: torch.Tensor, true: torch.Tensor, exclude_channels: list 
         return sum(accs) / max(len(accs), 1)
 
     # pred, true: [N, F]
-    p = (pred - pred.mean(dim=0, keepdim=True)) / (pred.std(dim=0, keepdim=True) + 1e-8)  
-    t = (true - true.mean(dim=0, keepdim=True)) / (true.std(dim=0, keepdim=True) + 1e-8)  
+    #
+    # Отклонение считаем делением на N, а не на N-1. Прежде здесь стоял
+    # torch.std, который несмещён (делит на N-1), а среднее произведения берётся
+    # по N — ответ выходил заниженным ровно в N/(N-1) раз: поле с самим собой
+    # давало 0,9975 вместо единицы на пятистах узлах. На нашей сетке из 133 279
+    # узлов это 7,5e-6 и на числа статьи не влияет, но корреляция должна быть
+    # корреляцией. Считаем вручную — так не зависим от того, как в текущей
+    # версии torch зовётся поправка на смещение.
+    def _std(x):
+        return ((x - x.mean(dim=0, keepdim=True)) ** 2).mean(dim=0, keepdim=True).sqrt()
+
+    p = (pred - pred.mean(dim=0, keepdim=True)) / (_std(pred) + 1e-8)
+    t = (true - true.mean(dim=0, keepdim=True)) / (_std(true) + 1e-8)
     acc_per_feat = (p * t).mean(dim=0)  
     if exclude_channels:
         mask = [i for i in range(acc_per_feat.shape[0]) if i not in exclude_channels]
