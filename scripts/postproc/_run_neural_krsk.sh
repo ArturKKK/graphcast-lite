@@ -125,6 +125,38 @@ if [[ -f "$DIR/krsk_train1y.parquet" ]]; then
   TR="$DIR/krsk_train.parquet"; VA="$DIR/krsk_val.parquet"
 fi
 
+# Больше данных. Один год дал 2,356 против 2,297 на трёх — значит данные ещё
+# не насытились. Берём четыре: 2016 — октябрь 2019 на обучение, ноябрь-декабрь
+# 2019 на отбор эпохи. Отбор отделён по времени, а не случайной выборкой:
+# соседние по времени строки почти дубликаты, и случайный отбор их бы перемешал.
+if [[ ! -f "$DIR/krsk_train4y.parquet" ]]; then
+  log "готовлю набор на четырёх годах"
+  python -u - "$DIR" <<'SPLIT4Y'
+import sys, pandas as pd
+d = sys.argv[1]
+df = pd.concat([pd.read_parquet(f"{d}/krsk_train.parquet"),
+                pd.read_parquet(f"{d}/krsk_val.parquet")], ignore_index=True)
+t = pd.to_datetime(df["valid_time_utc"])
+cut = pd.Timestamp("2019-11-01")
+for name, sel in (("train4y", t < cut), ("val4y", t >= cut)):
+    part = df[sel]
+    part.to_parquet(f"{d}/krsk_{name}.parquet", index=False)
+    print(f"  {name}: {len(part):,} строк", flush=True)
+SPLIT4Y
+fi
+if [[ -f "$DIR/krsk_train4y.parquet" ]]; then
+  TR="$DIR/krsk_train4y.parquet"; VA="$DIR/krsk_val4y.parquet"
+  train_and_eval "_4y"
+  TR="$DIR/krsk_train.parquet"; VA="$DIR/krsk_val.parquet"
+fi
+
+# Сильнее прижать переобучение. Проверочная ошибка встаёт на шестой эпохе, а
+# обучающая падает до сороковой — значит модель запоминает, а не обобщает.
+# Ёмкость наращивать бессмысленно, нужна регуляризация; берём две ступени,
+# чтобы увидеть направление, а не гадать.
+train_and_eval "_reg"  --dropout 0.25 --weight-decay 1e-3
+train_and_eval "_reg2" --dropout 0.40 --weight-decay 3e-3
+
 # Разбор по станциям у основной модели: где поправка работает, а где нет.
 log "--- разбор по станциям (основная модель)"
 python -u scripts/postproc/eval_per_station_v2.py \
