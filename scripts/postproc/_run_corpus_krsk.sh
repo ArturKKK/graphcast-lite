@@ -132,8 +132,12 @@ python -u scripts/postproc/build_corpus.py \
     --top-stations   71 \
     --years "$Y0" "$Y1" \
     --out-parquet    "data/postproc/corpus_krsk_${TAG}.parquet" \
-    >> "$OUT/corpus_${TAG}_build.log" 2>&1
-RC=$?
+    2>&1 | tee -a "$OUT/corpus_${TAG}_build.log" \
+    | grep --line-buffered -E "^(\[(порядок узлов|cfg|model|stations|inits|inference|join|done)\]|  \[[0-9])"
+# Подробности уходят в build-лог, а вехи — сюда, в master. Раньше проверка
+# порядка узлов печаталась только в build-лог, и в master её искали впустую.
+# Статус берём у python, а не у конвейера: grep вернёт 1, если вех не было.
+RC=${PIPESTATUS[0]}
 log "DONE сборка rc=$RC"
 CORPUS=$(ls -1 data/postproc/corpus_krsk_${TAG}.parquet data/postproc/corpus_krsk_${TAG}.pkl.gz 2>/dev/null | head -1)
 if [[ -n "$CORPUS" ]]; then
