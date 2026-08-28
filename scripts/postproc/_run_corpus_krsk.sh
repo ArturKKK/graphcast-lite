@@ -87,12 +87,18 @@ log "наблюдения: $ISD ($(ls "$ISD" | wc -l) файлов)"
 mkdir -p data/postproc
 # Если pyarrow есть в окружении — пишем parquet, иначе сборщик сам откатится на
 # pickle. Попытка доустановить дешёвая и на машине без сети просто не сработает.
-python -c "import pyarrow" 2>/dev/null || {
-  log "pyarrow нет — пробую поставить (без сети просто не выйдет, и это не страшно)"
-  pip install -q pyarrow >> "$OUT/corpus_${TAG}_pip.log" 2>&1
-  python -c "import pyarrow" 2>/dev/null && log "pyarrow поставлен" \
-    || log "pyarrow недоступен — корпус будет записан в pickle"
-}
+# Попытка доустановить pyarrow: строго с таймаутом и без повторов. Без сети
+# pip уходит в долгие ретраи с нарастающей паузой, и раннер выглядит зависшим.
+if ! python -c "import pyarrow" 2>/dev/null; then
+  log "pyarrow нет — одна попытка поставить, 60 секунд"
+  timeout 60 pip install -q --retries 0 --timeout 10 pyarrow \
+      >> "$OUT/corpus_${TAG}_pip.log" 2>&1
+  if python -c "import pyarrow" 2>/dev/null; then
+    log "pyarrow поставлен"
+  else
+    log "pyarrow недоступен — корпус будет записан в pickle, это штатно"
+  fi
+fi
 log "START сборки (развёртка до 120 ч, инициализации 00 и 12 UTC)"
 python -u scripts/postproc/build_corpus.py \
     --experiment-dir "experiments/$EXP" \
