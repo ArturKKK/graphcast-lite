@@ -168,13 +168,17 @@ def main() -> None:
 
         obs = te[ocol].to_numpy()
         gnn = te[gcol].to_numpy()
-        rows = [("сырой прогноз", metrics(gnn, obs)),
-                ("общее смещение", metrics(gnn + g_bias, obs)),
-                ("станция", metrics(gnn + c_st, obs)),
-                ("станция×месяц", metrics(gnn + c_sm, obs)),
-                ("станция×месяц×час", metrics(gnn + c_smh, obs))]
+        def row(label, pred):
+            rows.append((label, metrics(pred, obs), pred))
+
+        rows = []
+        row("сырой прогноз", gnn)
+        row("общее смещение", gnn + g_bias)
+        row("станция", gnn + c_st)
+        row("станция×месяц", gnn + c_sm)
+        row("станция×месяц×час", gnn + c_smh)
         if a.per_lead:
-            rows.append(("станция×срок", metrics(gnn + c_sl, obs)))
+            row("станция×срок", gnn + c_sl)
 
         base_feats = [c for c in RIDGE_FEATS if c in df.columns]
         obs_feats = obs_features(df)
@@ -198,8 +202,7 @@ def main() -> None:
                 X_te = np.where(np.isfinite(X_te), X_te, med)
                 m = make_pipeline(StandardScaler(), Ridge(alpha=1.0))
                 m.fit(X_tr, y)
-                rows.append((f"{label} ({len(feats)} призн.)",
-                             metrics(gnn + add + m.predict(X_te), obs)))
+                row(f"{label} ({len(feats)} призн.)", gnn + add + m.predict(X_te))
 
             ridge(base_feats, "регрессия")
             if obs_feats:
@@ -224,10 +227,28 @@ def main() -> None:
         raw = rows[0][1]["rmse"]
         print(f"=== {name}, {unit} ===")
         print(f"{'способ':>34} {'RMSE':>8} {'MAE':>8} {'смещ.':>8} {'выигрыш':>9}")
-        for label, m_ in rows:
+        for label, m_, _ in rows:
             gain = (raw - m_["rmse"]) / raw * 100
             print(f"{label:>34} {m_['rmse']:8.3f} {m_['mae']:8.3f} "
                   f"{m_['bias']:+8.3f} {gain:8.1f}%")
+
+        # Разрез по срокам. Одно общее число прячет главное: поправка обычно
+        # держится на коротких сроках, где ошибка модели ещё систематическая, и
+        # тает на дальних, где она становится случайной. Для статьи важно, где
+        # именно проходит эта граница.
+        best = min(rows[1:], key=lambda r: r[1]["rmse"])
+        leads = np.sort(te["lead_h"].unique())
+        print(f"\n  по срокам, лучший способ — {best[0]}:")
+        print("     " + "".join(f"{int(l):>8}" for l in leads))
+        lv = te["lead_h"].to_numpy()
+        def by_lead(pred):
+            return [np.sqrt(np.mean((pred[lv == l] - obs[lv == l]) ** 2))
+                    for l in leads]
+        r_raw, r_best = by_lead(gnn), by_lead(best[2])
+        print("сыр. " + "".join(f"{v:8.3f}" for v in r_raw))
+        print("испр." + "".join(f"{v:8.3f}" for v in r_best))
+        print("выигр" + "".join(f"{(a_ - b_) / a_ * 100:7.1f}%"
+                                for a_, b_ in zip(r_raw, r_best)))
         print()
 
 
