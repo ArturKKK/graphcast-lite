@@ -72,16 +72,8 @@ python -u scripts/postproc/baselines.py --corpus "$LAGS" \
 # 4. Деление по годам и обучение.
 if [[ ! -f "$DIR/nb6_test.parquet" ]]; then
   log "шаг 4: деление по годам"
-  python -u - "$LAGS" "$DIR" <<'SPLITNB'
-import sys, pandas as pd
-src, out = sys.argv[1], sys.argv[2]
-df = pd.read_parquet(src)
-y = pd.to_datetime(df["valid_time_utc"]).dt.year
-for name, years in (("train", [2016, 2017, 2018]), ("val", [2019]), ("test", [2020])):
-    part = df[y.isin(years)]
-    part.to_parquet(f"{out}/nb6_{name}.parquet", index=False)
-    print(f"  {name}: {len(part):,} строк", flush=True)
-SPLITNB
+  python -u scripts/postproc/split_corpus.py --in "$LAGS" --out-dir "$DIR" \
+      --prefix nb6 train=2016,2017,2018 val=2019 test=2020
   [[ -f "$DIR/nb6_test.parquet" ]] || { log "деление не удалось — стоп"; exit 1; }
 fi
 
@@ -103,6 +95,9 @@ log "шаг 6: проверка на 2020"
 python -u scripts/postproc/eval_per_lead_v2.py \
     --val-parquet "$DIR/nb6_test.parquet" --ckpt "$EXP/best_model.pth" \
     --out-dir "$EXP/eval_test2020" 2>&1 | grep --line-buffered -E "^\[eval\]|^Overall"
+python -u scripts/postproc/record_run.py \
+    --eval-json "$EXP/eval_test2020/eval_per_lead_v2.json" \
+    --name "$(basename "$EXP")" --note "окрестность 6 узлов" 2>&1 | tail -2
 log "шаг 7: разбор по станциям"
 python -u scripts/postproc/eval_per_station_v2.py \
     --val-parquet "$DIR/nb6_test.parquet" --ckpt "$EXP/best_model.pth" \

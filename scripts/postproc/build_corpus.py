@@ -67,6 +67,10 @@ if str(REPO_ROOT) not in sys.path:
 
 from src.config import ExperimentConfig
 from src.main import load_model_from_experiment_config
+from src.postprocessing.geometry import (COHERENCE_MIN_REGIONAL,
+                                         COHERENCE_MIN_WHOLE,
+                                         field_coherence,
+                                         neighbour_indices)
 from src.utils import load_from_json_file
 
 
@@ -529,30 +533,22 @@ class MultiresInputBuilder:
 
         Координаты узлов здесь восстановлены построением, а не прочитаны из
         слитого набора, поэтому стоит проверить, что порядок совпал. Опираемся
-        на то, что метеорологическое поле гладкое: у настоящего кадра значение
-        в узле почти совпадает со средним по соседям, у перемешанного связь
-        пропадает. Вставку проверяем отдельно — она занимает 1,9% узлов, и на
-        общей связи её порча незаметна.
+        на гладкость поля; вставку проверяем отдельно — она занимает 1,9 %
+        узлов, и на общей связи её порча незаметна. Сам расчёт — в
+        src/postprocessing/geometry.py, там же он и покрыт тестами.
+
+        Проверка идёт по нормированному кадру: нормировка поканальная и
+        линейная, а связь к линейному преобразованию нечувствительна.
         """
-        from scipy.spatial import cKDTree
-
-        phi, lam = np.radians(self.node_lats), np.radians(self.node_lons)
-        xyz = np.c_[np.cos(phi) * np.cos(lam), np.cos(phi) * np.sin(lam), np.sin(phi)]
-        _, nb = cKDTree(xyz).query(xyz, k=6)
-        f = np.asarray(frame[:, ch], dtype=np.float64)
-        nbm = f[nb[:, 1:]].mean(1)
-
-        def coh(sel):
-            a, b = f[sel], nbm[sel]
-            if a.size < 100 or a.std() < 1e-9 or b.std() < 1e-9:
-                return float("nan")
-            return float(np.corrcoef(a, b)[0, 1])
-
-        whole = coh(slice(None))
-        reg = coh(self.is_regional) if self.n_regional else float("nan")
+        whole = field_coherence(self.node_lats, self.node_lons, frame[:, ch])
+        reg = (field_coherence(self.node_lats, self.node_lons, frame[:, ch],
+                               mask=self.is_regional)
+               if self.n_regional else float("nan"))
         print(f"[порядок узлов] связь с соседями: по всей сетке {whole:+.3f}, "
               f"во вставке {reg:+.3f}", flush=True)
-        bad = whole < 0.85 or (self.n_regional and not np.isnan(reg) and reg < 0.60)
+        bad = (whole < COHERENCE_MIN_WHOLE
+               or (self.n_regional and not np.isnan(reg)
+                   and reg < COHERENCE_MIN_REGIONAL))
         if bad:
             raise SystemExit(
                 "[порядок узлов] поле не выглядит гладким: значения легли не на "
@@ -765,11 +761,8 @@ def main():
         # расстоянию, со сжатием долготы на косинус широты — на 55° градус
         # долготы вдвое короче градуса широты, и без поправки в соседи попадал
         # бы вытянутый по долготе ряд вместо круга.
-        nb_idx = []
-        if args.neighbours > 0:
-            kx = np.cos(np.radians(lat)) ** 2
-            d2c = (builder.node_lats - lat) ** 2 + kx * (builder.node_lons - lon) ** 2
-            nb_idx = np.argsort(d2c)[: args.neighbours].astype(int).tolist()
+        nb_idx = neighbour_indices(builder.node_lats, builder.node_lons,
+                                   lat, lon, args.neighbours)
         station_meta.append({
             "nb_idx": nb_idx,
             "usaf": usaf,

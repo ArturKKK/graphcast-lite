@@ -54,6 +54,9 @@ run_seed() {     # префикс нарезки, имя настройки, ж�
   python -u scripts/postproc/eval_per_lead_v2.py \
       --val-parquet "$d/${pref}_test.parquet" --ckpt "$exp/best_model.pth" \
       --out-dir "$exp/eval_test2020" 2>&1 | grep --line-buffered -E "^Overall"
+  python -u scripts/postproc/record_run.py \
+      --eval-json "$exp/eval_test2020/eval_per_lead_v2.json" \
+      --name "$(basename "$exp")" --note "жребий $seed" 2>&1 | tail -2
 }
 
 for seed in 43 44; do

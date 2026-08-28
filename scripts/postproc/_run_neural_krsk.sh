@@ -47,17 +47,8 @@ DIR=/data/postproc; mkdir -p "$DIR" 2>/dev/null || DIR=$(dirname "$LAGS")
 EXP=experiments/neural_postproc_krsk
 if [[ ! -f "$DIR/krsk_test.parquet" ]]; then
   log "делю корпус по годам: обучение 2016-2018, отбор 2019, проверка 2020"
-  python -u - "$LAGS" "$DIR" <<'PYEOF'
-import sys, pandas as pd
-src, out = sys.argv[1], sys.argv[2]
-df = pd.read_parquet(src)
-y = pd.to_datetime(df["valid_time_utc"]).dt.year
-for name, years in (("train", [2016, 2017, 2018]), ("val", [2019]), ("test", [2020])):
-    part = df[y.isin(years)]
-    p = f"{out}/krsk_{name}.parquet"
-    part.to_parquet(p, index=False)
-    print(f"  {name}: {len(part):,} строк -> {p}", flush=True)
-PYEOF
+  python -u scripts/postproc/split_corpus.py --in "$LAGS" --out-dir "$DIR" \
+      --prefix krsk train=2016,2017,2018 val=2019 test=2020
   [[ -f "$DIR/krsk_test.parquet" ]] || { log "деление не удалось — стоп"; exit 1; }
 fi
 
@@ -97,6 +88,11 @@ train_and_eval() {
   python -u scripts/postproc/eval_per_lead_v2.py \
       --val-parquet "$DIR/krsk_test.parquet" --ckpt "$exp/best_model.pth" \
       --out-dir "$exp/eval_test2020" 2>&1 | grep --line-buffered -E "^\[eval\]|^Overall"
+  # Числа сразу в учёт: иначе они живут только в логе, и через неделю связь
+  # между настройкой и результатом теряется.
+  python -u scripts/postproc/record_run.py \
+      --eval-json "$exp/eval_test2020/eval_per_lead_v2.json" \
+      --name "$(basename "$exp")" --note "${NOTE:-}" 2>&1 | tail -2
 }
 
 train_and_eval ""
@@ -111,17 +107,8 @@ train_and_eval "_prob" --probabilistic
 # он тоже не проверочный год.
 if [[ ! -f "$DIR/krsk_train1y.parquet" ]]; then
   log "готовлю набор на одном годе: обучение 2019, отбор 2018"
-  python -u - "$DIR" <<'SPLIT1Y'
-import sys, pandas as pd
-d = sys.argv[1]
-df = pd.concat([pd.read_parquet(f"{d}/krsk_train.parquet"),
-                pd.read_parquet(f"{d}/krsk_val.parquet")], ignore_index=True)
-y = pd.to_datetime(df["valid_time_utc"]).dt.year
-for name, years in (("train1y", [2019]), ("val1y", [2018])):
-    part = df[y.isin(years)]
-    part.to_parquet(f"{d}/krsk_{name}.parquet", index=False)
-    print(f"  {name}: {len(part):,} строк", flush=True)
-SPLIT1Y
+  python -u scripts/postproc/split_corpus.py --in "$LAGS" --out-dir "$DIR" \
+      --prefix krsk train1y=2019 val1y=2018
 fi
 if [[ -f "$DIR/krsk_train1y.parquet" ]]; then
   TR="$DIR/krsk_train1y.parquet"; VA="$DIR/krsk_val1y.parquet"

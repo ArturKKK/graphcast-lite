@@ -1,66 +1,78 @@
-#!/usr/bin/env python
-"""Split postproc corpus into train/val by year of valid_time (or init_time)."""
+#!/usr/bin/env python3
+"""Режет корпус постобработки по годам.
+
+Раньше каждый раннер делал это своим куском кода внутри heredoc — три почти
+одинаковых куска, и разойтись они могли незаметно. Теперь один скрипт, и он
+покрыт тестами.
+
+Годы задаются парами «имя=годы»:
+
+    python3 scripts/postproc/split_corpus.py --in corpus.parquet --out-dir DIR \\
+        --prefix krsk train=2016,2017,2018 val=2019 test=2020
+
+Год берётся по СРОКУ ДЕЙСТВИЯ прогноза, а не по сроку выпуска: проверочная
+выборка не должна содержать сроков, попадающих в обучающие годы. Выпуск 31
+декабря со сроком +120 ч действует уже в следующем году, и по выпуску такая
+строка ушла бы не в ту часть.
+"""
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 import pandas as pd
 
 
+def split_by_years(df: pd.DataFrame, parts: dict[str, list[int]],
+                   time_col: str = "valid_time_utc") -> dict[str, pd.DataFrame]:
+    """Разложить строки по частям. Год берётся из time_col."""
+    year = pd.to_datetime(df[time_col]).dt.year
+    seen: dict[int, str] = {}
+    for name, years in parts.items():
+        for y in years:
+            if y in seen:
+                raise SystemExit(
+                    f"год {y} указан и в «{seen[y]}», и в «{name}» — "
+                    f"части пересеклись бы, а это утечка обучения в проверку")
+            seen[y] = name
+    return {name: df[year.isin(years)] for name, years in parts.items()}
+
+
+def parse_parts(items: list[str]) -> dict[str, list[int]]:
+    parts: dict[str, list[int]] = {}
+    for it in items:
+        if "=" not in it:
+            raise SystemExit(f"ожидалось «имя=годы», получено «{it}»")
+        name, years = it.split("=", 1)
+        try:
+            parts[name] = [int(y) for y in years.split(",") if y]
+        except ValueError:
+            raise SystemExit(f"в «{it}» годы не разобрались")
+        if not parts[name]:
+            raise SystemExit(f"в «{it}» не задан ни один год")
+    return parts
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--in", dest="inp", required=True, help="input parquet")
-    ap.add_argument("--out-train", required=True)
-    ap.add_argument("--out-val", required=True)
-    ap.add_argument("--train-years", type=int, nargs="+", default=[2018, 2019])
-    ap.add_argument("--val-years", type=int, nargs="+", default=[2020])
-    ap.add_argument("--time-col", default=None,
-                    help="time column to use; auto-detected if not given")
-    ap.add_argument("--dropna-cols", nargs="+", default=None,
-                    help="drop rows with NaN in any of these columns (features+targets)")
-    args = ap.parse_args()
+    ap.add_argument("--in", dest="inp", required=True)
+    ap.add_argument("--out-dir", required=True)
+    ap.add_argument("--prefix", required=True, help="начало имени файлов части")
+    ap.add_argument("--time-col", default="valid_time_utc")
+    ap.add_argument("parts", nargs="+", metavar="ИМЯ=ГОДЫ",
+                    help="например train=2016,2017,2018 val=2019 test=2020")
+    a = ap.parse_args()
 
-    df = pd.read_parquet(args.inp)
-    print(f"loaded {len(df):,} rows, {len(df.columns)} cols")
-
-    if args.dropna_cols:
-        present = [c for c in args.dropna_cols if c in df.columns]
-        missing = [c for c in args.dropna_cols if c not in df.columns]
-        if missing:
-            print(f"WARN: dropna cols not in df, ignoring: {missing}")
-        before = len(df)
-        df = df.dropna(subset=present).reset_index(drop=True)
-        print(f"dropna({len(present)} cols): {before:,} -> {len(df):,} rows "
-              f"(dropped {before - len(df):,})")
-
-    tcol = args.time_col
-    if tcol is None:
-        for cand in ("valid_time", "init_time", "time", "valid", "init"):
-            if cand in df.columns:
-                tcol = cand
-                break
-    if tcol is None:
-        print("ERROR: no time column found. Columns:", list(df.columns), file=sys.stderr)
-        sys.exit(2)
-    print(f"using time column: {tcol}")
-
-    t = pd.to_datetime(df[tcol])
-    years = t.dt.year
-    print("year distribution:", dict(years.value_counts().sort_index()))
-
-    train = df[years.isin(args.train_years)].reset_index(drop=True)
-    val = df[years.isin(args.val_years)].reset_index(drop=True)
-    print(f"train rows: {len(train):,}  ({sorted(args.train_years)})")
-    print(f"val   rows: {len(val):,}  ({sorted(args.val_years)})")
-
-    Path(args.out_train).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.out_val).parent.mkdir(parents=True, exist_ok=True)
-    train.to_parquet(args.out_train, index=False)
-    val.to_parquet(args.out_val, index=False)
-    print(f"wrote {args.out_train}")
-    print(f"wrote {args.out_val}")
+    parts = parse_parts(a.parts)
+    df = pd.read_parquet(a.inp)
+    out = Path(a.out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    for name, part in split_by_years(df, parts, a.time_col).items():
+        if part.empty:
+            raise SystemExit(f"часть «{name}» пуста — проверь годы {parts[name]}")
+        p = out / f"{a.prefix}_{name}.parquet"
+        part.to_parquet(p, index=False)
+        print(f"  {name}: {len(part):,} строк -> {p}", flush=True)
 
 
 if __name__ == "__main__":

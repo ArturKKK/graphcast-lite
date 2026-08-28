@@ -57,6 +57,10 @@ git add -f experiments/*/training_log.txt 2>/dev/null
 # логи, и разбивка по срокам нейронного постпроцессора осталась бы жить лишь на
 # виртуалке, то есть до её пересоздания.
 git add -f experiments/*/eval_*/*.md experiments/*/eval_*/*.json 2>/dev/null
+# Нормировки и учёт прогонов: мелкие json, но по ним восстанавливается состав
+# признаков модели, а без него строка в учёте неполна.
+git add -f experiments/*/scalers.json experiments/*/station_to_idx.json 2>/dev/null
+git add -f docs/postproc_runs.md 2>/dev/null
 staged=$(git diff --cached --name-only | wc -l)
 echo "в индексе файлов: $staged"
 if [[ "$staged" -eq 0 ]]; then
