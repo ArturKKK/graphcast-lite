@@ -135,7 +135,11 @@ if [[ -z "$ISD" ]]; then
 fi
 log "наблюдения: $ISD ($(ls "$ISD" | wc -l) файлов)"
 
-mkdir -p data/postproc
+# Корпус кладём на /data, а не в /workdir: там квота 8 ГБ, а сам корпус и его
+# черновик тянут около гигабайта каждый. /data рестарт не переживает, поэтому
+# готовый файл в конце копируем в репозиторий, если он туда влезает.
+CORPUS_DIR=/data/postproc
+mkdir -p "$CORPUS_DIR"
 # Если pyarrow есть в окружении — пишем parquet, иначе сборщик сам откатится на
 # pickle. Попытка доустановить дешёвая и на машине без сети просто не сработает.
 # Попытка доустановить pyarrow: строго с таймаутом и без повторов. Без сети
@@ -161,7 +165,7 @@ ARGS=(scripts/postproc/build_corpus.py
     --isd-dir        "$ISD"
     --top-stations   71
     --years "$Y0" "$Y1"
-    --out-parquet    "data/postproc/corpus_krsk_${TAG}.parquet")
+    --out-parquet    "$CORPUS_DIR/corpus_krsk_${TAG}.parquet")
 # Подробности уходят в build-лог, а вехи — сюда, в master. Раньше проверка
 # порядка узлов печаталась только в build-лог, и в master её искали впустую.
 # Статус берём у python, а не у конвейера: grep вернёт 1, если вех не было.
@@ -174,7 +178,7 @@ log "DONE сборка rc=$RC"
 # Развёртка идёт больше двух часов и по ходу сбрасывает посчитанное в черновик.
 # Если упало уже после неё — на сшивке или записи — пересчитывать нечего:
 # досбираем из черновика.
-PART="data/postproc/corpus_krsk_${TAG}.partial.pkl"
+PART="$CORPUS_DIR/corpus_krsk_${TAG}.partial.pkl"
 if [[ $RC -ne 0 && -s "$PART" ]]; then
   log "упало (rc=$RC), но черновик на месте ($(du -h "$PART" | cut -f1)) — досбор без пересчёта"
   python -u "${ARGS[@]}" --from-partial 2>&1 | tee -a "$OUT/corpus_${TAG}_build.log" \
@@ -182,9 +186,20 @@ if [[ $RC -ne 0 && -s "$PART" ]]; then
   RC=${PIPESTATUS[0]}
   log "DONE досбор rc=$RC"
 fi
-CORPUS=$(ls -1 data/postproc/corpus_krsk_${TAG}.parquet data/postproc/corpus_krsk_${TAG}.pkl.gz 2>/dev/null | head -1)
+CORPUS=$(ls -1 "$CORPUS_DIR"/corpus_krsk_${TAG}.parquet "$CORPUS_DIR"/corpus_krsk_${TAG}.pkl.gz 2>/dev/null | head -1)
 if [[ -n "$CORPUS" ]]; then
   log "корпус: $CORPUS ($(du -h "$CORPUS" | cut -f1))"
+  # Дубль в /workdir, чтобы корпус пережил пересоздание виртуалки, — но только
+  # если после копии останется хотя бы гигабайт свободного места.
+  SZ=$(du -m "$CORPUS" | cut -f1)
+  FREE=$(df -Pm /workdir | awk 'NR==2{print $4}')
+  if (( FREE - SZ > 1024 )); then
+    mkdir -p data/postproc && cp -p "$CORPUS" data/postproc/ \
+      && log "копия в data/postproc/$(basename "$CORPUS") (в /workdir было $FREE МБ)"
+  else
+    log "в /workdir всего $FREE МБ, копию не делаю — корпус только на /data,"
+    log "  а он не переживёт пересоздание виртуалки"
+  fi
   python -u - "$CORPUS" <<'PYEOF'
 import sys, pandas as pd
 p = sys.argv[1]
