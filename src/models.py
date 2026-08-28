@@ -22,7 +22,21 @@ from torch_geometric.nn import GCNConv, SimpleConv, GATConv, LayerNorm
 import numpy as np
 from sklearn.neighbors import kneighbors_graph
 from torch_geometric.utils import dense_to_sparse, softmax
-from torch_geometric.nn import summary
+from torch_geometric.nn import summary as _pyg_summary
+
+
+def summary(*args, **kwargs):
+    """Табличка об устройстве блока. Печать, и только печать.
+
+    torch_geometric строит её через tabulate, а это необязательная зависимость:
+    без неё вызов падает с ModuleNotFoundError прямо в конструкторе модели, и
+    модель не создаётся вовсе. Сводка полезна в логе обучения, но ронять из-за
+    неё построение сети нельзя — 28.08.2026 на этом не собралась модель в
+    тестовом окружении. Возвращаем причину строкой и идём дальше."""
+    try:
+        return _pyg_summary(*args, **kwargs)
+    except Exception as e:                    # noqa: BLE001 — сводка не критична
+        return f"  (сводка не построена: {e.__class__.__name__}: {e})"
 
 from src.config import (
     ModelConfig,
