@@ -265,3 +265,6 @@ docs/paper/dialog_*.md
 # скриптом download_russia_isd_lite.py — в репозитории им не место.
 data/isd_lite_krsk/
 data/isd_lite_russia/
+.coverage
+.coverage.*
+htmlcov/
