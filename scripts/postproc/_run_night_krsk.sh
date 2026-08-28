@@ -67,7 +67,7 @@ fi
 log "шаг 3: базовые линии"
 python -u scripts/postproc/baselines.py --corpus "$LAGS" \
     --train-years 2016 2017 2018 --test-years 2020 --complete-obs 2>&1 \
-    | grep -E "только полные|^=== |сырой прогноз|станция×месяц×час|таблица \+"
+    | grep --line-buffered -E "только полные|^=== |сырой прогноз|станция×месяц×час|таблица \+"
 
 # 4. Деление по годам и обучение.
 if [[ ! -f "$DIR/nb6_test.parquet" ]]; then
@@ -91,14 +91,18 @@ if [[ ! -f "$EXP/best_model.pth" ]]; then
   python -u scripts/postproc/train_neural_postproc_v3.py \
       --train-parquet "$DIR/nb6_train.parquet" --val-parquet "$DIR/nb6_val.parquet" \
       --out-dir "$EXP" --epochs 20 --batch-size 4096 --station-emb-dim 32 \
-      --hidden 192,192,128 2>&1 | grep -E "^\[(cfg|model|dataset|ep )|^Done:"
+      --hidden 192,192,128 2>&1 \
+      | grep --line-buffered -E "^\[(cfg|model|dataset|ep )|^Done:"
+  # --line-buffered обязателен: без него grep копит строки в буфере и при
+  # записи в файл эпохи не видны до самого конца обучения. 28.08.2026 из-за
+  # этого прогон выглядел зависшим, хотя шёл нормально.
 fi
 [[ -f "$EXP/best_model.pth" ]] || { log "весов нет — стоп"; exit 1; }
 
 log "шаг 6: проверка на 2020"
 python -u scripts/postproc/eval_per_lead_v2.py \
     --val-parquet "$DIR/nb6_test.parquet" --ckpt "$EXP/best_model.pth" \
-    --out-dir "$EXP/eval_test2020" 2>&1 | grep -E "^\[eval\]|^Overall"
+    --out-dir "$EXP/eval_test2020" 2>&1 | grep --line-buffered -E "^\[eval\]|^Overall"
 log "шаг 7: разбор по станциям"
 python -u scripts/postproc/eval_per_station_v2.py \
     --val-parquet "$DIR/nb6_test.parquet" --ckpt "$EXP/best_model.pth" \

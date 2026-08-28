@@ -68,7 +68,7 @@ fi
 log "базовые линии на выборке сети (только полные наблюдения)"
 python -u scripts/postproc/baselines.py --corpus "$LAGS" \
     --train-years 2016 2017 2018 --test-years 2020 --complete-obs 2>&1 \
-    | grep -E "только полные|обучение |сырой прогноз|станция×месяц×час|регрессия|таблица \+"
+    | grep --line-buffered -E "только полные|обучение |сырой прогноз|станция×месяц×час|регрессия|таблица \+"
 
 # Две настройки. Основная видит признаки-наблюдения станции, абляция — нет.
 # Без абляции неясно, за счёт чего выигрыш: линейная регрессия на тех же
@@ -90,13 +90,13 @@ train_and_eval() {
         --out-dir       "$exp" \
         --epochs "$EPOCHS" --batch-size 4096 --station-emb-dim 32 \
         --hidden 192,192,128 "$@" 2>&1 \
-        | grep -E "^\[(cfg|model|dataset|ep )|^Done:"
+        | grep --line-buffered -E "^\[(cfg|model|dataset|ep )|^Done:"
     [[ -f "$exp/best_model.pth" ]] || { log "    весов нет — пропускаю оценку"; return 1; }
   fi
   log "    проверка на 2020"
   python -u scripts/postproc/eval_per_lead_v2.py \
       --val-parquet "$DIR/krsk_test.parquet" --ckpt "$exp/best_model.pth" \
-      --out-dir "$exp/eval_test2020" 2>&1 | grep -E "^\[eval\]|^Overall"
+      --out-dir "$exp/eval_test2020" 2>&1 | grep --line-buffered -E "^\[eval\]|^Overall"
 }
 
 train_and_eval ""
