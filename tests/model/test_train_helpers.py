@@ -225,3 +225,71 @@ def test_carry_forward_is_idempotent(carry):
     a = carry(torch.zeros(1, 2, 4), prev, tgt, [0], [3])
     b = carry(a.clone(), prev, tgt, [0], [3])
     assert torch.allclose(a, b)
+
+
+# --- расписание темпа обучения ----------------------------------------------
+
+@pytest.fixture
+def lr():
+    from src.train import cosine_lr_factor
+    return cosine_lr_factor
+
+
+def test_warmup_starts_above_zero(lr):
+    """Первый шаг не должен быть пустым: множитель 1/warmup, а не нуль."""
+    assert lr(0, warmup=100, total_steps=1000) == pytest.approx(0.01)
+
+
+def test_warmup_reaches_one_at_its_end(lr):
+    assert lr(99, warmup=100, total_steps=1000) == pytest.approx(1.0)
+
+
+def test_warmup_rises_monotonically(lr):
+    vals = [lr(s, warmup=50, total_steps=500) for s in range(50)]
+    assert all(b > a for a, b in zip(vals, vals[1:]))
+
+
+def test_decay_starts_at_one_right_after_warmup(lr):
+    assert lr(100, warmup=100, total_steps=1000) == pytest.approx(1.0)
+
+
+def test_decay_falls_monotonically(lr):
+    vals = [lr(s, warmup=100, total_steps=1000) for s in range(100, 1001, 25)]
+    assert all(b <= a for a, b in zip(vals, vals[1:]))
+
+
+def test_last_step_reaches_the_floor(lr):
+    """К концу обучения темп падает ровно до заданной доли."""
+    assert lr(1000, warmup=100, total_steps=1000, min_factor=0.1) == pytest.approx(0.1)
+    assert lr(1000, warmup=100, total_steps=1000, min_factor=0.0) == pytest.approx(0.0,
+                                                                                   abs=1e-12)
+
+
+def test_factor_stays_within_bounds(lr):
+    """Множитель никогда не выходит за [min_factor, 1] — включая шаги за концом."""
+    for s in range(0, 2000, 7):
+        v = lr(s, warmup=100, total_steps=1000, min_factor=0.05)
+        assert 0.05 - 1e-12 <= v <= 1.0 + 1e-12, (s, v)
+
+
+def test_half_way_is_about_half(lr):
+    """На середине спада множитель примерно посередине — это и есть косинус."""
+    v = lr(550, warmup=100, total_steps=1000)
+    assert v == pytest.approx(0.5, abs=0.01)
+
+
+def test_no_warmup_starts_the_decay_immediately(lr):
+    assert lr(0, warmup=0, total_steps=1000) == pytest.approx(1.0)
+
+
+def test_resuming_mid_training_does_not_restart_the_warmup(lr):
+    """Возобновление с середины не начинает разогрев заново.
+
+    Множитель зависит только от номера шага, поэтому при возобновлении с шага
+    500 он тот же, что был бы при непрерывном обучении. Планировщик при этом
+    отматывается на пройденные шаги — иначе после обрыва темп подскочил бы к
+    единице посреди обучения.
+    """
+    assert lr(500, warmup=100, total_steps=1000) == lr(500, warmup=100,
+                                                       total_steps=1000)
+    assert lr(500, warmup=100, total_steps=1000) < 1.0

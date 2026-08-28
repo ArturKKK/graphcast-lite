@@ -170,6 +170,25 @@ def update_attention_threshold(epoch, max_epochs=30, start_epoch=5, final_thresh
     if epoch > max_epochs + start_epoch: return final_threshold  
     return min(final_threshold, (epoch - start_epoch) * final_threshold / (max_epochs - start_epoch))
 
+def cosine_lr_factor(step: int, warmup: int, total_steps: int,
+                     min_factor: float = 0.0) -> float:
+    """Множитель темпа обучения: линейный разогрев, затем косинусный спад.
+
+    На разогреве множитель растёт от 1/warmup до единицы — с нуля начинать
+    нельзя, первый шаг тогда не делал бы ничего. После разогрева идёт половина
+    косинуса от единицы до min_factor, достигаемого на последнем шаге.
+
+    Вынесено из замыкания внутри train(): туда было не добраться тестами, а
+    ошибка в расписании не падает — она молча меняет всё обучение.
+    """
+    import math
+    if warmup > 0 and step < warmup:
+        return (step + 1) / max(1, warmup)
+    prog = (step - warmup) / max(1, total_steps - warmup)
+    prog = min(1.0, max(0.0, prog))
+    return min_factor + (1.0 - min_factor) * 0.5 * (1.0 + math.cos(math.pi * prog))
+
+
 def carry_forward_channels(out, prev_frame, target_frame,
                            static_channels=None, forcing_channels=None):
     """Подставить в прогноз каналы, которые сеть предсказывать не должна.
@@ -760,11 +779,7 @@ def train(
         total_steps = max(1, num_epochs * steps_per_epoch)
 
         def _lr_lambda(step: int) -> float:
-            if step < warmup:
-                return (step + 1) / max(1, warmup)
-            prog = (step - warmup) / max(1, total_steps - warmup)
-            prog = min(1.0, max(0.0, prog))
-            return min_factor + (1.0 - min_factor) * 0.5 * (1.0 + math.cos(math.pi * prog))
+            return cosine_lr_factor(step, warmup, total_steps, min_factor)
 
         # При возобновлении отматываем планировщик на уже пройденные шаги,
         # иначе он начнёт разогрев заново с середины обучения.
