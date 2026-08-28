@@ -7,7 +7,6 @@
 """
 import numpy as np
 import pytest
-
 from conftest import needs_torch
 
 pytestmark = needs_torch
@@ -69,9 +68,8 @@ def test_too_small_a_grid_is_a_hard_failure(unet_cls):
     """
     import torch
     m = unet_cls(in_channels=2, out_channels=1, base_filters=4).eval()
-    with pytest.raises(Exception):
-        with torch.no_grad():
-            m(torch.randn(1, 2, 6, 6))
+    with pytest.raises(Exception), torch.no_grad():
+        m(torch.randn(1, 2, 6, 6))
 
 
 def test_eval_mode_is_deterministic_and_differs_from_train(unet_cls):
@@ -194,6 +192,7 @@ def test_single_node_region_is_refused_clearly(roi_mod):
 def test_edge_features_survive_an_empty_edge_set():
     """Пустой набор рёбер даёт пустую таблицу признаков, а не отказ."""
     import numpy as np
+
     from src.create_graphs import _compute_mesh_edge_features
     got = _compute_mesh_edge_features(np.array([10.0, 20.0]), np.array([30.0, 40.0]),
                                       np.zeros((2, 0), dtype=int))

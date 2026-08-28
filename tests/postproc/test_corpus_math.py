@@ -9,10 +9,13 @@ from datetime import datetime
 import numpy as np
 import pytest
 
-from src.postprocessing.corpus_math import (bilinear_sample, compute_forcing,
-                                            dewpoint_depression_K,
-                                            solar_elevation, wind_components)
-
+from src.postprocessing.corpus_math import (
+    bilinear_sample,
+    compute_forcing,
+    dewpoint_depression_K,
+    solar_elevation,
+    wind_components,
+)
 
 # --- ветер -------------------------------------------------------------------
 
@@ -197,8 +200,9 @@ def test_impossible_input_gives_nan_not_a_crash(q, sp):
 def test_fix_calm_wind_recovers_rows(tmp_path):
     """Заплатка возвращает штили, не трогая всё остальное."""
     import importlib.util
-    import pandas as pd
     from pathlib import Path as _P
+
+    import pandas as pd
 
     spec = importlib.util.spec_from_file_location(
         "fix_calm", _P(__file__).resolve().parents[2]
@@ -225,8 +229,9 @@ def test_fix_calm_wind_recovers_rows(tmp_path):
 
 def test_fix_calm_wind_refuses_without_raw_columns(tmp_path):
     import importlib.util
-    import pandas as pd
     from pathlib import Path as _P
+
+    import pandas as pd
 
     spec = importlib.util.spec_from_file_location(
         "fix_calm2", _P(__file__).resolve().parents[2]

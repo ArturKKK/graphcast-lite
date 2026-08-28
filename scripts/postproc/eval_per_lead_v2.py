@@ -22,8 +22,10 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from src.postprocessing.neural.dataset import StationCorpusDataset
-from src.postprocessing.neural.models import (StationLeadAwareResidualMLP,
-                                              StationLeadBiasResidualMLP)
+from src.postprocessing.neural.models import (
+    StationLeadAwareResidualMLP,
+    StationLeadBiasResidualMLP,
+)
 
 
 def _rmse(a: np.ndarray, b: np.ndarray) -> float:

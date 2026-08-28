@@ -15,7 +15,6 @@
 """
 import numpy as np
 import pytest
-
 from conftest import needs_torch
 
 pytestmark = needs_torch
@@ -54,6 +53,7 @@ def small_config():
 
 def build_model(lats, lons):
     import torch
+
     from src.models import WeatherPrediction
     graph, pipeline, data = small_config()
     torch.manual_seed(0)

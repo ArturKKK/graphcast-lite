@@ -8,10 +8,13 @@
 import numpy as np
 import pytest
 
-from src.postprocessing.geometry import (COHERENCE_MIN_REGIONAL,
-                                         COHERENCE_MIN_WHOLE,
-                                         field_coherence, neighbour_indices,
-                                         snap_miss)
+from src.postprocessing.geometry import (
+    COHERENCE_MIN_REGIONAL,
+    COHERENCE_MIN_WHOLE,
+    field_coherence,
+    neighbour_indices,
+    snap_miss,
+)
 
 
 def make_grid(lat0=50.0, lat1=60.0, lon0=83.0, lon1=98.0, step=0.25):

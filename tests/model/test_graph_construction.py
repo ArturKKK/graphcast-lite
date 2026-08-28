@@ -6,11 +6,12 @@
 Поэтому порядок сверяется напрямую, а не через комментарии в коде.
 """
 import numpy as np
-import pytest
 import scipy.spatial
 
-from src.mesh.grid_mesh_connectivity import (_grid_lat_lon_to_coordinates,
-                                             radius_query_indices)
+from src.mesh.grid_mesh_connectivity import (
+    _grid_lat_lon_to_coordinates,
+    radius_query_indices,
+)
 
 
 def unit_positions(lats, lons):

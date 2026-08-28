@@ -20,7 +20,9 @@ scalers.npz и variables.json. Сам массив data.npy он не читае
         --extra   /data/datasets/global_512x256_extra_2010-2021_07deg \
         --out     /data/datasets/multires_krsk_33f_meta
 """
-import argparse, json, shutil
+import argparse
+import json
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -58,7 +60,7 @@ def main() -> None:
     # 1. координаты
     if merged is not None and (merged / "coords.npz").exists():
         shutil.copy(merged / "coords.npz", out / "coords.npz")
-        print(f"[coords] взяты из слитого источника")
+        print("[coords] взяты из слитого источника")
     else:
         if not (a.global_base and a.region_base):
             raise SystemExit("слитого источника нет — нужны --global-base и "
@@ -131,7 +133,7 @@ def main() -> None:
 
     # 3. имена каналов
     (out / "variables.json").write_text(json.dumps(ALL_VARS, indent=2))
-    print(f"[variables] 33 имени записаны")
+    print("[variables] 33 имени записаны")
 
     # 4. сводка для глаза — числа должны быть физически осмысленными
     print(f"\n{'канал':>10} {'среднее':>12} {'ст.откл.':>10}")

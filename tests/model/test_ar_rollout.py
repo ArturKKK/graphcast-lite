@@ -9,9 +9,7 @@
 Проверяем настоящим `train_epoch` с моделью-заглушкой, которая записывает, что
 ей подавали на каждом шаге. Так видно не результат, а само поведение развёртки.
 """
-import numpy as np
 import pytest
-
 from conftest import needs_torch
 
 pytestmark = needs_torch
@@ -55,6 +53,7 @@ def make_batch(n_steps, base=0.0):
 
 def run_epoch(model, batches, **kw):
     import torch
+
     from src.train import train_epoch
     opt = torch.optim.SGD(model.parameters(), lr=0.0)   # веса не двигаем
     return train_epoch(model, batches, opt, None, torch.device("cpu"),
@@ -157,6 +156,7 @@ def test_gradients_do_not_accumulate_between_batches(tr):
     обучение разошлось бы — но не сразу, а на середине эпохи.
     """
     import torch
+
     from src.train import train_epoch
     m = make_spy_model(delta_value=1.0)
     opt = torch.optim.SGD(m.parameters(), lr=0.0)

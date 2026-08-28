@@ -12,9 +12,13 @@ numpy. Сами панели — тонкая обёртка над imshow, пр
 import numpy as np
 import pytest
 
-from src.plotting import (DIV_CMAP, SEQ_CMAP, shared_limits, symmetric_limit,
-                          to_map_orientation)
-
+from src.plotting import (
+    DIV_CMAP,
+    SEQ_CMAP,
+    shared_limits,
+    symmetric_limit,
+    to_map_orientation,
+)
 
 # --- порядок осей ------------------------------------------------------------
 

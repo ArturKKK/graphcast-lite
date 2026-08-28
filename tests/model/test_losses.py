@@ -11,7 +11,6 @@
 """
 import numpy as np
 import pytest
-
 from conftest import needs_torch
 
 pytestmark = needs_torch
@@ -25,8 +24,12 @@ def tr():
 
 @pytest.fixture
 def loss_mod():
-    from src.train import (build_boundary_mask, combine_spatial_masks,
-                           get_lat_weights, weighted_mse_loss)
+    from src.train import (
+        build_boundary_mask,
+        combine_spatial_masks,
+        get_lat_weights,
+        weighted_mse_loss,
+    )
     return dict(loss=weighted_mse_loss, lat=get_lat_weights,
                 boundary=build_boundary_mask, combine=combine_spatial_masks)
 

@@ -50,7 +50,6 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
-import math
 import pickle
 import sys
 import time
@@ -67,15 +66,21 @@ if str(REPO_ROOT) not in sys.path:
 
 from src.config import ExperimentConfig
 from src.main import load_model_from_experiment_config
-from src.postprocessing.corpus_math import (bilinear_sample, compute_forcing,
-                                            dewpoint_depression_K,
-                                            solar_elevation, wind_components)
-from src.postprocessing.geometry import (COHERENCE_MIN_REGIONAL,
-                                         COHERENCE_MIN_WHOLE,
-                                         field_coherence,
-                                         neighbour_indices, snap_miss)
+from src.postprocessing.corpus_math import (
+    bilinear_sample,
+    compute_forcing,
+    dewpoint_depression_K,
+    solar_elevation,
+    wind_components,
+)
+from src.postprocessing.geometry import (
+    COHERENCE_MIN_REGIONAL,
+    COHERENCE_MIN_WHOLE,
+    field_coherence,
+    neighbour_indices,
+    snap_miss,
+)
 from src.utils import load_from_json_file
-
 
 # ── ROI must match the one used to build multires_russia_33f ──────────────────
 ROI = (41.0, 82.0, 19.0, 180.0)  # lat_min, lat_max, lon_min, lon_max

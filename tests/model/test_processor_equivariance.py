@@ -13,9 +13,7 @@
 и их порядок зависит от того, как kd-дерево обошло дерево. Зависимость от него
 означала бы, что прогноз меняется от перестроения графа.
 """
-import numpy as np
 import pytest
-
 from conftest import needs_torch
 
 pytestmark = needs_torch

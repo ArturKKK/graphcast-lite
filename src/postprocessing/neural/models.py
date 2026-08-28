@@ -11,7 +11,6 @@ from typing import Dict, List, Optional
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 def _mlp(in_dim: int, hidden: List[int], dropout: float) -> nn.Sequential:

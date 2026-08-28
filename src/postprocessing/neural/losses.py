@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, Optional
+from typing import Dict
 
 import torch
 import torch.nn.functional as F

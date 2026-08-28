@@ -8,11 +8,14 @@
 import numpy as np
 import pytest
 
-from src.utils import (cartesian_to_spherical,
-                       get_bipartite_relative_position_in_receiver_local_coordinates,
-                       get_rotation_matrices_to_local_coordinates,
-                       lat_lon_deg_to_spherical, spherical_to_cartesian,
-                       spherical_to_lat_lon)
+from src.utils import (
+    cartesian_to_spherical,
+    get_bipartite_relative_position_in_receiver_local_coordinates,
+    get_rotation_matrices_to_local_coordinates,
+    lat_lon_deg_to_spherical,
+    spherical_to_cartesian,
+    spherical_to_lat_lon,
+)
 
 
 def to_xyz(lat, lon):

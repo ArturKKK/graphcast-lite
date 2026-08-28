@@ -9,7 +9,6 @@
 """
 import numpy as np
 import pytest
-
 from conftest import needs_torch
 
 pytestmark = needs_torch

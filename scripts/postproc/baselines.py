@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import re
+
 import numpy as np
 import pandas as pd
 
@@ -195,8 +196,8 @@ def main() -> None:
         obs_feats = obs_features(df)
         try:
             from sklearn.linear_model import Ridge
-            from sklearn.preprocessing import StandardScaler
             from sklearn.pipeline import make_pipeline
+            from sklearn.preprocessing import StandardScaler
 
             def ridge(feats, label, target=None, offset=None):
                 """Регрессия невязки. target/offset — для настройки поверх таблицы."""

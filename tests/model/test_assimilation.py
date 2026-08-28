@@ -10,7 +10,6 @@
 """
 import numpy as np
 import pytest
-
 from conftest import needs_torch
 
 pytestmark = needs_torch
@@ -18,9 +17,11 @@ pytestmark = needs_torch
 
 @pytest.fixture
 def nud():
-    from src.assimilation.nudging import (NudgingAssimilator,
-                                          build_boundary_taper_mask,
-                                          cosine_taper_2d)
+    from src.assimilation.nudging import (
+        NudgingAssimilator,
+        build_boundary_taper_mask,
+        cosine_taper_2d,
+    )
     return dict(A=NudgingAssimilator, taper=cosine_taper_2d,
                 mask=build_boundary_taper_mask)
 

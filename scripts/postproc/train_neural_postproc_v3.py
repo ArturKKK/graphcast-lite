@@ -34,10 +34,12 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.postprocessing.neural.dataset import StationCorpusDataset, build_balanced_sampler
+from src.postprocessing.neural.dataset import (
+    StationCorpusDataset,
+    build_balanced_sampler,
+)
 from src.postprocessing.neural.losses import compute_total_loss
 from src.postprocessing.neural.models import StationLeadBiasResidualMLP
-
 
 # Same feature set as v2 (calendar + lapse + elevations already present)
 DEFAULT_FEATURES_V3: List[str] = [

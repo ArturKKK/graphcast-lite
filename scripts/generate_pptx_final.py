@@ -234,7 +234,6 @@ def add_formula(slide, text, top, left=Inches(0.7), font_size=20, center=True):
 
 
 def add_divider(slide, top):
-    from pptx.util import Emu
     left = Inches(0.7)
     width = prs.slide_width - Inches(1.4)
     line = slide.shapes.add_shape(1, left, top, width, Pt(1))  # MSO_SHAPE_TYPE.LINE doesn't work like that
