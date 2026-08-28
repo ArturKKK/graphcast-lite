@@ -21,12 +21,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-LEDGER = ROOT / "docs" / "postproc_runs.md"
+# Путь к учёту можно подменить — это нужно тестам, чтобы не писать в настоящий.
+LEDGER = Path(os.environ.get("POSTPROC_LEDGER", ROOT / "docs" / "postproc_runs.md"))
 
 HEADER = """# Учёт прогонов постобработки
 
