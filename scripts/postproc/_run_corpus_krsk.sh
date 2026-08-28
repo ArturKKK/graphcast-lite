@@ -6,10 +6,11 @@
 # ISD-Lite и складывает в parquet. Сроки прогноза 6-120 ч, инициализации в
 # 00 и 12 UTC.
 #
-# Прежний корпус собирался на общероссийской модели, веса которой потеряны;
-# красноярская сохранилась и вдобавок точнее после августовской работы.
-# 19-канальная часть у неё уже слита в один плоский массив, поэтому сборщику
-# передаётся --merged-base вместо пары глобальная/региональная сетка.
+# Собирается на красноярской модели chw — основной в статье. Кадры читаются
+# прямо из глобальной сетки и региональной вставки; слитый датасет на 81 ГБ,
+# на сборке которого цепочка падала, не нужен: порядок узлов восстанавливается
+# тем же построением, что и при слиянии (проверено — 133 279 узлов, из них
+# 2501 региональный, ровно как в датасете, на котором обучалась модель).
 #
 # Годы задаются аргументами. На одной машине весь диапазон сразу:
 #   bash scripts/postproc/_run_corpus_krsk.sh 2016 2020
@@ -32,15 +33,23 @@ log "=== КОРПУС ПОСТОБРАБОТКИ, годы $Y0-$Y1 ==="
 BUSY=$(pgrep -af "^python.*(src\.main|scripts/predict\.py|build_corpus\.py)" | head -1)
 [[ -n "$BUSY" ]] && { log "карта занята: $BUSY — стоп"; exit 1; }
 
-MERGE="$DATA/multires_krsk_19f_merge"
+GBASE="$DATA/wb2_512x256_19f_ar"
+RBASE="$DATA/region_krsk_61x41_19f_2010-2020_025deg"
+REXTRA="$DATA/region_krsk_61x41_extra_2010-2020_025deg"
 GEXTRA="$DATA/global_512x256_extra_2010-2021_07deg"
 META="$DATA/multires_krsk_33f_meta"
 
-if [[ ! -x "$VENV/bin/python" || ! -f "$MERGE/data.npy" ]]; then
+# Слитый датасет на 81 ГБ нам не нужен: сборщик читает кадры прямо из
+# глобальной и региональной сеток, а порядок узлов восстанавливается тем же
+# построением, что и при слиянии. Раньше цепочка падала именно на его сборке.
+if [[ ! -x "$VENV/bin/python" || ! -f "$GBASE/data.npy" || ! -f "$RBASE/data.npy" ]]; then
   log "подготовка окружения и датасетов"
   bash scripts/_paper_setup_vm.sh >> "$OUT/corpus_${TAG}_setup.log" 2>&1
-  log "подготовка rc=$?"
+  log "подготовка rc=$? (сбой на сборке слитого датасета не помеха — он не нужен)"
 fi
+for d in "$GBASE" "$RBASE" "$GEXTRA" "$REXTRA"; do
+  [[ -f "$d/data.npy" ]] || { log "нет $d/data.npy — стоп"; exit 1; }
+done
 source "$VENV/bin/activate" || { log "нет venv — стоп"; exit 1; }
 export PYTHONPATH="$REPO"
 
@@ -51,7 +60,8 @@ export PYTHONPATH="$REPO"
 if [[ ! -f "$META/scalers.npz" ]]; then
   log "собираю метаданные 33-канального датасета"
   python -u scripts/postproc/make_multires33f_meta.py \
-      --merged "$MERGE" --extra "$GEXTRA" --out "$META" 2>&1 | tail -14
+      --global-base "$GBASE" --region-base "$RBASE" --extra "$GEXTRA" \
+      --roi 50 60 83 98 --expect-nodes 133279 --out "$META" 2>&1 | tail -16
   [[ -f "$META/scalers.npz" ]] || { log "метаданные не собрались — стоп"; exit 1; }
 fi
 
@@ -103,9 +113,10 @@ log "START сборки (развёртка до 120 ч, инициализац�
 python -u scripts/postproc/build_corpus.py \
     --experiment-dir "experiments/$EXP" \
     --multires-dir   "$META" \
-    --merged-base    "$MERGE" \
+    --global-base    "$GBASE" \
+    --regional-base  "$RBASE" \
     --global-extra   "$GEXTRA" \
-    --regional-extra "$DATA/region_krsk_61x41_extra_2010-2020_025deg" \
+    --regional-extra "$REXTRA" \
     --stations-json  data/krsk_postproc_stations.json \
     --isd-dir        "$ISD" \
     --top-stations   71 \

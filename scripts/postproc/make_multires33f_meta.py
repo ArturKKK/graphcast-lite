@@ -36,20 +36,55 @@ ALL_VARS = BASE_VARS + EXTRA_PLEV + TIME_VARS
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--merged", required=True, help="слитый multires 19f")
+    ap.add_argument("--merged", default=None, help="слитый multires 19f (если собран)")
+    # Без слитого источника координаты и 19 нормировок восстанавливаются из
+    # исходников — ровно тем же построением, что и в build_multires_dataset.py:
+    # сначала глобальные узлы ВНЕ области, затем все узлы вставки.
+    ap.add_argument("--global-base", default=None, help="глобальный 19f датасет")
+    ap.add_argument("--region-base", default=None, help="региональный 19f датасет")
+    ap.add_argument("--roi", type=float, nargs=4, default=[50.0, 60.0, 83.0, 98.0],
+                    metavar=("LAT_MIN", "LAT_MAX", "LON_MIN", "LON_MAX"))
+    ap.add_argument("--expect-nodes", type=int, default=None,
+                    help="сколько узлов должно получиться (проверка построения)")
     ap.add_argument("--extra", required=True, help="ГЛОБАЛЬНЫЙ extra (источник нормировок plev)")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
-    merged, extra, out = Path(a.merged), Path(a.extra), Path(a.out)
+    merged = Path(a.merged) if a.merged else None
+    extra, out = Path(a.extra), Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
 
     assert len(ALL_VARS) == 33, len(ALL_VARS)
 
     # 1. координаты
-    src_coords = merged / "coords.npz"
-    if not src_coords.exists():
-        raise SystemExit(f"нет {src_coords}")
-    shutil.copy(src_coords, out / "coords.npz")
+    if merged is not None and (merged / "coords.npz").exists():
+        shutil.copy(merged / "coords.npz", out / "coords.npz")
+        print(f"[coords] взяты из слитого источника")
+    else:
+        if not (a.global_base and a.region_base):
+            raise SystemExit("слитого источника нет — нужны --global-base и "
+                             "--region-base, чтобы построить координаты")
+        gc = np.load(Path(a.global_base) / "coords.npz")
+        rc = np.load(Path(a.region_base) / "coords.npz")
+        g_lats = gc["latitude"].astype(np.float64)
+        g_lons = gc["longitude"].astype(np.float64)
+        r_lats = rc["latitude"].astype(np.float64)
+        r_lons = rc["longitude"].astype(np.float64)
+        lat_min, lat_max, lon_min, lon_max = a.roi
+        g_lon_mesh, g_lat_mesh = np.meshgrid(g_lons, g_lats)
+        in_roi = ((g_lat_mesh >= lat_min) & (g_lat_mesh <= lat_max)
+                  & (g_lon_mesh >= lon_min) & (g_lon_mesh <= lon_max))
+        keep = ~in_roi
+        g_fl, g_fo = g_lat_mesh[keep], g_lon_mesh[keep]
+        r_lon_mesh, r_lat_mesh = np.meshgrid(r_lons, r_lats)
+        r_fl, r_fo = r_lat_mesh.reshape(-1), r_lon_mesh.reshape(-1)
+        lat = np.concatenate([g_fl, r_fl]).astype(np.float32)
+        lon = np.concatenate([g_fo, r_fo]).astype(np.float32)
+        reg = np.zeros(len(lat), dtype=bool)
+        reg[len(g_fl):] = True
+        np.savez(out / "coords.npz", latitude=lat, longitude=lon, is_regional=reg)
+        print(f"[coords] построены из исходников: глобальная {len(g_lons)}x{len(g_lats)}, "
+              f"вставка {len(r_lons)}x{len(r_lats)}, область {a.roi}")
+        print(f"[coords] выброшено глобальных узлов внутри области: {int(in_roi.sum())}")
     c = np.load(out / "coords.npz")
     n_nodes = len(c["latitude"])
     has_reg = "is_regional" in c.files
@@ -60,11 +95,18 @@ def main() -> None:
         raise SystemExit("в coords.npz нет is_regional — сборщик не сможет "
                          "развести узлы вставки и глобальной части")
 
-    # 2. нормировки
-    m = np.load(merged / "scalers.npz")
+    if a.expect_nodes is not None and n_nodes != a.expect_nodes:
+        raise SystemExit(f"узлов вышло {n_nodes}, ожидалось {a.expect_nodes} — "
+                         f"построение не совпало с тем, на котором обучалась модель")
+
+    # 2. нормировки. В слитом источнике они скопированы у глобального датасета
+    # (build_multires_dataset.py, режим merge), поэтому берём оттуда же.
+    sc_src = merged if (merged is not None and (merged / "scalers.npz").exists()) \
+        else Path(a.global_base)
+    m = np.load(sc_src / "scalers.npz")
     m_mean, m_std = m["mean"].astype(np.float32), m["std"].astype(np.float32)
     if m_mean.shape != (19,):
-        raise SystemExit(f"в {merged}/scalers.npz {m_mean.shape}, ожидалось (19,)")
+        raise SystemExit(f"в {sc_src}/scalers.npz {m_mean.shape}, ожидалось (19,)")
     ext_path = extra / "scalers_extra.npz"
     if not ext_path.exists():
         ext_path = extra / "scalers.npz"
