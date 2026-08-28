@@ -552,6 +552,38 @@ def _coerce_int_arg(values, name):
     return out
 
 
+
+def save_table(df, out_path: Path) -> Path:
+    """Пишет таблицу, откатываясь на pickle, если parquet недоступен.
+
+    27.08.2026 два с лишним часа развёртки пропали на последней строке: в
+    окружении виртуалки не оказалось pyarrow. Формат тут второстепенен —
+    важно не потерять посчитанное.
+    """
+    try:
+        df.to_parquet(out_path, index=False)
+        return out_path
+    except ImportError as e:
+        alt = out_path.with_suffix(".pkl.gz")
+        print(f"[save] parquet недоступен ({e.__class__.__name__}), пишу {alt}",
+              flush=True)
+        df.to_pickle(alt, compression="gzip")
+        return alt
+
+
+def check_writable(out_path: Path) -> None:
+    """Проверяет запись ДО тяжёлого счёта, а не после."""
+    probe = out_path.parent / (".write_probe" + out_path.suffix)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    got = save_table(pd.DataFrame({"a": [1.0], "b": ["x"]}), probe)
+    try:
+        got.unlink()
+    except FileNotFoundError:
+        pass
+    fmt = "parquet" if got.suffix == out_path.suffix else "pickle (parquet недоступен)"
+    print(f"[save] проверка записи пройдена, формат: {fmt}", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--experiment-dir", required=True)
@@ -591,6 +623,7 @@ def main():
     print(f"[cfg] device={device}", flush=True)
 
     # 1. multires builder
+    check_writable(Path(args.out_parquet))
     if not args.merged_base and not (args.global_base and args.regional_base):
         raise SystemExit("нужен либо --merged-base, либо пара --global-base/--regional-base")
     builder = MultiresInputBuilder(
@@ -863,7 +896,7 @@ def main():
     # 10. write Parquet
     out_path = Path(args.out_parquet)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_parquet(out_path, index=False)
+    out_path = save_table(df, out_path)
     print(f"[done] wrote {out_path} — {len(df)} rows  "
           f"({df['station_usaf'].nunique()} stations)", flush=True)
 

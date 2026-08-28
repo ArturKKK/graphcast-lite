@@ -85,6 +85,14 @@ fi
 log "наблюдения: $ISD ($(ls "$ISD" | wc -l) файлов)"
 
 mkdir -p data/postproc
+# Если pyarrow есть в окружении — пишем parquet, иначе сборщик сам откатится на
+# pickle. Попытка доустановить дешёвая и на машине без сети просто не сработает.
+python -c "import pyarrow" 2>/dev/null || {
+  log "pyarrow нет — пробую поставить (без сети просто не выйдет, и это не страшно)"
+  pip install -q pyarrow >> "$OUT/corpus_${TAG}_pip.log" 2>&1
+  python -c "import pyarrow" 2>/dev/null && log "pyarrow поставлен" \
+    || log "pyarrow недоступен — корпус будет записан в pickle"
+}
 log "START сборки (развёртка до 120 ч, инициализации 00 и 12 UTC)"
 python -u scripts/postproc/build_corpus.py \
     --experiment-dir "experiments/$EXP" \
@@ -100,11 +108,13 @@ python -u scripts/postproc/build_corpus.py \
     >> "$OUT/corpus_${TAG}_build.log" 2>&1
 RC=$?
 log "DONE сборка rc=$RC"
-if [[ -f "data/postproc/corpus_krsk_${TAG}.parquet" ]]; then
-  log "корпус: $(du -h "data/postproc/corpus_krsk_${TAG}.parquet" | cut -f1)"
-  python -u - "data/postproc/corpus_krsk_${TAG}.parquet" <<'PYEOF'
+CORPUS=$(ls -1 data/postproc/corpus_krsk_${TAG}.parquet data/postproc/corpus_krsk_${TAG}.pkl.gz 2>/dev/null | head -1)
+if [[ -n "$CORPUS" ]]; then
+  log "корпус: $CORPUS ($(du -h "$CORPUS" | cut -f1))"
+  python -u - "$CORPUS" <<'PYEOF'
 import sys, pandas as pd
-df = pd.read_parquet(sys.argv[1])
+p = sys.argv[1]
+df = pd.read_pickle(p, compression="gzip") if p.endswith(".pkl.gz") else pd.read_parquet(p)
 print(f"[итог] строк {len(df):,}, столбцов {len(df.columns)}")
 print(f"[итог] станций {df['station_usaf'].nunique()}, "
       f"сроков прогноза {sorted(df['lead_h'].unique())}")
