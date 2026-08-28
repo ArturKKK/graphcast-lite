@@ -1,8 +1,13 @@
+from pathlib import Path
+import sys
 import argparse
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src.plotting import error_panel, field_panel, shared_limits, symmetric_limit
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -71,17 +76,13 @@ def main():
 
     # Рисуем
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    limit = max(np.abs(err_nudge).max(), np.abs(err_oi).max())
+    # Общий предел на оба способа — иначе сравнивать картинки нельзя.
+    limit = symmetric_limit(err_nudge, err_oi)
 
-    # Nudging
-    im1 = axes[0].imshow(err_nudge.T, origin='lower', cmap='bwr', vmin=-limit, vmax=limit)
-    axes[0].set_title(f"NUDGING\nRMSE: {args.rmse_nudge:.3f} | Skill: {args.skill_nudge:.1f}%")
-    plt.colorbar(im1, ax=axes[0], label="Error Bias [°C]")
-
-    # OI
-    im2 = axes[1].imshow(err_oi.T, origin='lower', cmap='bwr', vmin=-limit, vmax=limit)
-    axes[1].set_title(f"OPTIMAL INTERPOLATION (OI)\nRMSE: {args.rmse_oi:.3f} | Skill: {args.skill_oi:.1f}%")
-    plt.colorbar(im2, ax=axes[1], label="Error Bias [°C]")
+    error_panel(axes[0], err_nudge, limit=limit, label="Error Bias [°C]",
+                title=f"NUDGING\nRMSE: {args.rmse_nudge:.3f} | Skill: {args.skill_nudge:.1f}%")
+    error_panel(axes[1], err_oi, limit=limit, label="Error Bias [°C]",
+                title=f"OPTIMAL INTERPOLATION (OI)\nRMSE: {args.rmse_oi:.3f} | Skill: {args.skill_oi:.1f}%")
 
     plt.suptitle(f"Algorithm Comparison: {args.group_name}", fontsize=16)
     plt.tight_layout()

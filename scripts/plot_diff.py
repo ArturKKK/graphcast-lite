@@ -1,8 +1,13 @@
+from pathlib import Path
+import sys
 import argparse
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src.plotting import error_panel, field_panel, shared_limits, symmetric_limit
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -118,34 +123,18 @@ def main():
     # Визуализация
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     
-    # Шкалы для Полей (чтобы сравнивать цвета)
-    vmin_val = min(truth.min(), base.min(), exp.min())
-    vmax_val = max(truth.max(), base.max(), exp.max())
-    
-    # Шкалы для Ошибок (симметричная, чтобы 0 был белым)
-    # Находим максимальное отклонение по модулю
-    limit = max(np.abs(diff_base).max(), np.abs(diff_exp).max())
-    
-    # 1. Truth
-    im = axes[0,0].imshow(truth.T, origin='lower', cmap='jet', vmin=vmin_val, vmax=vmax_val)
-    axes[0,0].set_title(f"Ground Truth (ERA5) [{unit_name}]")
-    plt.colorbar(im, ax=axes[0,0])
+    # Поля — в одной шкале, карты ошибки — в одной симметричной: иначе картинки
+    # рядом выглядят сравнимыми, не будучи ими.
+    vmin_val, vmax_val = shared_limits(truth, base, exp)
+    limit = symmetric_limit(diff_base, diff_exp)
 
-    # 2. Prediction (Exp)
-    im = axes[0,1].imshow(exp.T, origin='lower', cmap='jet', vmin=vmin_val, vmax=vmax_val)
-    axes[0,1].set_title(f"Prediction: {args.title_suffix}")
-    plt.colorbar(im, ax=axes[0,1])
-
-    # 3. Error Baseline (Bias)
-    # bwr = Blue-White-Red (Синий=Холоднее, Красный=Теплее, Белый=Точно)
-    im = axes[1,0].imshow(diff_base.T, origin='lower', cmap='bwr', vmin=-limit, vmax=limit)
-    axes[1,0].set_title("Error: Baseline (Control)")
-    plt.colorbar(im, ax=axes[1,0])
-
-    # 4. Error Exp (Bias)
-    im = axes[1,1].imshow(diff_exp.T, origin='lower', cmap='bwr', vmin=-limit, vmax=limit)
-    axes[1,1].set_title(f"Error: {args.title_suffix}")
-    plt.colorbar(im, ax=axes[1,1])
+    field_panel(axes[0, 0], truth, vmin=vmin_val, vmax=vmax_val,
+                title=f"Ground Truth (ERA5) [{unit_name}]")
+    field_panel(axes[0, 1], exp, vmin=vmin_val, vmax=vmax_val,
+                title=f"Prediction: {args.title_suffix}")
+    # Расходящаяся шкала: холоднее — в одну сторону, теплее — в другую, нуль в середине
+    error_panel(axes[1, 0], diff_base, limit=limit, title="Error: Baseline (Control)")
+    error_panel(axes[1, 1], diff_exp, limit=limit, title=f"Error: {args.title_suffix}")
 
     plt.suptitle(f"Forecast +{(args.step_idx+1)*6}h | {args.title_suffix}", fontsize=16)
     plt.tight_layout()

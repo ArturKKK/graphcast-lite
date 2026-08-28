@@ -1,8 +1,13 @@
+from pathlib import Path
+import sys
 import argparse
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src.plotting import error_panel, field_panel, shared_limits, symmetric_limit
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -62,22 +67,15 @@ def main():
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
     
     # Шкала ошибок (берем по максимуму Базлайна, чтобы Финал выглядел бледным)
-    limit = max(np.abs(err_base).max(), np.abs(err_best).max())
+    # Общий предел по обеим картам ошибки, чтобы «финал» и правда выглядел
+    # бледнее контроля, а не просто был перекрашен в свою шкалу.
+    limit = symmetric_limit(err_base, err_best)
 
-    # 1. Truth
-    im0 = axes[0].imshow(truth.T, origin='lower', cmap='jet')
-    axes[0].set_title("Ground Truth (ERA5)\nTemperature [°C]")
-    plt.colorbar(im0, ax=axes[0])
-
-    # 2. Error Baseline
-    im1 = axes[1].imshow(err_base.T, origin='lower', cmap='bwr', vmin=-limit, vmax=limit)
-    axes[1].set_title(f"Error: Baseline (Control)\nRMSE: {rmse_base:.2f}°C")
-    plt.colorbar(im1, ax=axes[1])
-
-    # 3. Error Best
-    im2 = axes[2].imshow(err_best.T, origin='lower', cmap='bwr', vmin=-limit, vmax=limit)
-    axes[2].set_title(f"Error: Final Model (OI + Bounds)\nRMSE: {rmse_best:.2f}°C")
-    plt.colorbar(im2, ax=axes[2])
+    field_panel(axes[0], truth, title="Ground Truth (ERA5)\nTemperature [°C]")
+    error_panel(axes[1], err_base, limit=limit,
+                title=f"Error: Baseline (Control)\nRMSE: {rmse_base:.2f}°C")
+    error_panel(axes[2], err_best, limit=limit,
+                title=f"Error: Final Model (OI + Bounds)\nRMSE: {rmse_best:.2f}°C")
 
     plt.tight_layout()
     save_path = os.path.join(args.out_dir, "FINAL_RESULT.png")
