@@ -66,6 +66,20 @@ if [[ ! -x "$VENV/bin/python" ]]; then
   log "восстановление rc=$? (подробности в venv_restore.log)"
 fi
 source "$VENV/bin/activate" || { log "нет venv — стоп"; exit 1; }
+
+# Проверяем не наличие venv, а то, что он РАБОТАЕТ для нашей задачи: весь
+# корпус лежит в parquet, и без движка чтения всё падает на первом же файле.
+# Проверять по факту, а не по списку зависимостей: окружение могло остаться от
+# прежней версии requirements.
+if ! python -c "import pyarrow" 2>/dev/null; then
+  log "нет pyarrow (корпус в parquet без него не прочитать) — ставлю"
+  pip install -q pyarrow \
+      --extra-index-url https://artifactory.tcsbank.ru/artifactory/api/pypi/python-all/simple \
+      >>"$OUT/venv_restore.log" 2>&1
+  python -c "import pyarrow" 2>/dev/null \
+    || { log "pyarrow не поставился — см. venv_restore.log"; exit 1; }
+  log "pyarrow готов"
+fi
 export PYTHONPATH="$REPO"
 DIR=/data/postproc; mkdir -p "$DIR" 2>/dev/null || DIR=$(dirname "$CORPUS")
 
