@@ -19,7 +19,22 @@
 # Сырой прогноз печатается рядом в каждом случае, так что выигрыш считается на
 # своей выборке и подмены не происходит.
 #
-# Занимает около получаса. Запуск: bash scripts/postproc/_run_transfer_krsk.sh
+# Серия задаётся аргументами вида «придержать:жребий». По умолчанию — то, что
+# нужно для статьи: три жребия при 14 придержанных станциях и три при 28.
+#
+# Три жребия обязательны. При одном делении нельзя отличить потерю ОТ ПЕРЕНОСА
+# от того, что жребий выдал станции труднее среднего: у придержанных 29.08.2026
+# сырая ошибка была 3,231 против 2,917 у остальных, и часть падения выигрыша
+# объясняется этим, а не переносом.
+#
+# Две величины придержанного отвечают на второй вопрос: упирается перенос в
+# ЧИСЛО обучающих станций или в их РАЗНООБРАЗИЕ. При 28 придержанных обучающая
+# выборка вдвое меньше; если выигрыш на незнакомых не изменится — дело не в
+# объёме.
+#
+#   bash scripts/postproc/_run_transfer_krsk.sh                 # вся серия, ~1,5 ч
+#   bash scripts/postproc/_run_transfer_krsk.sh 14:42           # одна настройка
+#
 # Лог: /workdir/paper_results/transfer_krsk_master.log
 set -uo pipefail
 if [[ "${DAEMONIZED:-}" != "1" ]]; then
@@ -32,7 +47,9 @@ cd "$REPO" || exit 1
 log() { echo "[$(date '+%d.%m %H:%M:%S')] $*"; }
 exec 9>"$OUT/.transfer_krsk.lock"
 flock -n 9 || { log "уже работает — стоп"; exit 1; }
-log "=== ПЕРЕНОС НА НЕЗНАКОМЫЕ СТАНЦИИ ==="
+SERIES=("$@")
+[[ ${#SERIES[@]} -eq 0 ]] && SERIES=(14:42 14:43 14:44 28:42 28:43 28:44)
+log "=== ПЕРЕНОС НА НЕЗНАКОМЫЕ СТАНЦИИ: ${SERIES[*]} ==="
 BUSY=$(pgrep -af "^python.*(src\.main|build_corpus\.py|train_neural)" | head -1)
 [[ -n "$BUSY" ]] && { log "карта занята: $BUSY — стоп"; exit 1; }
 
@@ -105,52 +122,54 @@ if [[ -z "$LAGS" ]]; then
 fi
 log "корпус: $LAGS ($(du -h "$LAGS" | cut -f1))"
 
-# 1. Делим по станциям, потом по годам внутри каждой части.
-if [[ ! -f "$DIR/tr_seen_test.parquet" ]]; then
-  log "шаг 1: делю по станциям (придерживаю 14 из 71)"
-  python -u scripts/postproc/split_stations.py --in "$LAGS" --out-dir "$DIR" \
-      --prefix st --holdout 14 --seed 42 || { log "деление не удалось"; exit 1; }
-  log "шаг 2: делю по годам внутри каждой части"
-  python -u scripts/postproc/split_corpus.py --in "$DIR/st_seen.parquet" \
-      --out-dir "$DIR" --prefix tr_seen train=2016,2017,2018 val=2019 test=2020
-  python -u scripts/postproc/split_corpus.py --in "$DIR/st_unseen.parquet" \
-      --out-dir "$DIR" --prefix tr_unseen train=2016,2017,2018 val=2019 test=2020
-fi
+run_one() {   # придержать, жребий
+  local hold=$1 seed=$2 tag="h${1}s${2}"
+  log ""
+  log "########## придержано $hold станций, жребий $seed ##########"
 
-train_one() {   # имя, дополнительные аргументы
-  local tag=$1; shift
+  if [[ ! -f "$DIR/${tag}_seen_test.parquet" ]]; then
+    log "делю по станциям и годам"
+    python -u scripts/postproc/split_stations.py --in "$LAGS" --out-dir "$DIR" \
+        --prefix "$tag" --holdout "$hold" --seed "$seed" || return 1
+    for part in seen unseen; do
+      python -u scripts/postproc/split_corpus.py --in "$DIR/${tag}_${part}.parquet" \
+          --out-dir "$DIR" --prefix "${tag}_${part}" \
+          train=2016,2017,2018 val=2019 test=2020 || return 1
+    done
+  fi
+
   local exp="experiments/neural_postproc_transfer_${tag}"
   if [[ -f "$exp/best_model.pth" ]]; then
-    log "--- $tag: веса уже есть"
+    log "веса уже есть"
   else
-    log "--- $tag: обучение на 57 станциях, 20 эпох"
+    log "обучение без привязки к станции, 20 эпох"
     python -u scripts/postproc/train_neural_postproc_v3.py \
-        --train-parquet "$DIR/tr_seen_train.parquet" \
-        --val-parquet   "$DIR/tr_seen_val.parquet" \
+        --train-parquet "$DIR/${tag}_seen_train.parquet" \
+        --val-parquet   "$DIR/${tag}_seen_val.parquet" \
         --out-dir "$exp" --epochs 20 --batch-size 4096 \
-        --hidden 192,192,128 "$@" 2>&1 \
+        --hidden 192,192,128 --no-station-emb 2>&1 \
         | grep --line-buffered -E "^\[(cfg|model|dataset|ep )|^Done:"
-    [[ -f "$exp/best_model.pth" ]] || { log "    весов нет"; return 1; }
+    [[ -f "$exp/best_model.pth" ]] || { log "весов нет — пропускаю"; return 1; }
   fi
+
   for part in seen unseen; do
-    log "    проверка на 2020, станции: $part"
     python -u scripts/postproc/eval_per_lead_v2.py \
-        --val-parquet "$DIR/tr_${part}_test.parquet" --ckpt "$exp/best_model.pth" \
+        --val-parquet "$DIR/${tag}_${part}_test.parquet" --ckpt "$exp/best_model.pth" \
         --out-dir "$exp/eval_${part}" 2>&1 \
-        | grep --line-buffered -E "^\[eval\]|^Overall" \
-        || log "    на этой части не считается (для модели с вложением это ОЖИДАЕМО:"
-    log "      у незнакомой станции нет строки вложения)"
-    if [[ -f "$exp/eval_${part}/eval_per_lead_v2.json" ]]; then
+        | grep --line-buffered -E "^\[eval\]|^Overall|незнакомых"
+    [[ -f "$exp/eval_${part}/eval_per_lead_v2.json" ]] && \
       python -u scripts/postproc/record_run.py \
           --eval-json "$exp/eval_${part}/eval_per_lead_v2.json" \
           --name "transfer_${tag}_${part}" \
-          --note "перенос: $tag, станции $part" 2>&1 | tail -1
-    fi
+          --note "перенос: придержано $hold, жребий $seed, станции $part" 2>&1 | tail -1
   done
 }
 
-train_one emb  --station-emb-dim 32
-train_one free --no-station-emb
+for item in "${SERIES[@]}"; do
+  run_one "${item%%:*}" "${item##*:}"
+done
+
 log "=== ALL DONE ==="
-log "сравнивать: обе модели на знакомых станциях — цена отказа от вложения;"
-log "  модель без привязки на НЕЗНАКОМЫХ — ответ на вопрос о переносе"
+log "сравнивать: разброс между жребиями при одном и том же числе придержанных"
+log "  показывает, сколько в 15,1 % от трудности выборки, а не от переноса;"
+log "  разница между 14 и 28 придержанными — упирается ли перенос в число станций"
