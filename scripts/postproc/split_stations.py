@@ -41,10 +41,37 @@ def choose_holdout(stations, n_holdout: int, seed: int) -> list:
     return sorted(rng.choice(uniq, size=n_holdout, replace=False).tolist())
 
 
+def choose_train(stations, holdout: list, keep: int | None, seed: int) -> list:
+    """Какие станции оставить на обучение. keep=None — все, кроме придержанных.
+
+    Нужно, чтобы менять РАЗМЕР обучающей выборки, не трогая проверочную. Иначе
+    опыт «зависит ли перенос от числа станций» неразрешим: меняя число
+    придержанных, меняешь заодно состав проверки, и числа перестают быть
+    сравнимыми. 29.08.2026 на это и напоролись — при семи придержанных станциях
+    одна трудная определяла весь результат.
+    """
+    rest = sorted(set(stations) - set(holdout))
+    if keep is None or keep >= len(rest):
+        return rest
+    if keep < 1:
+        raise SystemExit("--keep должно быть не меньше единицы")
+    rng = np.random.default_rng(seed + 1000)   # другой поток, чем у придержанных
+    return sorted(rng.choice(rest, size=keep, replace=False).tolist())
+
+
 def split_by_stations(df: pd.DataFrame, holdout: list,
-                      col: str = "station_usaf") -> tuple[pd.DataFrame, pd.DataFrame]:
+                      col: str = "station_usaf",
+                      train: list | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Разделить на обучающую и придержанную части.
+
+    ``train`` позволяет взять лишь часть непридержанных станций: придержанная
+    часть при этом не меняется вовсе, и проверка остаётся сравнимой.
+    """
     held = df[col].isin(holdout)
-    return df[~held], df[held]
+    seen = df[~held]
+    if train is not None:
+        seen = seen[seen[col].isin(train)]
+    return seen, df[held]
 
 
 def main() -> None:
@@ -56,11 +83,16 @@ def main() -> None:
                     help="сколько станций придержать")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--station-col", default="station_usaf")
+    ap.add_argument("--keep", type=int, default=None,
+                    help="сколько станций оставить на обучение (по умолчанию все "
+                         "непридержанные). Меняет РАЗМЕР обучения, не трогая "
+                         "проверку — иначе сравнивать нечего")
     a = ap.parse_args()
 
     df = pd.read_parquet(a.inp)
     holdout = choose_holdout(df[a.station_col], a.holdout, a.seed)
-    seen, unseen = split_by_stations(df, holdout, a.station_col)
+    train = choose_train(df[a.station_col], holdout, a.keep, a.seed)
+    seen, unseen = split_by_stations(df, holdout, a.station_col, train)
     if seen.empty or unseen.empty:
         raise SystemExit("одна из частей пуста — проверь --holdout")
 
@@ -71,8 +103,10 @@ def main() -> None:
         part.to_parquet(p, index=False)
         print(f"  {name}: {len(part):,} строк, "
               f"{part[a.station_col].nunique()} станций -> {p}", flush=True)
-    (out / f"{a.prefix}_holdout.json").write_text(
-        json.dumps({"seed": a.seed, "holdout": holdout}, ensure_ascii=False, indent=1))
+    (out / f"{a.prefix}_holdout.json").write_text(json.dumps(
+        {"seed": a.seed, "holdout": holdout, "train": train,
+         "n_train": len(train)}, ensure_ascii=False, indent=1))
+    print(f"  на обучении станций: {len(train)}", flush=True)
     print(f"  придержаны станции: {', '.join(map(str, holdout))}", flush=True)
 
 
