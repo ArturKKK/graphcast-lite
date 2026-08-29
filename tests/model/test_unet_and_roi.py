@@ -270,9 +270,8 @@ def wake_up(model):
     import torch
     with torch.no_grad():
         for m in model.modules():
-            if isinstance(m, torch.nn.Linear):
-                if m.weight.abs().sum() == 0:
-                    m.weight.normal_(0.0, 0.3)
+            if isinstance(m, torch.nn.Linear) and m.weight.abs().sum() == 0:
+                m.weight.normal_(0.0, 0.3)
     return model
 
 
