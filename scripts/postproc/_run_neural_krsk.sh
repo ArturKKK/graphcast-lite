@@ -187,6 +187,18 @@ TR="$DIR/krsk_test.parquet"; VA="$DIR/krsk_val.parquet"
 train_and_eval "_ceil"
 TR="$DIR/krsk_train.parquet"; VA="$DIR/krsk_val.parquet"
 
+# Калибровка вероятностной настройки: можно ли верить заявленному разбросу.
+# Точность у неё не хуже точечной (2,289 против 2,297), то есть оценка
+# надёжности достаётся даром — но только если она честная. Модель, занижающая
+# разброс, будет уверенно ошибаться; завышающая бесполезна.
+if [[ -f experiments/neural_postproc_krsk_prob/best_model.pth ]]; then
+  log "--- калибровка вероятностной настройки"
+  python -u scripts/postproc/eval_calibration.py \
+      --val-parquet "$DIR/krsk_test.parquet" \
+      --ckpt experiments/neural_postproc_krsk_prob/best_model.pth \
+      --out-dir experiments/neural_postproc_krsk_prob/calibration 2>&1 | tail -22
+fi
+
 # Разбор по станциям у основной модели: где поправка работает, а где нет.
 log "--- разбор по станциям (основная модель)"
 python -u scripts/postproc/eval_per_station_v2.py \
