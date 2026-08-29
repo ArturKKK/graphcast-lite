@@ -1,0 +1,69 @@
+[28.08 19:54:47] === РАЗБРОС ПО НАЧАЛЬНОМУ СОСТОЯНИЮ ===
+[28.08 19:54:47] --- krsk, жребий 43
+[cfg] num_stations=71  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] пропусков в признаках: 5,792,039 (6.59%) — заменены средним
+[cfg] признаков: 26 -> 62 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,899,185 (6.32%) — заменены средним
+[model] StationLeadBiasResidualMLP params=108,344  (station_emb=32 hidden=[192, 192, 128] bias_head=Embedding(71,3))
+Done: {'best_val_combined': 4.008997416019596, 'epochs_run': 20}
+Overall: t2m RMSE=2.294°C, wind vec=1.719m/s
+[28.08 20:05:06] --- krsk_nb6, жребий 43
+[cfg] num_stations=71  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] добавлен признак nb_t2m_dev
+[dataset] добавлен признак nb_t2m_mean
+[dataset] добавлен признак nb_t2m_std
+[dataset] добавлен признак nb_u10_dev
+[dataset] добавлен признак nb_u10_mean
+[dataset] добавлен признак nb_u10_std
+[dataset] добавлен признак nb_v10_dev
+[dataset] добавлен признак nb_v10_mean
+[dataset] добавлен признак nb_v10_std
+[dataset] добавлен признак nb_z_surf_range
+[dataset] добавлен признак nb_z_surf_std
+[dataset] пропусков в признаках: 5,792,039 (5.60%) — заменены средним
+[cfg] признаков: 26 -> 73 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,899,185 (5.36%) — заменены средним
+[model] StationLeadBiasResidualMLP params=110,456  (station_emb=32 hidden=[192, 192, 128] bias_head=Embedding(71,3))
+Done: {'best_val_combined': 3.9813093924901324, 'epochs_run': 20}
+Overall: t2m RMSE=2.282°C, wind vec=1.712m/s
+[28.08 20:15:52] --- krsk, жребий 44
+[cfg] num_stations=71  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] пропусков в признаках: 5,792,039 (6.59%) — заменены средним
+[cfg] признаков: 26 -> 62 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,899,185 (6.32%) — заменены средним
+[model] StationLeadBiasResidualMLP params=108,344  (station_emb=32 hidden=[192, 192, 128] bias_head=Embedding(71,3))
+Done: {'best_val_combined': 4.008734475681821, 'epochs_run': 20}
+Overall: t2m RMSE=2.298°C, wind vec=1.720m/s
+[28.08 20:26:16] --- krsk_nb6, жребий 44
+[cfg] num_stations=71  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] добавлен признак nb_t2m_dev
+[dataset] добавлен признак nb_t2m_mean
+[dataset] добавлен признак nb_t2m_std
+[dataset] добавлен признак nb_u10_dev
+[dataset] добавлен признак nb_u10_mean
+[dataset] добавлен признак nb_u10_std
+[dataset] добавлен признак nb_v10_dev
+[dataset] добавлен признак nb_v10_mean
+[dataset] добавлен признак nb_v10_std
+[dataset] добавлен признак nb_z_surf_range
+[dataset] добавлен признак nb_z_surf_std
+[dataset] пропусков в признаках: 5,792,039 (5.60%) — заменены средним
+[cfg] признаков: 26 -> 73 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,899,185 (5.36%) — заменены средним
+[model] StationLeadBiasResidualMLP params=110,456  (station_emb=32 hidden=[192, 192, 128] bias_head=Embedding(71,3))
+Done: {'best_val_combined': 3.984272023240025, 'epochs_run': 20}
+Overall: t2m RMSE=2.281°C, wind vec=1.713m/s
+[28.08 20:36:47] === ALL DONE ===
+[28.08 20:36:47] жребий 42 уже посчитан: без окрестности 2,297 / 1,727; с окрестностью 2,277 / 1,714
