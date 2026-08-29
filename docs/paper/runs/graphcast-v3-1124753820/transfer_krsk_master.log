@@ -174,3 +174,369 @@ Overall: t2m RMSE=2.743°C, wind vec=1.980m/s
 [29.08 09:42:12] === ALL DONE ===
 [29.08 09:42:12] сравнивать: обе модели на знакомых станциях — цена отказа от вложения;
 [29.08 09:42:12]   модель без привязки на НЕЗНАКОМЫХ — ответ на вопрос о переносе
+[29.08 09:47:13] === ПЕРЕНОС НА НЕЗНАКОМЫЕ СТАНЦИИ: 14:42 14:43 14:44 28:42 28:43 28:44 ===
+[29.08 09:47:13] корпус: /data/postproc/corpus_krsk_lags2_nb12.parquet (591M)
+[29.08 09:47:13] 
+[29.08 09:47:13] ########## придержано 14 станций, жребий 42 ##########
+[29.08 09:47:13] делю по станциям и годам
+  seen: 2,475,695 строк, 57 станций -> /data/postproc/h14s42_seen.parquet
+  unseen: 607,919 строк, 14 станций -> /data/postproc/h14s42_unseen.parquet
+  придержаны станции: 292630, 292740, 293740, 295620, 295940, 296620, 297660, 298660, 298760, 360830, 360910, 360920, 361040, 363070
+  train: 1,484,571 строк -> /data/postproc/h14s42_seen_train.parquet
+  val: 494,824 строк -> /data/postproc/h14s42_seen_val.parquet
+  test: 496,300 строк -> /data/postproc/h14s42_seen_test.parquet
+  train: 364,253 строк -> /data/postproc/h14s42_unseen_train.parquet
+  val: 121,730 строк -> /data/postproc/h14s42_unseen_val.parquet
+  test: 121,936 строк -> /data/postproc/h14s42_unseen_test.parquet
+[29.08 09:47:31] обучение без привязки к станции, 20 эпох
+[cfg] num_stations=57  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] добавлен признак nb_t2m_dev
+[dataset] добавлен признак nb_t2m_mean
+[dataset] добавлен признак nb_t2m_std
+[dataset] добавлен признак nb_u10_dev
+[dataset] добавлен признак nb_u10_mean
+[dataset] добавлен признак nb_u10_std
+[dataset] добавлен признак nb_v10_dev
+[dataset] добавлен признак nb_v10_mean
+[dataset] добавлен признак nb_v10_std
+[dataset] добавлен признак nb_z_surf_range
+[dataset] добавлен признак nb_z_surf_std
+[dataset] пропусков в признаках: 4,606,108 (5.47%) — заменены средним
+[cfg] признаков: 26 -> 73 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,507,016 (5.23%) — заменены средним
+[model] StationLeadBiasResidualMLP params=101,827  (БЕЗ привязки к станции, hidden=[192, 192, 128])
+[ep 001] train loss=5.0657 val loss=4.7056 val rmse_t2m=2.464°C val bias_t2m=+0.037°C val vec_rmse_wind=1.757m/s
+[ep 002] train loss=4.5519 val loss=4.5423 val rmse_t2m=2.409°C val bias_t2m=-0.038°C val vec_rmse_wind=1.724m/s
+[ep 003] train loss=4.4050 val loss=4.4528 val rmse_t2m=2.381°C val bias_t2m=+0.012°C val vec_rmse_wind=1.706m/s
+[ep 004] train loss=4.3114 val loss=4.4075 val rmse_t2m=2.370°C val bias_t2m=+0.074°C val vec_rmse_wind=1.697m/s
+[ep 005] train loss=4.2534 val loss=4.3696 val rmse_t2m=2.358°C val bias_t2m=-0.019°C val vec_rmse_wind=1.689m/s
+[ep 006] train loss=4.2077 val loss=4.3494 val rmse_t2m=2.357°C val bias_t2m=+0.048°C val vec_rmse_wind=1.685m/s
+[ep 007] train loss=4.1540 val loss=4.3288 val rmse_t2m=2.350°C val bias_t2m=+0.014°C val vec_rmse_wind=1.680m/s
+[ep 008] train loss=4.1316 val loss=4.3109 val rmse_t2m=2.346°C val bias_t2m=-0.000°C val vec_rmse_wind=1.676m/s
+[ep 009] train loss=4.1002 val loss=4.2996 val rmse_t2m=2.340°C val bias_t2m=+0.032°C val vec_rmse_wind=1.675m/s
+[ep 010] train loss=4.0827 val loss=4.2905 val rmse_t2m=2.346°C val bias_t2m=-0.028°C val vec_rmse_wind=1.672m/s
+[ep 011] train loss=4.0715 val loss=4.2815 val rmse_t2m=2.338°C val bias_t2m=+0.033°C val vec_rmse_wind=1.671m/s
+[ep 012] train loss=4.0505 val loss=4.2805 val rmse_t2m=2.337°C val bias_t2m=+0.014°C val vec_rmse_wind=1.671m/s
+[ep 013] train loss=4.0357 val loss=4.2709 val rmse_t2m=2.334°C val bias_t2m=-0.020°C val vec_rmse_wind=1.668m/s
+[ep 014] train loss=4.0168 val loss=4.2639 val rmse_t2m=2.338°C val bias_t2m=-0.021°C val vec_rmse_wind=1.666m/s
+[ep 015] train loss=4.0127 val loss=4.2570 val rmse_t2m=2.332°C val bias_t2m=-0.022°C val vec_rmse_wind=1.665m/s
+[ep 016] train loss=4.0043 val loss=4.2580 val rmse_t2m=2.335°C val bias_t2m=-0.036°C val vec_rmse_wind=1.665m/s
+[ep 017] train loss=4.0105 val loss=4.2529 val rmse_t2m=2.334°C val bias_t2m=-0.003°C val vec_rmse_wind=1.664m/s
+[ep 018] train loss=3.9884 val loss=4.2519 val rmse_t2m=2.332°C val bias_t2m=-0.002°C val vec_rmse_wind=1.664m/s
+[ep 019] train loss=3.9901 val loss=4.2504 val rmse_t2m=2.331°C val bias_t2m=-0.002°C val vec_rmse_wind=1.664m/s
+[ep 020] train loss=3.9905 val loss=4.2498 val rmse_t2m=2.331°C val bias_t2m=+0.000°C val vec_rmse_wind=1.664m/s
+Done: {'best_val_combined': 3.9947623005484036, 'epochs_run': 20}
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.278°C, wind vec=1.712m/s
+[учёт] transfer_h14s42_seen: t2m 2.278 (21.9 %), ветер 1.712 (27.7 %) -> postproc_runs.md
+[dataset] незнакомых станций: 14 — номер не используется, ставлю 0
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.743°C, wind vec=1.980m/s
+[учёт] transfer_h14s42_unseen: t2m 2.743 (15.1 %), ветер 1.980 (13.2 %) -> postproc_runs.md
+[29.08 09:52:54] 
+[29.08 09:52:54] ########## придержано 14 станций, жребий 43 ##########
+[29.08 09:52:54] делю по станциям и годам
+  seen: 2,477,503 строк, 57 станций -> /data/postproc/h14s43_seen.parquet
+  unseen: 606,111 строк, 14 станций -> /data/postproc/h14s43_unseen.parquet
+  придержаны станции: 290590, 290680, 294300, 294640, 295580, 295710, 295760, 295940, 296540, 296620, 298740, 298760, 360640, 360960
+  train: 1,485,487 строк -> /data/postproc/h14s43_seen_train.parquet
+  val: 495,076 строк -> /data/postproc/h14s43_seen_val.parquet
+  test: 496,940 строк -> /data/postproc/h14s43_seen_test.parquet
+  train: 363,337 строк -> /data/postproc/h14s43_unseen_train.parquet
+  val: 121,478 строк -> /data/postproc/h14s43_unseen_val.parquet
+  test: 121,296 строк -> /data/postproc/h14s43_unseen_test.parquet
+[29.08 09:53:12] обучение без привязки к станции, 20 эпох
+[cfg] num_stations=57  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] добавлен признак nb_t2m_dev
+[dataset] добавлен признак nb_t2m_mean
+[dataset] добавлен признак nb_t2m_std
+[dataset] добавлен признак nb_u10_dev
+[dataset] добавлен признак nb_u10_mean
+[dataset] добавлен признак nb_u10_std
+[dataset] добавлен признак nb_v10_dev
+[dataset] добавлен признак nb_v10_mean
+[dataset] добавлен признак nb_v10_std
+[dataset] добавлен признак nb_z_surf_range
+[dataset] добавлен признак nb_z_surf_std
+[dataset] пропусков в признаках: 4,657,512 (5.61%) — заменены средним
+[cfg] признаков: 26 -> 73 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,510,724 (5.30%) — заменены средним
+[model] StationLeadBiasResidualMLP params=101,827  (БЕЗ привязки к станции, hidden=[192, 192, 128])
+[ep 001] train loss=5.2786 val loss=4.9666 val rmse_t2m=2.465°C val bias_t2m=+0.067°C val vec_rmse_wind=1.820m/s
+[ep 002] train loss=4.8040 val loss=4.7868 val rmse_t2m=2.423°C val bias_t2m=+0.025°C val vec_rmse_wind=1.783m/s
+[ep 003] train loss=4.6500 val loss=4.7124 val rmse_t2m=2.407°C val bias_t2m=+0.042°C val vec_rmse_wind=1.768m/s
+[ep 004] train loss=4.5336 val loss=4.6631 val rmse_t2m=2.387°C val bias_t2m=+0.042°C val vec_rmse_wind=1.759m/s
+[ep 005] train loss=4.4900 val loss=4.6180 val rmse_t2m=2.375°C val bias_t2m=+0.049°C val vec_rmse_wind=1.750m/s
+[ep 006] train loss=4.4212 val loss=4.6038 val rmse_t2m=2.364°C val bias_t2m=+0.095°C val vec_rmse_wind=1.748m/s
+[ep 007] train loss=4.3827 val loss=4.5715 val rmse_t2m=2.364°C val bias_t2m=+0.083°C val vec_rmse_wind=1.741m/s
+[ep 008] train loss=4.3595 val loss=4.5594 val rmse_t2m=2.363°C val bias_t2m=+0.028°C val vec_rmse_wind=1.738m/s
+[ep 009] train loss=4.3277 val loss=4.5417 val rmse_t2m=2.356°C val bias_t2m=-0.018°C val vec_rmse_wind=1.735m/s
+[ep 010] train loss=4.2870 val loss=4.5380 val rmse_t2m=2.352°C val bias_t2m=+0.019°C val vec_rmse_wind=1.735m/s
+[ep 011] train loss=4.2785 val loss=4.5262 val rmse_t2m=2.353°C val bias_t2m=+0.039°C val vec_rmse_wind=1.732m/s
+[ep 012] train loss=4.2635 val loss=4.5238 val rmse_t2m=2.349°C val bias_t2m=+0.055°C val vec_rmse_wind=1.732m/s
+[ep 013] train loss=4.2364 val loss=4.5103 val rmse_t2m=2.352°C val bias_t2m=+0.033°C val vec_rmse_wind=1.728m/s
+[ep 014] train loss=4.2354 val loss=4.5020 val rmse_t2m=2.347°C val bias_t2m=+0.060°C val vec_rmse_wind=1.726m/s
+[ep 015] train loss=4.2175 val loss=4.4995 val rmse_t2m=2.346°C val bias_t2m=+0.027°C val vec_rmse_wind=1.726m/s
+[ep 016] train loss=4.2116 val loss=4.4998 val rmse_t2m=2.348°C val bias_t2m=+0.030°C val vec_rmse_wind=1.726m/s
+[ep 017] train loss=4.2031 val loss=4.4981 val rmse_t2m=2.346°C val bias_t2m=+0.015°C val vec_rmse_wind=1.726m/s
+[ep 018] train loss=4.2097 val loss=4.4978 val rmse_t2m=2.346°C val bias_t2m=+0.029°C val vec_rmse_wind=1.726m/s
+[ep 019] train loss=4.2068 val loss=4.4956 val rmse_t2m=2.346°C val bias_t2m=+0.025°C val vec_rmse_wind=1.725m/s
+[ep 020] train loss=4.1933 val loss=4.4947 val rmse_t2m=2.346°C val bias_t2m=+0.025°C val vec_rmse_wind=1.725m/s
+Done: {'best_val_combined': 4.070392942321825, 'epochs_run': 20}
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.326°C, wind vec=1.736m/s
+[учёт] transfer_h14s43_seen: t2m 2.326 (21.5 %), ветер 1.736 (26.1 %) -> postproc_runs.md
+[dataset] незнакомых станций: 14 — номер не используется, ставлю 0
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.540°C, wind vec=1.876m/s
+[учёт] transfer_h14s43_unseen: t2m 2.540 (16.6 %), ветер 1.876 (20.7 %) -> postproc_runs.md
+[29.08 09:58:34] 
+[29.08 09:58:34] ########## придержано 14 станций, жребий 44 ##########
+[29.08 09:58:34] делю по станциям и годам
+  seen: 2,477,733 строк, 57 станций -> /data/postproc/h14s44_seen.parquet
+  unseen: 605,881 строк, 14 станций -> /data/postproc/h14s44_unseen.parquet
+  придержаны станции: 290590, 292630, 292760, 293480, 293630, 294300, 295610, 295940, 296540, 296760, 297890, 360640, 360900, 361040
+  train: 1,485,197 строк -> /data/postproc/h14s44_seen_train.parquet
+  val: 495,852 строк -> /data/postproc/h14s44_seen_val.parquet
+  test: 496,684 строк -> /data/postproc/h14s44_seen_test.parquet
+  train: 363,627 строк -> /data/postproc/h14s44_unseen_train.parquet
+  val: 120,702 строк -> /data/postproc/h14s44_unseen_val.parquet
+  test: 121,552 строк -> /data/postproc/h14s44_unseen_test.parquet
+[29.08 09:58:52] обучение без привязки к станции, 20 эпох
+[cfg] num_stations=57  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] добавлен признак nb_t2m_dev
+[dataset] добавлен признак nb_t2m_mean
+[dataset] добавлен признак nb_t2m_std
+[dataset] добавлен признак nb_u10_dev
+[dataset] добавлен признак nb_u10_mean
+[dataset] добавлен признак nb_u10_std
+[dataset] добавлен признак nb_v10_dev
+[dataset] добавлен признак nb_v10_mean
+[dataset] добавлен признак nb_v10_std
+[dataset] добавлен признак nb_z_surf_range
+[dataset] добавлен признак nb_z_surf_std
+[dataset] пропусков в признаках: 4,560,281 (5.47%) — заменены средним
+[cfg] признаков: 26 -> 73 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,485,627 (5.20%) — заменены средним
+[model] StationLeadBiasResidualMLP params=101,827  (БЕЗ привязки к станции, hidden=[192, 192, 128])
+[ep 001] train loss=5.2708 val loss=4.9735 val rmse_t2m=2.446°C val bias_t2m=+0.048°C val vec_rmse_wind=1.826m/s
+[ep 002] train loss=4.8047 val loss=4.8024 val rmse_t2m=2.409°C val bias_t2m=-0.018°C val vec_rmse_wind=1.790m/s
+[ep 003] train loss=4.6460 val loss=4.7328 val rmse_t2m=2.388°C val bias_t2m=-0.001°C val vec_rmse_wind=1.776m/s
+[ep 004] train loss=4.5362 val loss=4.6767 val rmse_t2m=2.377°C val bias_t2m=+0.085°C val vec_rmse_wind=1.765m/s
+[ep 005] train loss=4.4963 val loss=4.6464 val rmse_t2m=2.364°C val bias_t2m=+0.034°C val vec_rmse_wind=1.760m/s
+[ep 006] train loss=4.4193 val loss=4.6157 val rmse_t2m=2.352°C val bias_t2m=+0.027°C val vec_rmse_wind=1.754m/s
+[ep 007] train loss=4.3985 val loss=4.5996 val rmse_t2m=2.349°C val bias_t2m=+0.071°C val vec_rmse_wind=1.751m/s
+[ep 008] train loss=4.3600 val loss=4.5757 val rmse_t2m=2.343°C val bias_t2m=+0.088°C val vec_rmse_wind=1.746m/s
+[ep 009] train loss=4.3399 val loss=4.5709 val rmse_t2m=2.340°C val bias_t2m=+0.038°C val vec_rmse_wind=1.745m/s
+[ep 010] train loss=4.3090 val loss=4.5518 val rmse_t2m=2.337°C val bias_t2m=+0.032°C val vec_rmse_wind=1.741m/s
+[ep 011] train loss=4.2888 val loss=4.5400 val rmse_t2m=2.337°C val bias_t2m=+0.065°C val vec_rmse_wind=1.738m/s
+[ep 012] train loss=4.2804 val loss=4.5484 val rmse_t2m=2.340°C val bias_t2m=+0.010°C val vec_rmse_wind=1.740m/s
+[ep 013] train loss=4.2535 val loss=4.5346 val rmse_t2m=2.331°C val bias_t2m=+0.034°C val vec_rmse_wind=1.738m/s
+[ep 014] train loss=4.2420 val loss=4.5348 val rmse_t2m=2.333°C val bias_t2m=+0.068°C val vec_rmse_wind=1.738m/s
+[ep 015] train loss=4.2267 val loss=4.5291 val rmse_t2m=2.332°C val bias_t2m=+0.028°C val vec_rmse_wind=1.736m/s
+[ep 016] train loss=4.2231 val loss=4.5289 val rmse_t2m=2.331°C val bias_t2m=+0.023°C val vec_rmse_wind=1.736m/s
+[ep 017] train loss=4.2116 val loss=4.5244 val rmse_t2m=2.330°C val bias_t2m=+0.026°C val vec_rmse_wind=1.736m/s
+[ep 018] train loss=4.2094 val loss=4.5224 val rmse_t2m=2.329°C val bias_t2m=+0.043°C val vec_rmse_wind=1.735m/s
+[ep 019] train loss=4.2188 val loss=4.5226 val rmse_t2m=2.330°C val bias_t2m=+0.039°C val vec_rmse_wind=1.735m/s
+[ep 020] train loss=4.2208 val loss=4.5221 val rmse_t2m=2.329°C val bias_t2m=+0.033°C val vec_rmse_wind=1.735m/s
+Done: {'best_val_combined': 4.064063886811033, 'epochs_run': 20}
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.301°C, wind vec=1.770m/s
+[учёт] transfer_h14s44_seen: t2m 2.301 (21.7 %), ветер 1.770 (24.6 %) -> postproc_runs.md
+[dataset] незнакомых станций: 14 — номер не используется, ставлю 0
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.624°C, wind vec=1.808m/s
+[учёт] transfer_h14s44_unseen: t2m 2.624 (16.3 %), ветер 1.808 (23.9 %) -> postproc_runs.md
+[29.08 10:04:14] 
+[29.08 10:04:14] ########## придержано 28 станций, жребий 42 ##########
+[29.08 10:04:14] делю по станциям и годам
+  seen: 1,869,109 строк, 43 станций -> /data/postproc/h28s42_seen.parquet
+  unseen: 1,214,505 строк, 28 станций -> /data/postproc/h28s42_unseen.parquet
+  придержаны станции: 291490, 292530, 292760, 293480, 293670, 294770, 295580, 295660, 295760, 295800, 295870, 295940, 296760, 297360, 297520, 297590, 297680, 297710, 298690, 298740, 360580, 360610, 360640, 360830, 360900, 361030, 361040, 362780
+  train: 1,120,671 строк -> /data/postproc/h28s42_seen_train.parquet
+  val: 373,910 строк -> /data/postproc/h28s42_seen_val.parquet
+  test: 374,528 строк -> /data/postproc/h28s42_seen_test.parquet
+  train: 728,153 строк -> /data/postproc/h28s42_unseen_train.parquet
+  val: 242,644 строк -> /data/postproc/h28s42_unseen_val.parquet
+  test: 243,708 строк -> /data/postproc/h28s42_unseen_test.parquet
+[29.08 10:04:31] обучение без привязки к станции, 20 эпох
+[cfg] num_stations=43  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] добавлен признак nb_t2m_dev
+[dataset] добавлен признак nb_t2m_mean
+[dataset] добавлен признак nb_t2m_std
+[dataset] добавлен признак nb_u10_dev
+[dataset] добавлен признак nb_u10_mean
+[dataset] добавлен признак nb_u10_std
+[dataset] добавлен признак nb_v10_dev
+[dataset] добавлен признак nb_v10_mean
+[dataset] добавлен признак nb_v10_std
+[dataset] добавлен признак nb_z_surf_range
+[dataset] добавлен признак nb_z_surf_std
+[dataset] пропусков в признаках: 3,314,519 (5.25%) — заменены средним
+[cfg] признаков: 26 -> 73 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,073,377 (4.97%) — заменены средним
+[model] StationLeadBiasResidualMLP params=101,827  (БЕЗ привязки к станции, hidden=[192, 192, 128])
+[ep 001] train loss=5.1792 val loss=4.7976 val rmse_t2m=2.445°C val bias_t2m=+0.073°C val vec_rmse_wind=1.784m/s
+[ep 002] train loss=4.6658 val loss=4.6519 val rmse_t2m=2.416°C val bias_t2m=+0.046°C val vec_rmse_wind=1.753m/s
+[ep 003] train loss=4.5024 val loss=4.5655 val rmse_t2m=2.388°C val bias_t2m=-0.034°C val vec_rmse_wind=1.735m/s
+[ep 004] train loss=4.4111 val loss=4.5024 val rmse_t2m=2.370°C val bias_t2m=+0.085°C val vec_rmse_wind=1.722m/s
+[ep 005] train loss=4.3185 val loss=4.4726 val rmse_t2m=2.361°C val bias_t2m=+0.006°C val vec_rmse_wind=1.716m/s
+[ep 006] train loss=4.2780 val loss=4.4534 val rmse_t2m=2.352°C val bias_t2m=-0.032°C val vec_rmse_wind=1.713m/s
+[ep 007] train loss=4.2201 val loss=4.4370 val rmse_t2m=2.349°C val bias_t2m=+0.031°C val vec_rmse_wind=1.710m/s
+[ep 008] train loss=4.2219 val loss=4.4317 val rmse_t2m=2.350°C val bias_t2m=-0.029°C val vec_rmse_wind=1.708m/s
+[ep 009] train loss=4.1650 val loss=4.4134 val rmse_t2m=2.349°C val bias_t2m=+0.069°C val vec_rmse_wind=1.704m/s
+[ep 010] train loss=4.1311 val loss=4.3942 val rmse_t2m=2.342°C val bias_t2m=+0.044°C val vec_rmse_wind=1.700m/s
+[ep 011] train loss=4.1203 val loss=4.4028 val rmse_t2m=2.345°C val bias_t2m=+0.066°C val vec_rmse_wind=1.702m/s
+[ep 012] train loss=4.1040 val loss=4.3878 val rmse_t2m=2.339°C val bias_t2m=+0.039°C val vec_rmse_wind=1.699m/s
+[ep 013] train loss=4.0824 val loss=4.3874 val rmse_t2m=2.344°C val bias_t2m=+0.047°C val vec_rmse_wind=1.698m/s
+[ep 014] train loss=4.0877 val loss=4.3882 val rmse_t2m=2.340°C val bias_t2m=+0.066°C val vec_rmse_wind=1.699m/s
+[ep 015] train loss=4.0695 val loss=4.3845 val rmse_t2m=2.344°C val bias_t2m=+0.046°C val vec_rmse_wind=1.698m/s
+[ep 016] train loss=4.0827 val loss=4.3807 val rmse_t2m=2.341°C val bias_t2m=+0.030°C val vec_rmse_wind=1.697m/s
+[ep 017] train loss=4.0399 val loss=4.3737 val rmse_t2m=2.339°C val bias_t2m=+0.042°C val vec_rmse_wind=1.695m/s
+[ep 018] train loss=4.0415 val loss=4.3734 val rmse_t2m=2.341°C val bias_t2m=+0.041°C val vec_rmse_wind=1.695m/s
+[ep 019] train loss=4.0546 val loss=4.3753 val rmse_t2m=2.341°C val bias_t2m=+0.028°C val vec_rmse_wind=1.696m/s
+[ep 020] train loss=4.0420 val loss=4.3742 val rmse_t2m=2.341°C val bias_t2m=+0.036°C val vec_rmse_wind=1.695m/s
+Done: {'best_val_combined': 4.034200352589613, 'epochs_run': 20}
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.288°C, wind vec=1.736m/s
+[учёт] transfer_h28s42_seen: t2m 2.288 (17.6 %), ветер 1.736 (25.4 %) -> postproc_runs.md
+[dataset] незнакомых станций: 28 — номер не используется, ставлю 0
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.826°C, wind vec=2.122m/s
+[учёт] transfer_h28s42_unseen: t2m 2.826 (13.6 %), ветер 2.122 (11.3 %) -> postproc_runs.md
+[29.08 10:08:41] 
+[29.08 10:08:41] ########## придержано 28 станций, жребий 43 ##########
+[29.08 10:08:41] делю по станциям и годам
+  seen: 1,867,464 строк, 43 станций -> /data/postproc/h28s43_seen.parquet
+  unseen: 1,216,150 строк, 28 станций -> /data/postproc/h28s43_unseen.parquet
+  придержаны станции: 287854, 290680, 293320, 293670, 293740, 294300, 294560, 294670, 294710, 294850, 295580, 295610, 295630, 295660, 295710, 295780, 296620, 297360, 297710, 298690, 298760, 299560, 360580, 360640, 360900, 360960, 361040, 363070
+  train: 1,120,016 строк -> /data/postproc/h28s43_seen_train.parquet
+  val: 373,052 строк -> /data/postproc/h28s43_seen_val.parquet
+  test: 374,396 строк -> /data/postproc/h28s43_seen_test.parquet
+  train: 728,808 строк -> /data/postproc/h28s43_unseen_train.parquet
+  val: 243,502 строк -> /data/postproc/h28s43_unseen_val.parquet
+  test: 243,840 строк -> /data/postproc/h28s43_unseen_test.parquet
+[29.08 10:08:58] обучение без привязки к станции, 20 эпох
+[cfg] num_stations=43  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] добавлен признак nb_t2m_dev
+[dataset] добавлен признак nb_t2m_mean
+[dataset] добавлен признак nb_t2m_std
+[dataset] добавлен признак nb_u10_dev
+[dataset] добавлен признак nb_u10_mean
+[dataset] добавлен признак nb_u10_std
+[dataset] добавлен признак nb_v10_dev
+[dataset] добавлен признак nb_v10_mean
+[dataset] добавлен признак nb_v10_std
+[dataset] добавлен признак nb_z_surf_range
+[dataset] добавлен признак nb_z_surf_std
+[dataset] пропусков в признаках: 3,590,809 (5.89%) — заменены средним
+[cfg] признаков: 26 -> 73 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,180,302 (5.64%) — заменены средним
+[model] StationLeadBiasResidualMLP params=101,827  (БЕЗ привязки к станции, hidden=[192, 192, 128])
+[ep 001] train loss=5.4099 val loss=5.0616 val rmse_t2m=2.473°C val bias_t2m=-0.024°C val vec_rmse_wind=1.845m/s
+[ep 002] train loss=4.8323 val loss=4.8842 val rmse_t2m=2.417°C val bias_t2m=+0.030°C val vec_rmse_wind=1.813m/s
+[ep 003] train loss=4.6673 val loss=4.7950 val rmse_t2m=2.396°C val bias_t2m=+0.089°C val vec_rmse_wind=1.795m/s
+[ep 004] train loss=4.5534 val loss=4.7400 val rmse_t2m=2.384°C val bias_t2m=+0.066°C val vec_rmse_wind=1.782m/s
+[ep 005] train loss=4.4856 val loss=4.7008 val rmse_t2m=2.370°C val bias_t2m=+0.061°C val vec_rmse_wind=1.776m/s
+[ep 006] train loss=4.4301 val loss=4.6651 val rmse_t2m=2.360°C val bias_t2m=+0.036°C val vec_rmse_wind=1.769m/s
+[ep 007] train loss=4.3896 val loss=4.6479 val rmse_t2m=2.354°C val bias_t2m=-0.059°C val vec_rmse_wind=1.765m/s
+[ep 008] train loss=4.3384 val loss=4.6363 val rmse_t2m=2.353°C val bias_t2m=-0.021°C val vec_rmse_wind=1.763m/s
+[ep 009] train loss=4.3253 val loss=4.6251 val rmse_t2m=2.345°C val bias_t2m=+0.005°C val vec_rmse_wind=1.761m/s
+[ep 010] train loss=4.2983 val loss=4.6102 val rmse_t2m=2.349°C val bias_t2m=-0.016°C val vec_rmse_wind=1.757m/s
+[ep 011] train loss=4.2601 val loss=4.6026 val rmse_t2m=2.345°C val bias_t2m=-0.017°C val vec_rmse_wind=1.756m/s
+[ep 012] train loss=4.2301 val loss=4.5976 val rmse_t2m=2.341°C val bias_t2m=-0.007°C val vec_rmse_wind=1.756m/s
+[ep 013] train loss=4.2374 val loss=4.5902 val rmse_t2m=2.339°C val bias_t2m=-0.013°C val vec_rmse_wind=1.754m/s
+[ep 014] train loss=4.2173 val loss=4.5901 val rmse_t2m=2.344°C val bias_t2m=-0.039°C val vec_rmse_wind=1.754m/s
+[ep 015] train loss=4.2258 val loss=4.5931 val rmse_t2m=2.342°C val bias_t2m=-0.008°C val vec_rmse_wind=1.754m/s
+[ep 016] train loss=4.2094 val loss=4.5854 val rmse_t2m=2.340°C val bias_t2m=-0.016°C val vec_rmse_wind=1.753m/s
+[ep 017] train loss=4.1911 val loss=4.5831 val rmse_t2m=2.337°C val bias_t2m=+0.008°C val vec_rmse_wind=1.753m/s
+[ep 018] train loss=4.1927 val loss=4.5814 val rmse_t2m=2.337°C val bias_t2m=+0.014°C val vec_rmse_wind=1.752m/s
+[ep 019] train loss=4.1869 val loss=4.5806 val rmse_t2m=2.336°C val bias_t2m=+0.010°C val vec_rmse_wind=1.752m/s
+[ep 020] train loss=4.1858 val loss=4.5807 val rmse_t2m=2.337°C val bias_t2m=+0.003°C val vec_rmse_wind=1.752m/s
+Done: {'best_val_combined': 4.088500446692759, 'epochs_run': 20}
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.284°C, wind vec=1.779m/s
+[учёт] transfer_h28s43_seen: t2m 2.284 (20.1 %), ветер 1.779 (24.9 %) -> postproc_runs.md
+[dataset] незнакомых станций: 28 — номер не используется, ставлю 0
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.850°C, wind vec=1.945m/s
+[учёт] transfer_h28s43_unseen: t2m 2.850 (9.3 %), ветер 1.945 (16.5 %) -> postproc_runs.md
+[29.08 10:13:06] 
+[29.08 10:13:06] ########## придержано 28 станций, жребий 44 ##########
+[29.08 10:13:06] делю по станциям и годам
+  seen: 1,868,323 строк, 43 станций -> /data/postproc/h28s44_seen.parquet
+  unseen: 1,215,291 строк, 28 станций -> /data/postproc/h28s44_unseen.parquet
+  придержаны станции: 287854, 292530, 292630, 292820, 293320, 293670, 294710, 295580, 295630, 295660, 295710, 295780, 296530, 296540, 296760, 297660, 297710, 297890, 298740, 360580, 360610, 360900, 360920, 360960, 361030, 361040, 362780, 363070
+  train: 1,120,303 строк -> /data/postproc/h28s44_seen_train.parquet
+  val: 373,350 строк -> /data/postproc/h28s44_seen_val.parquet
+  test: 374,670 строк -> /data/postproc/h28s44_seen_test.parquet
+  train: 728,521 строк -> /data/postproc/h28s44_unseen_train.parquet
+  val: 243,204 строк -> /data/postproc/h28s44_unseen_val.parquet
+  test: 243,566 строк -> /data/postproc/h28s44_unseen_test.parquet
+[29.08 10:13:23] обучение без привязки к станции, 20 эпох
+[cfg] num_stations=43  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] добавлен признак nb_t2m_dev
+[dataset] добавлен признак nb_t2m_mean
+[dataset] добавлен признак nb_t2m_std
+[dataset] добавлен признак nb_u10_dev
+[dataset] добавлен признак nb_u10_mean
+[dataset] добавлен признак nb_u10_std
+[dataset] добавлен признак nb_v10_dev
+[dataset] добавлен признак nb_v10_mean
+[dataset] добавлен признак nb_v10_std
+[dataset] добавлен признак nb_z_surf_range
+[dataset] добавлен признак nb_z_surf_std
+[dataset] пропусков в признаках: 3,457,378 (5.51%) — заменены средним
+[cfg] признаков: 26 -> 73 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,125,805 (5.22%) — заменены средним
+[model] StationLeadBiasResidualMLP params=101,827  (БЕЗ привязки к станции, hidden=[192, 192, 128])
+[ep 001] train loss=5.1933 val loss=4.8486 val rmse_t2m=2.439°C val bias_t2m=-0.012°C val vec_rmse_wind=1.801m/s
+[ep 002] train loss=4.6355 val loss=4.6618 val rmse_t2m=2.377°C val bias_t2m=-0.009°C val vec_rmse_wind=1.764m/s
+[ep 003] train loss=4.4432 val loss=4.5513 val rmse_t2m=2.352°C val bias_t2m=+0.070°C val vec_rmse_wind=1.741m/s
+[ep 004] train loss=4.3714 val loss=4.5004 val rmse_t2m=2.331°C val bias_t2m=+0.081°C val vec_rmse_wind=1.732m/s
+[ep 005] train loss=4.2951 val loss=4.4690 val rmse_t2m=2.327°C val bias_t2m=+0.039°C val vec_rmse_wind=1.725m/s
+[ep 006] train loss=4.2318 val loss=4.4524 val rmse_t2m=2.322°C val bias_t2m=+0.082°C val vec_rmse_wind=1.722m/s
+[ep 007] train loss=4.2233 val loss=4.4335 val rmse_t2m=2.320°C val bias_t2m=+0.045°C val vec_rmse_wind=1.717m/s
+[ep 008] train loss=4.1698 val loss=4.4320 val rmse_t2m=2.311°C val bias_t2m=+0.056°C val vec_rmse_wind=1.719m/s
+[ep 009] train loss=4.1401 val loss=4.4190 val rmse_t2m=2.317°C val bias_t2m=-0.008°C val vec_rmse_wind=1.714m/s
+[ep 010] train loss=4.0963 val loss=4.4050 val rmse_t2m=2.315°C val bias_t2m=+0.021°C val vec_rmse_wind=1.712m/s
+[ep 011] train loss=4.1009 val loss=4.4012 val rmse_t2m=2.312°C val bias_t2m=+0.039°C val vec_rmse_wind=1.711m/s
+[ep 012] train loss=4.0760 val loss=4.3896 val rmse_t2m=2.305°C val bias_t2m=+0.049°C val vec_rmse_wind=1.709m/s
+[ep 013] train loss=4.0591 val loss=4.3928 val rmse_t2m=2.310°C val bias_t2m=+0.027°C val vec_rmse_wind=1.709m/s
+[ep 014] train loss=4.0677 val loss=4.3835 val rmse_t2m=2.303°C val bias_t2m=+0.070°C val vec_rmse_wind=1.708m/s
+[ep 015] train loss=4.0342 val loss=4.3773 val rmse_t2m=2.305°C val bias_t2m=+0.038°C val vec_rmse_wind=1.706m/s
+[ep 016] train loss=4.0274 val loss=4.3767 val rmse_t2m=2.307°C val bias_t2m=+0.030°C val vec_rmse_wind=1.706m/s
+[ep 017] train loss=4.0452 val loss=4.3788 val rmse_t2m=2.306°C val bias_t2m=+0.040°C val vec_rmse_wind=1.707m/s
+[ep 018] train loss=4.0327 val loss=4.3750 val rmse_t2m=2.303°C val bias_t2m=+0.032°C val vec_rmse_wind=1.706m/s
+[ep 019] train loss=4.0148 val loss=4.3726 val rmse_t2m=2.304°C val bias_t2m=+0.046°C val vec_rmse_wind=1.705m/s
+[ep 020] train loss=4.0080 val loss=4.3732 val rmse_t2m=2.304°C val bias_t2m=+0.042°C val vec_rmse_wind=1.706m/s
+Done: {'best_val_combined': 4.009012928936693, 'epochs_run': 20}
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.235°C, wind vec=1.745m/s
+[учёт] transfer_h28s44_seen: t2m 2.235 (20.4 %), ветер 1.745 (26.2 %) -> postproc_runs.md
+[dataset] незнакомых станций: 28 — номер не используется, ставлю 0
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.826°C, wind vec=2.029m/s
+[учёт] transfer_h28s44_unseen: t2m 2.826 (12.4 %), ветер 2.029 (13.1 %) -> postproc_runs.md
+[29.08 10:17:35] === ALL DONE ===
+[29.08 10:17:35] сравнивать: разброс между жребиями при одном и том же числе придержанных
+[29.08 10:17:35]   показывает, сколько в 15,1 % от трудности выборки, а не от переноса;
+[29.08 10:17:35]   разница между 14 и 28 придержанными — упирается ли перенос в число станций
