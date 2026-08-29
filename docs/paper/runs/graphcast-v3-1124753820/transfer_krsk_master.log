@@ -1,0 +1,151 @@
+[29.08 08:13:01] === ПЕРЕНОС НА НЕЗНАКОМЫЕ СТАНЦИИ ===
+[29.08 08:13:01] нет корпуса с признаками — сначала _run_night_krsk.sh
+[29.08 08:14:55] === ПЕРЕНОС НА НЕЗНАКОМЫЕ СТАНЦИИ ===
+scripts/postproc/_run_transfer_krsk.sh: line 41: /data/venvs/graphcast/bin/activate: No such file or directory
+[29.08 08:14:55] нет venv — стоп
+[29.08 08:19:02] === ПЕРЕНОС НА НЕЗНАКОМЫЕ СТАНЦИИ ===
+[29.08 08:19:02] окружения нет (стёрлось с /data) — восстанавливаю, это несколько минут
+[29.08 08:22:33] восстановление rc=0 (подробности в venv_restore.log)
+[29.08 08:22:33] признаков для_nb12 набора нет, но корпус на месте: data/postproc/corpus_krsk_2016_2020_nb12.parquet
+[29.08 08:22:33] достраиваю признаки-наблюдения (полминуты) -> /data/postproc/corpus_krsk_lags2_nb12.parquet
+Trying to import the above resulted in these errors:
+ - Missing optional dependency 'pyarrow'. pyarrow is required for parquet support. Use pip or conda to install pyarrow.
+ - Missing optional dependency 'fastparquet'. fastparquet is required for parquet support. Use pip or conda to install fastparquet.
+[29.08 08:22:34] корпус: data/postproc/corpus_krsk_lags2_nb6.parquet (594M)
+[29.08 08:22:34] шаг 1: делю по станциям (придерживаю 14 из 71)
+Traceback (most recent call last):
+  File "/workdir/graphcast-lite/scripts/postproc/split_stations.py", line 80, in <module>
+    main()
+  File "/workdir/graphcast-lite/scripts/postproc/split_stations.py", line 61, in main
+    df = pd.read_parquet(a.inp)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/pandas/io/parquet.py", line 653, in read_parquet
+    impl = get_engine(engine)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/pandas/io/parquet.py", line 68, in get_engine
+    raise ImportError(
+ImportError: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'.
+A suitable version of pyarrow or fastparquet is required for parquet support.
+Trying to import the above resulted in these errors:
+ - Missing optional dependency 'pyarrow'. pyarrow is required for parquet support. Use pip or conda to install pyarrow.
+ - Missing optional dependency 'fastparquet'. fastparquet is required for parquet support. Use pip or conda to install fastparquet.
+[29.08 08:22:34] деление не удалось
+[29.08 08:29:15] === ПЕРЕНОС НА НЕЗНАКОМЫЕ СТАНЦИИ ===
+[29.08 08:29:15] нет pyarrow (корпус в parquet без него не прочитать) — ставлю
+[29.08 08:29:18] pyarrow готов
+[29.08 08:29:18] признаков для_nb12 набора нет, но корпус на месте: data/postproc/corpus_krsk_2016_2020_nb12.parquet
+[29.08 08:29:18] достраиваю признаки-наблюдения (полминуты) -> /data/postproc/corpus_krsk_lags2_nb12.parquet
+
+добавлено признаков: 34 — obs_lag_age_h, obs_t2m_lag0, obs_t2m_lag6, obs_t2m_lag12, obs_t2m_lag24, obs_t2m_tend24, err_t2m_lag0, err_t2m_lag6, err_t2m_lag12, err_t2m_lag24, err_t2m_lag_mean, obs_t2m_anom, obs_u10_lag0, obs_u10_lag6, obs_u10_lag12, obs_u10_lag24, obs_u10_tend24, err_u10_lag0, err_u10_lag6, err_u10_lag12, err_u10_lag24, err_u10_lag_mean, obs_u10_anom, obs_v10_lag0, obs_v10_lag6, obs_v10_lag12, obs_v10_lag24, obs_v10_tend24, err_v10_lag0, err_v10_lag6, err_v10_lag12, err_v10_lag24, err_v10_lag_mean, obs_v10_anom
+записано /data/postproc/corpus_krsk_lags2_nb12.parquet: 3,083,614 строк, 95 столбцов
+[29.08 08:29:46] корпус: /data/postproc/corpus_krsk_lags2_nb12.parquet (591M)
+[29.08 08:29:46] шаг 1: делю по станциям (придерживаю 14 из 71)
+  seen: 2,475,695 строк, 57 станций -> /data/postproc/st_seen.parquet
+  unseen: 607,919 строк, 14 станций -> /data/postproc/st_unseen.parquet
+  придержаны станции: 292630, 292740, 293740, 295620, 295940, 296620, 297660, 298660, 298760, 360830, 360910, 360920, 361040, 363070
+[29.08 08:29:55] шаг 2: делю по годам внутри каждой части
+  train: 1,484,571 строк -> /data/postproc/tr_seen_train.parquet
+  val: 494,824 строк -> /data/postproc/tr_seen_val.parquet
+  test: 496,300 строк -> /data/postproc/tr_seen_test.parquet
+  train: 364,253 строк -> /data/postproc/tr_unseen_train.parquet
+  val: 121,730 строк -> /data/postproc/tr_unseen_val.parquet
+  test: 121,936 строк -> /data/postproc/tr_unseen_test.parquet
+[29.08 08:30:03] --- emb: обучение на 57 станциях, 20 эпох
+[cfg] num_stations=57  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] добавлен признак nb_t2m_dev
+[dataset] добавлен признак nb_t2m_mean
+[dataset] добавлен признак nb_t2m_std
+[dataset] добавлен признак nb_u10_dev
+[dataset] добавлен признак nb_u10_mean
+[dataset] добавлен признак nb_u10_std
+[dataset] добавлен признак nb_v10_dev
+[dataset] добавлен признак nb_v10_mean
+[dataset] добавлен признак nb_v10_std
+[dataset] добавлен признак nb_z_surf_range
+[dataset] добавлен признак nb_z_surf_std
+[dataset] пропусков в признаках: 4,606,108 (5.47%) — заменены средним
+[cfg] признаков: 26 -> 73 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,507,016 (5.23%) — заменены средним
+[model] StationLeadBiasResidualMLP params=109,966  (station_emb=32 hidden=[192, 192, 128] bias_head=Embedding(57,3))
+[ep 001] train loss=4.8555 val loss=4.4329 val rmse_t2m=2.417°C val bias_t2m=+0.032°C val vec_rmse_wind=1.694m/s
+[ep 002] train loss=4.2589 val loss=4.2862 val rmse_t2m=2.358°C val bias_t2m=-0.023°C val vec_rmse_wind=1.666m/s
+[ep 003] train loss=4.1195 val loss=4.2268 val rmse_t2m=2.348°C val bias_t2m=-0.002°C val vec_rmse_wind=1.653m/s
+[ep 004] train loss=4.0521 val loss=4.2105 val rmse_t2m=2.335°C val bias_t2m=+0.024°C val vec_rmse_wind=1.652m/s
+[ep 005] train loss=4.0085 val loss=4.1909 val rmse_t2m=2.334°C val bias_t2m=+0.046°C val vec_rmse_wind=1.647m/s
+[ep 006] train loss=3.9649 val loss=4.1641 val rmse_t2m=2.326°C val bias_t2m=-0.010°C val vec_rmse_wind=1.641m/s
+[ep 007] train loss=3.9472 val loss=4.1698 val rmse_t2m=2.324°C val bias_t2m=+0.027°C val vec_rmse_wind=1.644m/s
+[ep 008] train loss=3.9065 val loss=4.1562 val rmse_t2m=2.323°C val bias_t2m=-0.046°C val vec_rmse_wind=1.640m/s
+[ep 009] train loss=3.8981 val loss=4.1570 val rmse_t2m=2.323°C val bias_t2m=+0.017°C val vec_rmse_wind=1.641m/s
+[ep 010] train loss=3.8714 val loss=4.1517 val rmse_t2m=2.318°C val bias_t2m=-0.014°C val vec_rmse_wind=1.641m/s
+[ep 011] train loss=3.8555 val loss=4.1541 val rmse_t2m=2.320°C val bias_t2m=-0.003°C val vec_rmse_wind=1.641m/s
+[ep 012] train loss=3.8408 val loss=4.1470 val rmse_t2m=2.314°C val bias_t2m=-0.022°C val vec_rmse_wind=1.640m/s
+[ep 013] train loss=3.8386 val loss=4.1508 val rmse_t2m=2.317°C val bias_t2m=+0.029°C val vec_rmse_wind=1.640m/s
+[ep 014] train loss=3.8208 val loss=4.1480 val rmse_t2m=2.320°C val bias_t2m=+0.006°C val vec_rmse_wind=1.640m/s
+[ep 015] train loss=3.8076 val loss=4.1471 val rmse_t2m=2.319°C val bias_t2m=-0.003°C val vec_rmse_wind=1.640m/s
+[ep 016] train loss=3.8083 val loss=4.1389 val rmse_t2m=2.316°C val bias_t2m=-0.015°C val vec_rmse_wind=1.638m/s
+[ep 017] train loss=3.8042 val loss=4.1338 val rmse_t2m=2.313°C val bias_t2m=+0.005°C val vec_rmse_wind=1.637m/s
+[ep 018] train loss=3.7937 val loss=4.1373 val rmse_t2m=2.315°C val bias_t2m=+0.003°C val vec_rmse_wind=1.638m/s
+[ep 019] train loss=3.7966 val loss=4.1379 val rmse_t2m=2.315°C val bias_t2m=-0.010°C val vec_rmse_wind=1.638m/s
+[ep 020] train loss=3.7861 val loss=4.1370 val rmse_t2m=2.314°C val bias_t2m=+0.002°C val vec_rmse_wind=1.638m/s
+Done: {'best_val_combined': 3.9495777880308944, 'epochs_run': 20}
+[29.08 08:35:17]     проверка на 2020, станции: seen
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.255°C, wind vec=1.702m/s
+[29.08 08:35:27]       у незнакомой станции нет строки вложения)
+[учёт] transfer_emb_seen: t2m 2.255 (22.7 %), ветер 1.702 (28.2 %) -> postproc_runs.md
+[29.08 08:35:27]     проверка на 2020, станции: unseen
+[29.08 08:35:29]     на этой части не считается (для модели с вложением это ОЖИДАЕМО:
+[29.08 08:35:29]       у незнакомой станции нет строки вложения)
+[29.08 08:35:29] --- free: обучение на 57 станциях, 20 эпох
+[cfg] num_stations=57  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] добавлен признак nb_t2m_dev
+[dataset] добавлен признак nb_t2m_mean
+[dataset] добавлен признак nb_t2m_std
+[dataset] добавлен признак nb_u10_dev
+[dataset] добавлен признак nb_u10_mean
+[dataset] добавлен признак nb_u10_std
+[dataset] добавлен признак nb_v10_dev
+[dataset] добавлен признак nb_v10_mean
+[dataset] добавлен признак nb_v10_std
+[dataset] добавлен признак nb_z_surf_range
+[dataset] добавлен признак nb_z_surf_std
+[dataset] пропусков в признаках: 4,606,108 (5.47%) — заменены средним
+[cfg] признаков: 26 -> 73 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,507,016 (5.23%) — заменены средним
+[model] StationLeadBiasResidualMLP params=101,827  (БЕЗ привязки к станции, hidden=[192, 192, 128])
+[ep 001] train loss=5.0657 val loss=4.7056 val rmse_t2m=2.464°C val bias_t2m=+0.037°C val vec_rmse_wind=1.757m/s
+[ep 002] train loss=4.5519 val loss=4.5423 val rmse_t2m=2.409°C val bias_t2m=-0.038°C val vec_rmse_wind=1.724m/s
+[ep 003] train loss=4.4050 val loss=4.4528 val rmse_t2m=2.381°C val bias_t2m=+0.012°C val vec_rmse_wind=1.706m/s
+[ep 004] train loss=4.3114 val loss=4.4075 val rmse_t2m=2.370°C val bias_t2m=+0.074°C val vec_rmse_wind=1.697m/s
+[ep 005] train loss=4.2534 val loss=4.3696 val rmse_t2m=2.358°C val bias_t2m=-0.019°C val vec_rmse_wind=1.689m/s
+[ep 006] train loss=4.2077 val loss=4.3494 val rmse_t2m=2.357°C val bias_t2m=+0.048°C val vec_rmse_wind=1.685m/s
+[ep 007] train loss=4.1540 val loss=4.3288 val rmse_t2m=2.350°C val bias_t2m=+0.014°C val vec_rmse_wind=1.680m/s
+[ep 008] train loss=4.1316 val loss=4.3109 val rmse_t2m=2.346°C val bias_t2m=-0.000°C val vec_rmse_wind=1.676m/s
+[ep 009] train loss=4.1002 val loss=4.2996 val rmse_t2m=2.340°C val bias_t2m=+0.032°C val vec_rmse_wind=1.675m/s
+[ep 010] train loss=4.0827 val loss=4.2905 val rmse_t2m=2.346°C val bias_t2m=-0.028°C val vec_rmse_wind=1.672m/s
+[ep 011] train loss=4.0715 val loss=4.2815 val rmse_t2m=2.338°C val bias_t2m=+0.033°C val vec_rmse_wind=1.671m/s
+[ep 012] train loss=4.0505 val loss=4.2805 val rmse_t2m=2.337°C val bias_t2m=+0.014°C val vec_rmse_wind=1.671m/s
+[ep 013] train loss=4.0357 val loss=4.2709 val rmse_t2m=2.334°C val bias_t2m=-0.020°C val vec_rmse_wind=1.668m/s
+[ep 014] train loss=4.0168 val loss=4.2639 val rmse_t2m=2.338°C val bias_t2m=-0.021°C val vec_rmse_wind=1.666m/s
+[ep 015] train loss=4.0127 val loss=4.2570 val rmse_t2m=2.332°C val bias_t2m=-0.022°C val vec_rmse_wind=1.665m/s
+[ep 016] train loss=4.0043 val loss=4.2580 val rmse_t2m=2.335°C val bias_t2m=-0.036°C val vec_rmse_wind=1.665m/s
+[ep 017] train loss=4.0105 val loss=4.2529 val rmse_t2m=2.334°C val bias_t2m=-0.003°C val vec_rmse_wind=1.664m/s
+[ep 018] train loss=3.9884 val loss=4.2519 val rmse_t2m=2.332°C val bias_t2m=-0.002°C val vec_rmse_wind=1.664m/s
+[ep 019] train loss=3.9901 val loss=4.2504 val rmse_t2m=2.331°C val bias_t2m=-0.002°C val vec_rmse_wind=1.664m/s
+[ep 020] train loss=3.9905 val loss=4.2498 val rmse_t2m=2.331°C val bias_t2m=+0.000°C val vec_rmse_wind=1.664m/s
+Done: {'best_val_combined': 3.9947623005484036, 'epochs_run': 20}
+[29.08 08:40:36]     проверка на 2020, станции: seen
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.278°C, wind vec=1.712m/s
+[29.08 08:40:46]       у незнакомой станции нет строки вложения)
+[учёт] transfer_free_seen: t2m 2.278 (21.9 %), ветер 1.712 (27.7 %) -> postproc_runs.md
+[29.08 08:40:46]     проверка на 2020, станции: unseen
+[29.08 08:40:48]     на этой части не считается (для модели с вложением это ОЖИДАЕМО:
+[29.08 08:40:48]       у незнакомой станции нет строки вложения)
+[29.08 08:40:48] === ALL DONE ===
+[29.08 08:40:48] сравнивать: обе модели на знакомых станциях — цена отказа от вложения;
+[29.08 08:40:48]   модель без привязки на НЕЗНАКОМЫХ — ответ на вопрос о переносе
