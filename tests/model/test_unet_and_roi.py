@@ -258,13 +258,47 @@ def test_station_model_does_have_embeddings(pp_cls):
     assert [n for n, mod in m.named_modules() if isinstance(mod, nn.Embedding)]
 
 
+def wake_up(model):
+    """Сдвинуть веса выходной головы с нуля.
+
+    Голова поправки намеренно инициализирована нулём: при создании модель выдаёт
+    ровно прогноз сети, и обучение стартует с неиспорченного состояния. Но из-за
+    этого на старте выход НЕ ЗАВИСИТ НИ ОТ ЧЕГО — и проверка «зависит ли он от
+    номера станции» на непробуждённой модели прошла бы у любой модели, ничего не
+    проверив. Поэтому сначала оживляем голову, изображая обученное состояние.
+    """
+    import torch
+    with torch.no_grad():
+        for m in model.modules():
+            if isinstance(m, torch.nn.Linear):
+                if m.weight.abs().sum() == 0:
+                    m.weight.normal_(0.0, 0.3)
+    return model
+
+
+def test_head_starts_at_zero_so_the_model_equals_the_raw_forecast(pp_cls):
+    """При создании поправка нулевая — модель повторяет прогноз сети точь-в-точь.
+
+    Замени инициализацию на обычную, и обучение начнётся с испорченного
+    прогноза, а первые эпохи уйдут на возврат к исходному.
+    """
+    import torch
+    m = make_pp(pp_cls, emb_dim=8)
+    gnn = {"t2m": torch.randn(9), "u10": torch.randn(9), "v10": torch.randn(9)}
+    with torch.no_grad():
+        out = m(torch.randn(9, 12), torch.zeros(9, dtype=torch.long), torch.rand(9), gnn)
+    assert torch.allclose(out["t2m"], gnn["t2m"], atol=1e-6), "поправка на старте не нулевая"
+
+
 def test_station_free_forecast_ignores_the_station_number(pp_cls):
     """Главное свойство: номер станции на прогноз не влияет вовсе.
 
     Иначе перенос на новую площадку был бы невозможен, чем бы номер ни заполнили.
+    Модель предварительно «пробуждается»: на нулевой голове этот тест прошёл бы
+    у кого угодно.
     """
     import torch
-    m = make_pp(pp_cls, emb_dim=0)
+    m = wake_up(make_pp(pp_cls, emb_dim=0))
     feats = torch.randn(20, 12)
     lead = torch.rand(20)
     gnn = {"t2m": torch.randn(20), "u10": torch.randn(20), "v10": torch.randn(20)}
@@ -278,7 +312,7 @@ def test_station_free_forecast_ignores_the_station_number(pp_cls):
 def test_station_model_does_depend_on_the_station_number(pp_cls):
     """Обратная сторона: с вложением номер ВЛИЯЕТ — потому перенос и невозможен."""
     import torch
-    m = make_pp(pp_cls, emb_dim=8)
+    m = wake_up(make_pp(pp_cls, emb_dim=8))
     feats = torch.randn(20, 12)
     lead = torch.rand(20)
     gnn = {"t2m": torch.randn(20), "u10": torch.randn(20), "v10": torch.randn(20)}
