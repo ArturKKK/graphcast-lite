@@ -63,6 +63,11 @@ def main() -> None:
         feature_cols=feature_cols,   # список из чекпойнта — единственно верный
         scalers=scalers,
         auto_obs_features=False,
+        # Модель без привязки к станции номер не использует, поэтому её можно
+        # проверять на площадках, которых она не видела. Модели с вложением
+        # незнакомая станция по-прежнему запрещена: подставлять ей чужой номер
+        # бессмысленно, и отказ тут правильнее молчаливой чепухи.
+        unknown_station_idx=(0 if cfg.get("station_emb_dim", 32) <= 0 else None),
         station_to_idx=station_to_idx,
     )
     loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False, num_workers=2)

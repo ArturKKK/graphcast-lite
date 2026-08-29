@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from conftest import load_module  # noqa: E402
@@ -152,3 +153,35 @@ def test_feature_order_is_stable_between_runs(tmp_path):
     a = StationCorpusDataset(p, station_to_idx=STATIONS).feature_cols
     b = StationCorpusDataset(p, station_to_idx=STATIONS).feature_cols
     assert a == b
+
+
+def test_unknown_station_is_refused_by_default(tmp_path):
+    """Незнакомая станция — отказ, если номер модели нужен.
+
+    Подставить ей чужой номер значило бы применить к новой площадке поправку,
+    выученную для другой: числа получились бы, и понять по ним ничего было бы
+    нельзя. Отказ тут правильнее молчаливой чепухи.
+    """
+    p = tmp_path / "c.parquet"
+    df = make_parquet(p)
+    df["station_usaf"] = "99999"                 # станции нет в отображении
+    df.to_parquet(p, index=False)
+    with pytest.raises(KeyError, match="99999"):
+        StationCorpusDataset(p, station_to_idx=STATIONS)
+
+
+def test_unknown_station_is_allowed_when_the_number_is_not_used(tmp_path, capsys):
+    """Модели без привязки к станции незнакомая площадка не помеха.
+
+    Она номер не использует вовсе, но датасет требовал его для каждой строки — и
+    проверить перенос на новую станцию было нельзя из-за ограничения датасета, а
+    не модели. Ровно на это упёрся прогон переноса 29.08.2026.
+    """
+    p = tmp_path / "c.parquet"
+    df = make_parquet(p)
+    df.loc[df.index[:400], "station_usaf"] = "99999"
+    df.to_parquet(p, index=False)
+    ds = StationCorpusDataset(p, station_to_idx=STATIONS, unknown_station_idx=0)
+    assert len(ds) > 0
+    assert "незнакомых станций" in capsys.readouterr().out
+    assert ds.station_idx_arr.min() >= 0

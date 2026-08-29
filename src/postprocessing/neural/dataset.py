@@ -114,6 +114,7 @@ class StationCorpusDataset(Dataset):
         feature_cols: Sequence[str] = DEFAULT_FEATURES,
         target_cols: Sequence[str] = TARGET_COLS,
         auto_obs_features: bool = True,
+        unknown_station_idx: int | None = None,
         scalers: Optional[Dict[str, Tuple[float, float]]] = None,
         filter_expr: Optional[str] = None,
         drop_obs_missing: bool = True,
@@ -224,14 +225,32 @@ class StationCorpusDataset(Dataset):
         np.nan_to_num(self.X_norm, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
 
         # station→idx (for v2 station embedding); if mapping missing keys, raise.
+        #
+        # unknown_station_idx делает исключение: незнакомой станции ставится
+        # указанный номер вместо отказа. Нужно для модели БЕЗ привязки к
+        # станции — она номер не использует вовсе, но датасет требовал его для
+        # каждой строки, и проверить перенос на новую площадку было нельзя из-за
+        # ограничения датасета, а не модели. Для модели С вложением подставлять
+        # чужой номер бессмысленно, поэтому по умолчанию по-прежнему отказ.
         self.station_to_idx = station_to_idx
         if station_to_idx is not None:
-            try:
+            if unknown_station_idx is None:
+                try:
+                    self.station_idx_arr = np.array(
+                        [station_to_idx[s] for s in self.station_ids], dtype=np.int64
+                    )
+                except KeyError as e:
+                    raise KeyError(f"station_to_idx missing station_usaf={e}")
+            else:
+                unknown = {s for s in self.station_ids if s not in station_to_idx}
+                if unknown:
+                    print(f"[dataset] незнакомых станций: {len(unknown)} — "
+                          f"номер не используется, ставлю {unknown_station_idx}",
+                          flush=True)
                 self.station_idx_arr = np.array(
-                    [station_to_idx[s] for s in self.station_ids], dtype=np.int64
+                    [station_to_idx.get(s, unknown_station_idx) for s in self.station_ids],
+                    dtype=np.int64,
                 )
-            except KeyError as e:
-                raise KeyError(f"station_to_idx missing station_usaf={e}")
         else:
             self.station_idx_arr = None
         # lead_norm column (if present in parquet) for v2 FiLM
