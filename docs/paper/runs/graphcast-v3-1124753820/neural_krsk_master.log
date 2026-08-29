@@ -590,3 +590,110 @@ Stations in box: 71 / 50; region n=485,888
 Region pp T2m RMSE = 2.297°C (GNN 2.978°C)
 Region pp wind vec-RMSE = 1.727m/s (GNN 2.353m/s)
 [28.08 16:53:28] === ALL DONE ===
+[29.08 12:42:23] === НЕЙРОННЫЙ ПОСТПРОЦЕССОР ===
+[29.08 12:42:23] корпус: data/postproc/corpus_krsk_lags2_seen.parquet (438M)
+[29.08 12:42:23] делю корпус по годам: обучение 2016-2018, отбор 2019, проверка 2020
+  train: 1,848,824 строк -> /data/postproc/krsk_train.parquet
+  val: 616,554 строк -> /data/postproc/krsk_val.parquet
+  test: 618,236 строк -> /data/postproc/krsk_test.parquet
+[29.08 12:42:30] базовые линии на выборке сети (только полные наблюдения)
+только полные наблюдения: 3,083,614 -> 2,388,455 строк (выборка нейронного постпроцессора)
+обучение 1,417,593 строк ([2016, 2017, 2018]), проверка 485,888 строк ([2020]), станций 71
+                     сырой прогноз    2.978    2.113   -0.470      0.0%
+                 станция×месяц×час    2.521    1.808   -0.139     15.4%
+              регрессия (8 призн.)    2.922    2.071   -0.232      1.9%
+регрессия + наблюдения (42 призн.)    2.617    1.894   -0.186     12.1%
+   таблица + регрессия (42 призн.)    2.498    1.800   -0.160     16.1%
+  по срокам, лучший способ — таблица + регрессия (42 призн.):
+                     сырой прогноз    1.740    1.357   +0.375      0.0%
+                 станция×месяц×час    1.635    1.255   +0.128      6.0%
+              регрессия (8 призн.)    1.496    1.128   +0.038     14.0%
+регрессия + наблюдения (42 призн.)    1.444    1.087   +0.032     17.0%
+   таблица + регрессия (42 призн.)    1.445    1.084   +0.066     17.0%
+  по срокам, лучший способ — регрессия + наблюдения (42 призн.):
+                     сырой прогноз    1.585    1.222   +0.233      0.0%
+                 станция×месяц×час    1.467    1.120   +0.026      7.4%
+              регрессия (8 призн.)    1.324    0.983   -0.009     16.5%
+регрессия + наблюдения (42 призн.)    1.264    0.937   -0.025     20.2%
+   таблица + регрессия (42 призн.)    1.259    0.937   -0.016     20.6%
+  по срокам, лучший способ — таблица + регрессия (42 призн.):
+[29.08 12:42:53] --- experiments/neural_postproc_krsk: веса уже есть, обучение пропускаю
+[29.08 12:42:53]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.297°C, wind vec=1.727m/s
+[учёт] neural_postproc_krsk: t2m 2.297 (22.9 %), ветер 1.727 (26.6 %) -> postproc_runs.md
+[29.08 12:43:04] --- experiments/neural_postproc_krsk_noobs: веса уже есть, обучение пропускаю
+[29.08 12:43:04]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.331°C, wind vec=1.718m/s
+[учёт] neural_postproc_krsk_noobs: t2m 2.331 (21.7 %), ветер 1.718 (27.0 %) -> postproc_runs.md
+[29.08 12:43:16] --- experiments/neural_postproc_krsk_prob: веса уже есть, обучение пропускаю
+[29.08 12:43:16]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.289°C, wind vec=1.719m/s
+[учёт] neural_postproc_krsk_prob: t2m 2.289 (23.2 %), ветер 1.719 (27.0 %) -> postproc_runs.md
+[29.08 12:43:28] готовлю набор на одном годе: обучение 2019, отбор 2018
+  train1y: 616,554 строк -> /data/postproc/krsk_train1y.parquet
+  val1y: 616,552 строк -> /data/postproc/krsk_val1y.parquet
+[29.08 12:43:31] --- experiments/neural_postproc_krsk_1y: веса уже есть, обучение пропускаю
+[29.08 12:43:31]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.356°C, wind vec=1.757m/s
+[учёт] neural_postproc_krsk_1y: t2m 2.356 (20.9 %), ветер 1.757 (25.3 %) -> postproc_runs.md
+[29.08 12:43:43] готовлю набор на четырёх годах
+  train4y: 2,362,780 строк
+  val4y: 102,598 строк
+[29.08 12:43:49] --- experiments/neural_postproc_krsk_4y: веса уже есть, обучение пропускаю
+[29.08 12:43:49]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.296°C, wind vec=1.715m/s
+[учёт] neural_postproc_krsk_4y: t2m 2.296 (22.9 %), ветер 1.715 (27.1 %) -> postproc_runs.md
+[29.08 12:44:00] --- experiments/neural_postproc_krsk_reg: веса уже есть, обучение пропускаю
+[29.08 12:44:00]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.299°C, wind vec=1.711m/s
+[учёт] neural_postproc_krsk_reg: t2m 2.299 (22.8 %), ветер 1.711 (27.3 %) -> postproc_runs.md
+[29.08 12:44:12] --- experiments/neural_postproc_krsk_reg2: веса уже есть, обучение пропускаю
+[29.08 12:44:12]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.314°C, wind vec=1.719m/s
+[учёт] neural_postproc_krsk_reg2: t2m 2.314 (22.3 %), ветер 1.719 (26.9 %) -> postproc_runs.md
+[29.08 12:44:23] --- experiments/neural_postproc_krsk_dz: веса уже есть, обучение пропускаю
+[29.08 12:44:23]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.297°C, wind vec=1.722m/s
+[учёт] neural_postproc_krsk_dz: t2m 2.297 (22.9 %), ветер 1.722 (26.8 %) -> postproc_runs.md
+[29.08 12:44:35] --- experiments/neural_postproc_krsk_ceil: веса уже есть, обучение пропускаю
+[29.08 12:44:35]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.080°C, wind vec=1.583m/s
+[учёт] neural_postproc_krsk_ceil: t2m 2.080 (30.2 %), ветер 1.583 (32.7 %) -> postproc_runs.md
+[29.08 12:44:46] --- калибровка вероятностной настройки
+[dataset] пропусков в признаках: 1,915,506 (6.57%) — заменены средним
+[калибровка] строк 485,888
+  ошибка 2.289 °C, заявленный разброс 1.942 °C, отношение 1.179
+    (больше единицы — самоуверенность, меньше — перестраховка)
+  попадание в +-1 сигма: 64.4 % (должно быть 68,3)
+  попадание в +-2 сигма: 91.9 % (должно быть 95,4)
+  CRPS с переменной сигмой 1.1570, с постоянной 1.2013 (+3.7 % от переменной)
+  надёжность по корзинам (заявлено -> действительно):
+    n= 48,589  сигма  0.871 -> ошибка  0.992    1.14x
+    n= 48,589  сигма  1.070 -> ошибка  1.223    1.14x
+    n= 48,589  сигма  1.219 -> ошибка  1.409    1.16x
+    n= 48,589  сигма  1.363 -> ошибка  1.626    1.19x
+    n= 48,589  сигма  1.515 -> ошибка  1.792    1.18x
+    n= 48,589  сигма  1.684 -> ошибка  1.991    1.18x
+    n= 48,589  сигма  1.889 -> ошибка  2.221    1.18x
+    n= 48,589  сигма  2.154 -> ошибка  2.533    1.18x
+    n= 48,588  сигма  2.538 -> ошибка  3.034    1.20x
+    n= 48,588  сигма  3.486 -> ошибка  4.188    1.20x
+[калибровка] записано experiments/neural_postproc_krsk_prob/calibration/calibration.json
+[29.08 12:45:03] --- разбор по станциям (основная модель)
+[dataset] пропусков в признаках: 1,915,506 (6.57%) — заменены средним
+[eval] модель: StationLeadBiasResidualMLP
+Saved: experiments/neural_postproc_krsk/eval_stations/eval_per_station_krsk.json
+Saved: experiments/neural_postproc_krsk/eval_stations/eval_per_station_krsk.md
+Stations in box: 71 / 50; region n=485,888
+Region pp T2m RMSE = 2.297°C (GNN 2.978°C)
+Region pp wind vec-RMSE = 1.727m/s (GNN 2.353m/s)
+[29.08 12:45:15] === ALL DONE ===
