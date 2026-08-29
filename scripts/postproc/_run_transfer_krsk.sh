@@ -49,34 +49,37 @@ DIR=/data/postproc; mkdir -p "$DIR" 2>/dev/null || DIR=data/postproc
 # случается и от часа простоя. Корпус при этом копируется в /workdir и
 # переживает перезапуск, а производные наборы — нет. Раннер, который в такой
 # ситуации просто отказывается, отправляет считать заново то, что уже посчитано.
-LAGS=""
-for c in "$DIR"/corpus_krsk_lags2_nb12.parquet data/postproc/corpus_krsk_lags2_nb12.parquet \
-         "$DIR"/corpus_krsk_lags2_nb6.parquet  data/postproc/corpus_krsk_lags2_nb6.parquet; do
-  [[ -f "$c" ]] && { LAGS="$c"; break; }
+# Порядок предпочтения — по качеству корпуса, а не по тому, что подвернулось:
+# nb12 (окрестность вышла на полку), затем nb6, затем без окрестности. Внутри
+# каждого сначала ищем готовые признаки, потом сам корпус — достроить признаки
+# стоит полминуты, а развёртка корпуса четыре часа, так что выбрать готовый
+# худший корпус вместо сырого лучшего было бы неверной экономией.
+find_first() { for c in "$@"; do [[ -f "$c" ]] && { echo "$c"; return; }; done; }
+
+LAGS=""; RAW=""
+for suf in _nb12 _nb6 ""; do
+  LAGS=$(find_first "$DIR/corpus_krsk_lags2${suf:-_plain}.parquet" \
+                    "data/postproc/corpus_krsk_lags2${suf:-_plain}.parquet")
+  [[ -n "$LAGS" ]] && break
+  RAW=$(find_first "$DIR/corpus_krsk_2016_2020${suf}.parquet" \
+                   "data/postproc/corpus_krsk_2016_2020${suf}.parquet")
+  if [[ -n "$RAW" ]]; then
+    LAGS="$DIR/corpus_krsk_lags2${suf:-_plain}.parquet"
+    log "признаков для${suf:- базового} набора нет, но корпус на месте: $RAW"
+    log "достраиваю признаки-наблюдения (полминуты) -> $LAGS"
+    python -u scripts/postproc/add_obs_lags.py --in "$RAW" --out "$LAGS" \
+        --clim-years 2016 2017 2018 2>&1 | tail -3
+    [[ -f "$LAGS" ]] && break
+    LAGS=""
+  fi
 done
 
 if [[ -z "$LAGS" ]]; then
-  RAW=""
-  for c in "$DIR"/corpus_krsk_2016_2020_nb12.parquet data/postproc/corpus_krsk_2016_2020_nb12.parquet \
-           "$DIR"/corpus_krsk_2016_2020_nb6.parquet  data/postproc/corpus_krsk_2016_2020_nb6.parquet \
-           "$DIR"/corpus_krsk_2016_2020.parquet      data/postproc/corpus_krsk_2016_2020.parquet; do
-    [[ -f "$c" ]] && { RAW="$c"; break; }
-  done
-  if [[ -z "$RAW" ]]; then
-    log "нет ни набора с признаками, ни самого корпуса."
-    log "  Смотрел в $DIR и data/postproc. Корпус стирается вместе с /data при"
-    log "  перезапуске виртуалки; если копии в /workdir тоже нет — придётся"
-    log "  пересобрать: bash scripts/postproc/_run_night_krsk.sh 12"
-    exit 1
-  fi
-  SUF=$(basename "$RAW" .parquet); SUF=${SUF#corpus_krsk_2016_2020}
-  SUF=${SUF#_}; SUF=${SUF:-plain}
-  LAGS="$DIR/corpus_krsk_lags2_${SUF}.parquet"
-  log "признаков нет, но корпус на месте: $RAW"
-  log "достраиваю признаки-наблюдения (полминуты) -> $LAGS"
-  python -u scripts/postproc/add_obs_lags.py --in "$RAW" --out "$LAGS" \
-      --clim-years 2016 2017 2018 2>&1 | tail -3
-  [[ -f "$LAGS" ]] || { log "признаки не собрались — стоп"; exit 1; }
+  log "нет ни набора с признаками, ни самого корпуса."
+  log "  Смотрел в $DIR и data/postproc. Корпус стирается вместе с /data при"
+  log "  перезапуске виртуалки; если копии в /workdir тоже нет — придётся"
+  log "  пересобрать: bash scripts/postproc/_run_night_krsk.sh 12"
+  exit 1
 fi
 log "корпус: $LAGS ($(du -h "$LAGS" | cut -f1))"
 
