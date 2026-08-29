@@ -248,9 +248,15 @@ def train_v3(cfg: TrainConfigV3) -> Dict[str, float]:
         film_hidden=cfg.film_hidden,
     ).to(cfg.device)
     n_params = sum(p.numel() for p in model.parameters())
-    print(f"[model] StationLeadBiasResidualMLP params={n_params:,}  "
-          f"(station_emb={cfg.station_emb_dim} hidden={cfg.hidden} bias_head=Embedding({num_stations},3))",
-          flush=True)
+    if cfg.station_emb_dim > 0:
+        how = (f"station_emb={cfg.station_emb_dim} hidden={cfg.hidden} "
+               f"bias_head=Embedding({num_stations},3)")
+    else:
+        # Пишем прямо: модель БЕЗ привязки к станции, её можно применить к
+        # площадке, которой она не видела. Прежняя строка сообщала бы про
+        # вложение, которого нет.
+        how = f"БЕЗ привязки к станции, hidden={cfg.hidden}"
+    print(f"[model] StationLeadBiasResidualMLP params={n_params:,}  ({how})", flush=True)
 
     optim = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=cfg.epochs)
@@ -328,6 +334,11 @@ def _parse_args() -> TrainConfigV3:
     p.add_argument("--w-t2m", type=float, default=1.0)
     p.add_argument("--w-wind", type=float, default=1.0)
     p.add_argument("--no-balanced", action="store_true")
+    p.add_argument("--no-station-emb", action="store_true",
+                   help="обучить БЕЗ привязки к станции: ни вложения, ни "
+                        "добавочного смещения. Такую модель можно применить к "
+                        "площадке, которой она не видела — с вложением это "
+                        "невозможно, для новой станции нет строки")
     p.add_argument("--no-obs-features", action="store_true",
                    help="не брать признаки-наблюдения станции. Нужно для "
                         "абляции: отделить вклад нелинейности от вклада самих "
@@ -343,7 +354,6 @@ def _parse_args() -> TrainConfigV3:
         out_dir=args.out_dir,
         hidden=[int(x) for x in args.hidden.split(",")],
         dropout=args.dropout,
-        station_emb_dim=args.station_emb_dim,
         film_hidden=args.film_hidden,
         probabilistic=args.probabilistic,
         epochs=args.epochs,
@@ -356,6 +366,7 @@ def _parse_args() -> TrainConfigV3:
         w_wind=args.w_wind,
         balanced_sampling=(not args.no_balanced),
         obs_features=(not args.no_obs_features),
+        station_emb_dim=(0 if args.no_station_emb else args.station_emb_dim),
         num_workers=args.num_workers,
         seed=args.seed,
     )

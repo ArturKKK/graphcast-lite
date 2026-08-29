@@ -221,3 +221,84 @@ def test_residual_head_shapes(roi_mod):
     with torch.no_grad():
         out = h(torch.randn(11, 4), torch.randn(11, 3))
     assert out.shape == (11, 3)
+
+
+# =====================  постпроцессор без привязки к станции  ================
+
+@pytest.fixture
+def pp_cls():
+    from src.postprocessing.neural.models import StationLeadBiasResidualMLP
+    return StationLeadBiasResidualMLP
+
+
+def make_pp(cls, emb_dim, n_feat=12, n_st=7):
+    import torch
+    torch.manual_seed(0)
+    return cls(feature_dim=n_feat, num_stations=n_st, station_emb_dim=emb_dim,
+               hidden=[16, 16], film_hidden=8).eval()
+
+
+def test_station_free_model_has_no_embeddings(pp_cls):
+    """Ни вложения станции, ни добавочного смещения — значит нет и привязки.
+
+    С вложением модель нельзя применить к площадке, которой она не видела: для
+    новой станции попросту нет строки. Вопрос не теоретический — если поправку
+    надо настраивать годами наблюдений на каждой площадке, поставить её на
+    новую нельзя.
+    """
+    import torch.nn as nn
+    m = make_pp(pp_cls, emb_dim=0)
+    assert not [n for n, mod in m.named_modules() if isinstance(mod, nn.Embedding)]
+    assert m.station_free is True
+
+
+def test_station_model_does_have_embeddings(pp_cls):
+    import torch.nn as nn
+    m = make_pp(pp_cls, emb_dim=8)
+    assert [n for n, mod in m.named_modules() if isinstance(mod, nn.Embedding)]
+
+
+def test_station_free_forecast_ignores_the_station_number(pp_cls):
+    """Главное свойство: номер станции на прогноз не влияет вовсе.
+
+    Иначе перенос на новую площадку был бы невозможен, чем бы номер ни заполнили.
+    """
+    import torch
+    m = make_pp(pp_cls, emb_dim=0)
+    feats = torch.randn(20, 12)
+    lead = torch.rand(20)
+    gnn = {"t2m": torch.randn(20), "u10": torch.randn(20), "v10": torch.randn(20)}
+    with torch.no_grad():
+        a = m(feats, torch.zeros(20, dtype=torch.long), lead, gnn)
+        b = m(feats, torch.full((20,), 6, dtype=torch.long), lead, gnn)
+    for k in a:
+        assert torch.allclose(a[k], b[k], atol=0.0), f"выход {k} зависит от номера станции"
+
+
+def test_station_model_does_depend_on_the_station_number(pp_cls):
+    """Обратная сторона: с вложением номер ВЛИЯЕТ — потому перенос и невозможен."""
+    import torch
+    m = make_pp(pp_cls, emb_dim=8)
+    feats = torch.randn(20, 12)
+    lead = torch.rand(20)
+    gnn = {"t2m": torch.randn(20), "u10": torch.randn(20), "v10": torch.randn(20)}
+    with torch.no_grad():
+        a = m(feats, torch.zeros(20, dtype=torch.long), lead, gnn)
+        b = m(feats, torch.full((20,), 6, dtype=torch.long), lead, gnn)
+    assert not torch.allclose(a["t2m"], b["t2m"], atol=1e-6)
+
+
+def test_station_free_model_is_smaller(pp_cls):
+    a = sum(p.numel() for p in make_pp(pp_cls, emb_dim=0).parameters())
+    b = sum(p.numel() for p in make_pp(pp_cls, emb_dim=8).parameters())
+    assert a < b
+
+
+def test_station_free_output_shapes(pp_cls):
+    import torch
+    m = make_pp(pp_cls, emb_dim=0)
+    gnn = {"t2m": torch.randn(5), "u10": torch.randn(5), "v10": torch.randn(5)}
+    with torch.no_grad():
+        out = m(torch.randn(5, 12), torch.zeros(5, dtype=torch.long),
+                torch.rand(5), gnn)
+    assert out["t2m"].shape == (5,)

@@ -296,18 +296,32 @@ class StationLeadBiasResidualMLP(nn.Module):
         super().__init__()
         hidden = hidden or [192, 192, 128]
         self.probabilistic = probabilistic
-        self.station_emb = nn.Embedding(num_stations, station_emb_dim)
-        nn.init.normal_(self.station_emb.weight, mean=0.0, std=0.05)
-
-        # PER-STATION ADDITIVE BIAS HEAD (the key v3 innovation)
-        # Init at zero so it does no harm at epoch 0; trains via gradient.
-        self.bias_emb = nn.Embedding(num_stations, 3)
-        if bias_init_std > 0.0:
-            nn.init.normal_(self.bias_emb.weight, mean=0.0, std=bias_init_std)
+        # Режим БЕЗ ПРИВЯЗКИ К СТАНЦИИ: station_emb_dim=0 убирает и вложение, и
+        # добавочную голову смещения. Тогда модель описывает площадку только
+        # признаками — широтой, долготой, высотой, разностью высот со рельефом
+        # модели, — и её можно применить к станции, которой она никогда не
+        # видела. С вложением это невозможно в принципе: для новой станции
+        # попросту нет строки, и никакое приближение её не заменит.
+        #
+        # Вопрос не теоретический: если постпроцессор работает только там, где у
+        # него есть годы наблюдений, поставить его на новую площадку нельзя.
+        self.station_free = station_emb_dim <= 0
+        if self.station_free:
+            self.station_emb = None
+            self.bias_emb = None
         else:
-            nn.init.zeros_(self.bias_emb.weight)
+            self.station_emb = nn.Embedding(num_stations, station_emb_dim)
+            nn.init.normal_(self.station_emb.weight, mean=0.0, std=0.05)
 
-        in_dim = feature_dim + station_emb_dim
+            # PER-STATION ADDITIVE BIAS HEAD (the key v3 innovation)
+            # Init at zero so it does no harm at epoch 0; trains via gradient.
+            self.bias_emb = nn.Embedding(num_stations, 3)
+            if bias_init_std > 0.0:
+                nn.init.normal_(self.bias_emb.weight, mean=0.0, std=bias_init_std)
+            else:
+                nn.init.zeros_(self.bias_emb.weight)
+
+        in_dim = feature_dim + max(0, station_emb_dim)
         first_h = hidden[0]
         self.fc1 = nn.Linear(in_dim, first_h)
         self.ln1 = nn.LayerNorm(first_h)
@@ -357,8 +371,10 @@ class StationLeadBiasResidualMLP(nn.Module):
         lead_norm: torch.Tensor,
         gnn_targets: Optional[Dict[str, torch.Tensor]] = None,
     ) -> Dict[str, torch.Tensor]:
-        emb = self.station_emb(station_idx)
-        x = torch.cat([features, emb], dim=-1)
+        if self.station_free:
+            x = features
+        else:
+            x = torch.cat([features, self.station_emb(station_idx)], dim=-1)
         h = self.fc1(x)
         h = self.ln1(h)
         h = self.act(h)
@@ -370,9 +386,13 @@ class StationLeadBiasResidualMLP(nn.Module):
         h = self.tail(h)
 
         # per-station additive bias (t2m, u, v)
-        b = self.bias_emb(station_idx)  # (B, 3)
-        b_t = b[:, 0]
-        b_uv = b[:, 1:3]
+        if self.station_free:
+            b_t = features.new_zeros(features.shape[0])
+            b_uv = features.new_zeros(features.shape[0], 2)
+        else:
+            b = self.bias_emb(station_idx)  # (B, 3)
+            b_t = b[:, 0]
+            b_uv = b[:, 1:3]
 
         out: Dict[str, torch.Tensor] = {}
         if self.probabilistic:
