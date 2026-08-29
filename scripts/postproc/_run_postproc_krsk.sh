@@ -39,6 +39,14 @@ for c in /data/postproc/corpus_krsk_2016_2020.parquet \
 done
 [[ -z "$CORPUS" ]] && { log "корпус не найден — сначала _run_corpus_krsk.sh"; exit 1; }
 log "корпус: $CORPUS ($(du -h "$CORPUS" | cut -f1))"
+# /data стирается при каждом перезапуске виртуалки, а он случается и от часа
+# простоя — вместе с /data исчезает venv. Восстанавливаем его сами: данные у нас
+# свои, в parquet, поэтому датасеты распаковывать не нужно (VENV_ONLY=1).
+if [[ ! -x "$VENV/bin/python" ]]; then
+  log "окружения нет (стёрлось с /data) — восстанавливаю, это несколько минут"
+  VENV_ONLY=1 bash scripts/_paper_setup_vm.sh >>"$OUT/venv_restore.log" 2>&1
+  log "восстановление rc=$? (подробности в venv_restore.log)"
+fi
 source "$VENV/bin/activate" || { log "нет venv — стоп"; exit 1; }
 export PYTHONPATH="$REPO"
 

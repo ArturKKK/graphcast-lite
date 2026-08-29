@@ -64,6 +64,16 @@ fi
 source "$VENV/bin/activate"
 echo "python=$(which python); torch=$(python -c 'import torch;print(torch.__version__, torch.cuda.is_available())' 2>&1)"
 
+# VENV_ONLY=1 — остановиться здесь. Нужно раннерам постобработки: им требуется
+# только окружение, а данные ERA5 у них свои, в parquet. Распаковка датасетов
+# заняла бы полчаса и без архивов вообще не прошла бы. /data стирается при
+# каждом перезапуске виртуалки, вместе с venv, — поэтому восстанавливать его
+# должен уметь каждый раннер, а не только этот установщик.
+if [[ "${VENV_ONLY:-0}" == "1" ]]; then
+  echo "[venv-only] окружение готово, датасеты не трогаю"
+  exit 0
+fi
+
 # ----- 2. extract global 512x256 (tar.zst) -----
 if [[ ! -f "$BASE_DIR/data.npy" ]]; then
   echo "[2/4 $(date +%H:%M:%S)] extracting global 512x256"

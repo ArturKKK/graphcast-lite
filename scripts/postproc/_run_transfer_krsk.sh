@@ -38,6 +38,14 @@ BUSY=$(pgrep -af "^python.*(src\.main|build_corpus\.py|train_neural)" | head -1)
 
 # Берём набор с окрестностью из 12 узлов: на нём выигрыш вышел на полку
 # (2,271 против 2,277 у шести и 2,269 у двадцати четырёх).
+# /data стирается при каждом перезапуске виртуалки, а он случается и от часа
+# простоя — вместе с /data исчезает venv. Восстанавливаем его сами: данные у нас
+# свои, в parquet, поэтому датасеты распаковывать не нужно (VENV_ONLY=1).
+if [[ ! -x "$VENV/bin/python" ]]; then
+  log "окружения нет (стёрлось с /data) — восстанавливаю, это несколько минут"
+  VENV_ONLY=1 bash scripts/_paper_setup_vm.sh >>"$OUT/venv_restore.log" 2>&1
+  log "восстановление rc=$? (подробности в venv_restore.log)"
+fi
 source "$VENV/bin/activate" || { log "нет venv — стоп"; exit 1; }
 export PYTHONPATH="$REPO"
 DIR=/data/postproc; mkdir -p "$DIR" 2>/dev/null || DIR=data/postproc
