@@ -38,17 +38,47 @@ BUSY=$(pgrep -af "^python.*(src\.main|build_corpus\.py|train_neural)" | head -1)
 
 # Берём набор с окрестностью из 12 узлов: на нём выигрыш вышел на полку
 # (2,271 против 2,277 у шести и 2,269 у двадцати четырёх).
-LAGS=""
-for c in /data/postproc/corpus_krsk_lags2_nb12.parquet \
-         data/postproc/corpus_krsk_lags2_nb12.parquet \
-         /data/postproc/corpus_krsk_lags2_nb6.parquet; do
-  [[ -f "$c" ]] && { LAGS="$c"; break; }
-done
-[[ -z "$LAGS" ]] && { log "нет корпуса с признаками — сначала _run_night_krsk.sh"; exit 1; }
-log "корпус: $LAGS"
 source "$VENV/bin/activate" || { log "нет venv — стоп"; exit 1; }
 export PYTHONPATH="$REPO"
-DIR=/data/postproc; mkdir -p "$DIR" 2>/dev/null || DIR=$(dirname "$LAGS")
+DIR=/data/postproc; mkdir -p "$DIR" 2>/dev/null || DIR=data/postproc
+
+# Ищем набор с признаками-наблюдениями. Если его нет — ищем сам корпус и
+# достраиваем признаки: это полминуты против четырёх часов развёртки.
+#
+# Нужно потому, что /data стирается при каждом перезапуске виртуалки, а он
+# случается и от часа простоя. Корпус при этом копируется в /workdir и
+# переживает перезапуск, а производные наборы — нет. Раннер, который в такой
+# ситуации просто отказывается, отправляет считать заново то, что уже посчитано.
+LAGS=""
+for c in "$DIR"/corpus_krsk_lags2_nb12.parquet data/postproc/corpus_krsk_lags2_nb12.parquet \
+         "$DIR"/corpus_krsk_lags2_nb6.parquet  data/postproc/corpus_krsk_lags2_nb6.parquet; do
+  [[ -f "$c" ]] && { LAGS="$c"; break; }
+done
+
+if [[ -z "$LAGS" ]]; then
+  RAW=""
+  for c in "$DIR"/corpus_krsk_2016_2020_nb12.parquet data/postproc/corpus_krsk_2016_2020_nb12.parquet \
+           "$DIR"/corpus_krsk_2016_2020_nb6.parquet  data/postproc/corpus_krsk_2016_2020_nb6.parquet \
+           "$DIR"/corpus_krsk_2016_2020.parquet      data/postproc/corpus_krsk_2016_2020.parquet; do
+    [[ -f "$c" ]] && { RAW="$c"; break; }
+  done
+  if [[ -z "$RAW" ]]; then
+    log "нет ни набора с признаками, ни самого корпуса."
+    log "  Смотрел в $DIR и data/postproc. Корпус стирается вместе с /data при"
+    log "  перезапуске виртуалки; если копии в /workdir тоже нет — придётся"
+    log "  пересобрать: bash scripts/postproc/_run_night_krsk.sh 12"
+    exit 1
+  fi
+  SUF=$(basename "$RAW" .parquet); SUF=${SUF#corpus_krsk_2016_2020}
+  SUF=${SUF#_}; SUF=${SUF:-plain}
+  LAGS="$DIR/corpus_krsk_lags2_${SUF}.parquet"
+  log "признаков нет, но корпус на месте: $RAW"
+  log "достраиваю признаки-наблюдения (полминуты) -> $LAGS"
+  python -u scripts/postproc/add_obs_lags.py --in "$RAW" --out "$LAGS" \
+      --clim-years 2016 2017 2018 2>&1 | tail -3
+  [[ -f "$LAGS" ]] || { log "признаки не собрались — стоп"; exit 1; }
+fi
+log "корпус: $LAGS ($(du -h "$LAGS" | cut -f1))"
 
 # 1. Делим по станциям, потом по годам внутри каждой части.
 if [[ ! -f "$DIR/tr_seen_test.parquet" ]]; then
