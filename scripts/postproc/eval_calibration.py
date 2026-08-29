@@ -42,7 +42,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.postprocessing.calibration import (coverage, crps_gaussian,
-                                            reliability)
+                                            reliability, spread_scale)
 from src.postprocessing.neural.dataset import StationCorpusDataset
 from src.postprocessing.neural.models import (StationLeadAwareResidualMLP,
                                               StationLeadBiasResidualMLP)
@@ -53,6 +53,10 @@ def main() -> None:
     ap.add_argument("--val-parquet", required=True)
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--out-dir", required=True)
+    ap.add_argument("--fit-parquet", default=None,
+                   help="набор, на котором настраивается множитель разброса. "
+                        "Обязан отличаться от проверочного: подогнав и проверив "
+                        "на одних данных, получишь единицу по построению")
     ap.add_argument("--batch-size", type=int, default=8192)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = ap.parse_args()
@@ -63,6 +67,23 @@ def main() -> None:
         raise SystemExit(
             "модель точечная, разброса не выдаёт — калибровать нечего. "
             "Нужна настройка, обученная с --probabilistic.")
+
+    def predict(path):
+        ds = StationCorpusDataset(path, feature_cols=ckpt["feature_cols"],
+                                  scalers=ckpt["scalers"],
+                                  station_to_idx=ckpt["station_to_idx"],
+                                  auto_obs_features=False)
+        from torch.utils.data import DataLoader
+        loader = DataLoader(ds, batch_size=a.batch_size, shuffle=False)
+        mus, sigs = [], []
+        with torch.no_grad():
+            for b in loader:
+                out = model(b["features"].to(a.device), b["station_idx"].to(a.device),
+                            b["lead_norm"].to(a.device),
+                            {k: b[f"gnn_{k}"].to(a.device) for k in ("t2m", "u10", "v10")})
+                mus.append(out["t2m_mu"].cpu().numpy())
+                sigs.append(np.exp(out["t2m_log_sigma"].cpu().numpy()))
+        return np.concatenate(mus), np.concatenate(sigs), ds.Y[:, 0]
 
     ds = StationCorpusDataset(a.val_parquet, feature_cols=ckpt["feature_cols"],
                               scalers=ckpt["scalers"],
@@ -101,6 +122,19 @@ def main() -> None:
     crps_const = float(crps_gaussian(mu, np.full_like(sigma, sharp), obs).mean())
     rel = reliability(sigma, err)
 
+    # Множитель разброса. Настраивается на отдельном наборе — иначе это подгонка:
+    # на тех же данных отношение станет единицей по построению.
+    scaled = None
+    if a.fit_parquet:
+        f_mu, f_sigma, f_obs = predict(a.fit_parquet)
+        k = spread_scale(f_sigma, f_mu - f_obs)
+        s2 = sigma * k
+        scaled = {"factor": k, "fitted_on": a.fit_parquet,
+                  "ratio": rmse / float(np.sqrt((s2 ** 2).mean())),
+                  "coverage_1sigma": coverage(s2, err, 1.0),
+                  "coverage_2sigma": coverage(s2, err, 2.0),
+                  "crps": float(crps_gaussian(mu, s2, obs).mean())}
+
     print(f"[калибровка] строк {len(err):,}")
     print(f"  ошибка {rmse:.3f} °C, заявленный разброс {sharp:.3f} °C, "
           f"отношение {rmse / sharp:.3f}")
@@ -114,13 +148,23 @@ def main() -> None:
         print(f"    n={r['n']:>7,}  сигма {r['sigma_mean']:6.3f} -> "
               f"ошибка {r['rmse']:6.3f}   {r['rmse'] / max(r['sigma_mean'], 1e-9):5.2f}x")
 
+    if scaled:
+        print(f"\n  множитель разброса {scaled['factor']:.3f}, настроен на "
+              f"{Path(scaled['fitted_on']).name}, применён к проверке:")
+        print(f"    отношение {scaled['ratio']:.3f} (было {rmse / sharp:.3f})")
+        print(f"    попадание в +-1 сигма {scaled['coverage_1sigma']:.1f} % "
+              f"(было {cov1:.1f}, должно 68,3)")
+        print(f"    попадание в +-2 сигма {scaled['coverage_2sigma']:.1f} % "
+              f"(было {cov2:.1f}, должно 95,4)")
+        print(f"    CRPS {scaled['crps']:.4f} (было {crps:.4f})")
+
     out = Path(a.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     (out / "calibration.json").write_text(json.dumps({
         "n": len(err), "rmse": rmse, "sharpness": sharp, "ratio": rmse / sharp,
         "coverage_1sigma": cov1, "coverage_2sigma": cov2,
         "crps": crps, "crps_constant_sigma": crps_const,
-        "reliability": rel}, ensure_ascii=False, indent=1))
+        "reliability": rel, "scaled": scaled}, ensure_ascii=False, indent=1))
     print(f"[калибровка] записано {out / 'calibration.json'}", flush=True)
 
 

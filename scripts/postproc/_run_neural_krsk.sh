@@ -196,7 +196,8 @@ if [[ -f experiments/neural_postproc_krsk_prob/best_model.pth ]]; then
   python -u scripts/postproc/eval_calibration.py \
       --val-parquet "$DIR/krsk_test.parquet" \
       --ckpt experiments/neural_postproc_krsk_prob/best_model.pth \
-      --out-dir experiments/neural_postproc_krsk_prob/calibration 2>&1 | tail -22
+      --fit-parquet "$DIR/krsk_val.parquet" \
+      --out-dir experiments/neural_postproc_krsk_prob/calibration 2>&1 | tail -28
 fi
 
 # Разбор по станциям у основной модели: где поправка работает, а где нет.

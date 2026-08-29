@@ -115,3 +115,54 @@ def test_bins_catch_a_mismatch_that_averages_hide():
     assert overall == pytest.approx(1.0, abs=0.05), "в среднем расхождения нет"
     ratios = [r["rmse"] / r["sigma_mean"] for r in cal.reliability(sigma_swapped, err, 2)]
     assert max(ratios) / min(ratios) > 5, "разбивка не выявила подмену"
+
+
+# --- множитель разброса ------------------------------------------------------
+
+def test_scale_of_a_well_calibrated_model_is_one():
+    rng = np.random.default_rng(10)
+    sigma = rng.uniform(0.2, 4.0, 50000)
+    assert cal.spread_scale(sigma, rng.normal(0, sigma)) == pytest.approx(1.0, abs=0.02)
+
+
+def test_scale_exposes_how_much_the_spread_is_understated():
+    """Модель, занижающая разброс вдвое, требует множителя около двух."""
+    rng = np.random.default_rng(11)
+    sigma_true = rng.uniform(0.2, 4.0, 50000)
+    err = rng.normal(0, sigma_true)
+    assert cal.spread_scale(sigma_true / 2.0, err) == pytest.approx(2.0, abs=0.05)
+
+
+def test_scaling_fixes_a_uniformly_understated_spread():
+    """Одно число выправляет положение, если ранжирование верное.
+
+    Это и есть случай нашей модели: отношение 1,14-1,20 по всем корзинам при
+    общем 1,18 — то есть неуверенность упорядочена правильно, занижена лишь
+    величина.
+    """
+    rng = np.random.default_rng(12)
+    sigma_true = rng.uniform(0.2, 4.0, 100000)
+    err = rng.normal(0, sigma_true)
+    stated = sigma_true / 1.18
+    k = cal.spread_scale(stated, err)
+    assert cal.coverage(stated, err, 1.0) < 65.0
+    assert cal.coverage(stated * k, err, 1.0) == pytest.approx(68.3, abs=1.0)
+
+
+def test_scaling_cannot_fix_wrong_ordering():
+    """А при перепутанном ранжировании множитель бесполезен.
+
+    Он выправит среднее, но по корзинам расхождение останется — потому и нужна
+    разбивка, а не одно число.
+    """
+    rng = np.random.default_rng(13)
+    n = 40000
+    err = np.concatenate([rng.normal(0, 0.5, n), rng.normal(0, 4.0, n)])
+    stated = np.concatenate([np.full(n, 4.0), np.full(n, 0.5)])
+    k = cal.spread_scale(stated, err)
+    ratios = [r["rmse"] / r["sigma_mean"] for r in cal.reliability(stated * k, err, 2)]
+    assert max(ratios) / min(ratios) > 5
+
+
+def test_zero_spread_does_not_divide_by_zero():
+    assert cal.spread_scale(np.zeros(10), np.ones(10)) == 1.0
