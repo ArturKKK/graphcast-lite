@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 
 import numpy as np
@@ -27,6 +26,7 @@ import sys
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from src.postprocessing.stations import load_stations
 from src.postprocessing.terrain import tiles_for_points
 
 BASE = "https://s3.amazonaws.com/elevation-tiles-prod/skadi"
@@ -42,11 +42,9 @@ def main() -> None:
     ap.add_argument("--out-dir", default="data/dem", help="куда лягут листы")
     a = ap.parse_args()
 
-    raw = json.loads(Path(a.stations).read_text())
-    items = raw if isinstance(raw, list) else list(raw.values())
-    lats = np.array([float(s["lat"]) for s in items])
-    lons = np.array([float(s["lon"]) % 360.0 for s in items])
-    lons = np.where(lons > 180.0, lons - 360.0, lons)
+    items = load_stations(a.stations)
+    lats = np.array([s["lat"] for s in items])
+    lons = np.array([s["lon"] for s in items])
 
     tiles = tiles_for_points(lats, lons, a.margin_deg)
     print(f"станций: {len(items)}, широты {lats.min():.2f}..{lats.max():.2f}, "

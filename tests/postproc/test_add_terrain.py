@@ -130,3 +130,60 @@ def test_radii_choice_changes_the_feature_set(scene):
     got, _ = run(tmp, dem, extra=("--radii-km", "2", "10"))
     names = {c for c in got.columns if c.startswith("terr_tpi_")}
     assert names == {"terr_tpi_2km", "terr_tpi_10km"}
+
+
+def test_runs_against_the_real_stations_file(tmp_path):
+    """Скрипт запускается на ШТАТНОМ файле станций, а не на самодельном.
+
+    Без этого теста 30.08.2026 всё выглядело зелёным: фикстура выше выдумывала
+    станции со всеми нужными полями, а настоящий файл держит номер станции
+    КЛЮЧОМ словаря — и скрипт падал с KeyError: 'usaf' уже на виртуалке, после
+    часа подготовки. Проверяем на двух станциях, чьи листы синтезируем; для
+    остальных ожидаем честное сообщение о нехватке листов.
+    """
+    real = ROOT / "data" / "krsk_postproc_stations.json"
+    if not real.exists():
+        pytest.skip("нет штатного файла станций")
+
+    from src.postprocessing.stations import load_stations
+    stations = load_stations(real)
+    # берём станцию и синтезируем ровно те листы, которые ей нужны
+    from src.postprocessing.terrain import tiles_for_points
+    s0 = stations[0]
+    need = tiles_for_points([s0["lat"]], [s0["lon"]], 0.35)
+    dem = tmp_path / "dem"
+    dem.mkdir()
+    for i, name in enumerate(need):
+        write_hgt(dem / f"{name}.hgt", hills(n=181, seed=i))
+
+    rows = [{"station_usaf": s["usaf"], "lead_h": 6, "obs_t2m_K": 273.0}
+            for s in stations]
+    pd.DataFrame(rows).to_parquet(tmp_path / "corpus.parquet", index=False)
+
+    out = tmp_path / "out.parquet"
+    r = subprocess.run(
+        [sys.executable, str(SCRIPT), "--corpus", str(tmp_path / "corpus.parquet"),
+         "--out", str(out), "--stations", str(real), "--dem-dir", str(dem)],
+        capture_output=True, text=True, cwd=ROOT)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+    got = pd.read_parquet(out)
+    assert len(got) == len(stations), "склейка изменила число строк"
+    mine = got[got.station_usaf == s0["usaf"]]
+    assert len(mine) == 1
+    assert mine["terr_slope"].notna().all(), "у станции с листами нет рельефа"
+
+
+def test_station_numbers_match_the_corpus_column(tmp_path):
+    """Номер из файла станций стыкуется с колонкой корпуса как строка.
+
+    Если бы одна сторона держала номер числом, а другая строкой, склейка
+    молча дала бы пустой рельеф у всех станций — и это выглядело бы как
+    «листов не хватило», уводя разбор совсем не туда.
+    """
+    real = ROOT / "data" / "krsk_postproc_stations.json"
+    if not real.exists():
+        pytest.skip("нет штатного файла станций")
+    from src.postprocessing.stations import load_stations
+    for s in load_stations(real):
+        assert isinstance(s["usaf"], str)

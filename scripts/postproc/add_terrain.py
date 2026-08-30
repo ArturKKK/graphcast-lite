@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -25,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from src.postprocessing.stations import load_stations
 from src.postprocessing.terrain import load_mosaic, station_terrain
 
 
@@ -33,9 +33,7 @@ def build_table(stations, dem_dir, radii_m, margin_deg=0.35) -> pd.DataFrame:
     rows, skipped = [], []
     for s in stations:
         usaf = str(s["usaf"])
-        lat, lon = float(s["lat"]), float(s["lon"])
-        if lon > 180.0:
-            lon -= 360.0
+        lat, lon = float(s["lat"]), float(s["lon"])   # долгота уже в [-180, 180]
         try:
             dem, center, cell = load_mosaic(dem_dir, lat, lon, margin_deg)
         except FileNotFoundError as e:
@@ -68,8 +66,7 @@ def main() -> None:
                          "долины, 20 км — положение в крупном рельефе")
     a = ap.parse_args()
 
-    raw = json.loads(Path(a.stations).read_text())
-    stations = raw if isinstance(raw, list) else list(raw.values())
+    stations = load_stations(a.stations)
     table = build_table(stations, a.dem_dir, [r * 1000 for r in a.radii_km])
     if table.empty:
         raise SystemExit("ни одной станции не посчитано — проверь --dem-dir")

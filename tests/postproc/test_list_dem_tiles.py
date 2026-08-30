@@ -15,8 +15,12 @@ SCRIPT = ROOT / "scripts" / "postproc" / "list_dem_tiles.py"
 
 
 def stations(tmp_path, points):
+    """Настоящий файл станций — словарь с номером в ключе; повторяем эту форму,
+    иначе тест проверял бы не тот вход, что бывает на самом деле."""
     p = tmp_path / "st.json"
-    p.write_text(json.dumps([{"lat": la, "lon": lo} for la, lo in points]))
+    p.write_text(json.dumps({
+        f"29{i:04d}": {"lat": la, "lon": lo, "elev": 200.0 + i}
+        for i, (la, lo) in enumerate(points)}))
     return p
 
 
