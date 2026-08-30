@@ -76,10 +76,38 @@ if [[ "$NTILES" -lt 100 ]]; then
 fi
 
 # 2. Исходный корпус с признаками окрестности.
-LAGS="$DIR/corpus_krsk_lags2_nb${NB}.parquet"
-[[ -f "$LAGS" ]] || LAGS="$DIR/corpus_krsk_lags2_seen.parquet"
-[[ -f "$LAGS" ]] || { log "нет корпуса — сначала _run_night_krsk.sh $NB"; exit 1; }
+#    /data стирается при перезапуске виртуалки, а корпус жил именно там —
+#    30.08.2026 он так и пропал. Поэтому ищем в нескольких местах, а не в одном,
+#    и при неудаче печатаем весь список, чтобы было видно, чего не хватает.
+#    Можно задать явно: CORPUS=/путь/к.parquet bash scripts/postproc/_run_terrain_krsk.sh
+LAGS=""
+CORPUS_CANDIDATES=("${CORPUS:-}"
+  "$DIR/corpus_krsk_lags2_nb${NB}.parquet"
+  "$DIR/corpus_krsk_2016_2020_nb${NB}.parquet"
+  "$DIR/corpus_krsk_lags2_seen.parquet"
+  "/data/datasets/postproc/corpus_krsk_lags2_nb${NB}.parquet"
+  "/data/datasets/postproc/corpus_krsk_lags2_seen.parquet"
+  "$REPO/data/postproc/corpus_krsk_lags2_nb${NB}.parquet"
+  "$REPO/data/postproc/corpus_krsk_lags2_seen.parquet")
+for c in "${CORPUS_CANDIDATES[@]}"; do
+  [[ -n "$c" && -f "$c" ]] && { LAGS="$c"; break; }
+done
+if [[ -z "$LAGS" ]]; then
+  log "нет корпуса. Искал здесь:"
+  for c in "${CORPUS_CANDIDATES[@]}"; do [[ -n "$c" ]] && log "    $c"; done
+  log "  Корпус лежал в /data/postproc, а /data стирается при перезапуске"
+  log "  виртуалки. Найти уцелевшую копию:"
+  log "    find /data /workdir /root -maxdepth 6 -name 'corpus_krsk*' 2>/dev/null"
+  log "  Если копии нет — пересобрать: bash scripts/postproc/_run_night_krsk.sh $NB"
+  log "  (это несколько часов: развёртка модели по всем срокам заново)"
+  exit 1
+fi
 log "корпус: $LAGS ($(du -h "$LAGS" | cut -f1))"
+
+# Корпус пережил перезапуск только если лежит вне /data. Копию класть некуда:
+# в /workdir квота 8 ГБ. Но сказать об этом стоит — чтобы пропажа не удивляла.
+[[ "$LAGS" == /data/postproc/* ]] && \
+  log "  ВНИМАНИЕ: корпус в /data/postproc — он не переживёт перезапуск виртуалки"
 
 # 3. Приклейка описателей рельефа.
 TERR="$DIR/corpus_krsk_lags2_nb${NB}_terr.parquet"
