@@ -55,8 +55,8 @@ def test_both_builders_use_the_shared_module():
         assert "<sup>" not in src, f"{name}: своя копия правила надстрочных знаков"
 
 
-def test_pdf_builder_drops_the_prompt(tmp_path):
-    """Сборка, из которой печатается PDF, не тащит служебный раздел.
+def test_pdf_builder_output_is_sane(tmp_path):
+    """Сборка, из которой печатается PDF, даёт годную вёрстку.
 
     Это тот самый путь, который уходит в журнал, и проверять надо именно его,
     а не соседнюю сборку для вычитки.
@@ -69,10 +69,38 @@ def test_pdf_builder_drops_the_prompt(tmp_path):
                        capture_output=True, text=True, cwd=ROOT)
     assert r.returncode == 0, r.stdout + r.stderr
     html = artifact.read_text()
-    assert "придирчивый рецензент" not in html, "промпт попал в вёрстку для PDF"
-    assert "Wijnands" in html, "отрезано лишнее — пропал список литературы"
+    assert "Wijnands" in html, "пропал список литературы"
     assert "^1,2^" not in html, "крышки аффиляций не преобразованы"
     assert "<sup>1,2</sup>" in html
+
+
+def test_review_prompt_lives_outside_the_manuscript():
+    """Промпт для рецензирующей нейросети — в отдельном файле, не в статье.
+
+    Раньше он лежал в конце рукописи и держался только на отсечении при сборке.
+    Отдельный файл надёжнее: попасть в статью он физически не может.
+    """
+    article = ROOT / "docs" / "paper" / "article_gip.md"
+    prompt = ROOT / "docs" / "paper" / "review_prompt.md"
+    assert prompt.exists(), "файл с промптом пропал"
+    body = prompt.read_text()
+    assert "придирчивый рецензент" in body
+    assert len(body) > 3000, "промпт подозрительно короткий — не обрезан ли?"
+    if article.exists():
+        assert "придирчивый рецензент" not in article.read_text(), (
+            "промпт вернулся в рукопись")
+
+
+def test_cutting_still_guards_against_the_prompt_coming_back():
+    """Отсечение оставлено страховкой на случай, если промпт снова впишут.
+
+    Файл вынесен, но правило не убрано: стоит дешёво, а цена отказа — служебный
+    текст в журнальной подаче.
+    """
+    text = "Статья.\n\n## Промпт для независимой проверки\n\nТы рецензент.\n"
+    got, done = prepare(text)
+    assert "Ты рецензент" not in got
+    assert done["cut"]
 
 
 def test_service_section_list_is_not_empty():
