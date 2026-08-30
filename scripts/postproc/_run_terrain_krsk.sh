@@ -83,18 +83,37 @@ fi
 LAGS=""
 CORPUS_CANDIDATES=("${CORPUS:-}"
   "$DIR/corpus_krsk_lags2_nb${NB}.parquet"
-  "$DIR/corpus_krsk_2016_2020_nb${NB}.parquet"
-  "$DIR/corpus_krsk_lags2_seen.parquet"
-  "/data/datasets/postproc/corpus_krsk_lags2_nb${NB}.parquet"
-  "/data/datasets/postproc/corpus_krsk_lags2_seen.parquet"
   "$REPO/data/postproc/corpus_krsk_lags2_nb${NB}.parquet"
-  "$REPO/data/postproc/corpus_krsk_lags2_seen.parquet")
+  "/data/datasets/postproc/corpus_krsk_lags2_nb${NB}.parquet")
 for c in "${CORPUS_CANDIDATES[@]}"; do
   [[ -n "$c" && -f "$c" ]] && { LAGS="$c"; break; }
 done
+
+# Готового набора нет, но может уцелеть СЫРОЙ корпус. Признаки-наблюдения
+# считаются из него за минуты — это пересчёт по таблице, без развёртки модели.
+# Восстанавливать самим стоит: 30.08.2026 пропажа lags2 выглядела как «всё
+# заново», хотя пересобрать надо было только надстройку.
+if [[ -z "$LAGS" ]]; then
+  RAW=""
+  for r in "$DIR/corpus_krsk_2016_2020_nb${NB}.parquet" \
+           "$REPO/data/postproc/corpus_krsk_2016_2020_nb${NB}.parquet" \
+           "/data/datasets/postproc/corpus_krsk_2016_2020_nb${NB}.parquet"; do
+    [[ -f "$r" ]] && { RAW="$r"; break; }
+  done
+  if [[ -n "$RAW" ]]; then
+    LAGS="$(dirname "$RAW")/corpus_krsk_lags2_nb${NB}.parquet"
+    log "готового набора нет, но есть сырой корпус: $RAW"
+    log "  считаю признаки-наблюдения (минуты, развёртки модели не будет)"
+    python -u scripts/postproc/add_obs_lags.py --in "$RAW" --out "$LAGS" \
+        --clim-years 2016 2017 2018 2>&1 | tail -4
+    [[ -f "$LAGS" ]] || { log "признаки не собрались — стоп"; exit 1; }
+  fi
+fi
 if [[ -z "$LAGS" ]]; then
   log "нет корпуса. Искал здесь:"
   for c in "${CORPUS_CANDIDATES[@]}"; do [[ -n "$c" ]] && log "    $c"; done
+  log "  ...а также сырой corpus_krsk_2016_2020_nb${NB}.parquet в тех же местах"
+  log "  (из сырого признаки-наблюдения досчитываются за минуты)."
   log "  Корпус лежал в /data/postproc, а /data стирается при перезапуске"
   log "  виртуалки. Найти уцелевшую копию:"
   log "    find /data /workdir /root -maxdepth 6 -name 'corpus_krsk*' 2>/dev/null"
