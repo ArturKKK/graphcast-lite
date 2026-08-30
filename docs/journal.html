@@ -1,0 +1,1162 @@
+<title>Журнал graphcast-lite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@500;600;700&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;1,7..72,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ground:#F6F7F9; --surface:#FFFFFF; --surface-2:#EFF2F5;
+  --ink:#16202B; --ink-2:#4A5967; --ink-3:#7D8B98;
+  --rule:#DDE3E9; --rule-2:#C8D2DA;
+  --warm:#C2622B; --cool:#1F6F7A; --neutral:#7D8B98;
+  --yes:#2E6E4E; --no:#A33A3A; --open:#8A6D1F;
+  --warm-wash:#F6E9DF; --cool-wash:#E2EEF0;
+  --shadow:0 1px 2px rgba(22,32,43,.06), 0 8px 24px rgba(22,32,43,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#10161C; --surface:#161E26; --surface-2:#1D262F;
+    --ink:#E4E9ED; --ink-2:#A7B3BD; --ink-3:#74828D;
+    --rule:#26313B; --rule-2:#33414D;
+    --warm:#E08A4E; --cool:#5FB8C4; --neutral:#74828D;
+    --yes:#5EA97C; --no:#D96B6B; --open:#C8A44C;
+    --warm-wash:#2A2119; --cool-wash:#16272B;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#10161C; --surface:#161E26; --surface-2:#1D262F;
+  --ink:#E4E9ED; --ink-2:#A7B3BD; --ink-3:#74828D;
+  --rule:#26313B; --rule-2:#33414D;
+  --warm:#E08A4E; --cool:#5FB8C4; --neutral:#74828D;
+  --yes:#5EA97C; --no:#D96B6B; --open:#C8A44C;
+  --warm-wash:#2A2119; --cool-wash:#16272B;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:"Literata",Georgia,"Times New Roman",serif;
+  font-size:17px; line-height:1.62; margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{display:grid; grid-template-columns:250px minmax(0,1fr); gap:56px;
+  max-width:1240px; margin:0 auto; padding:0 32px 120px}
+@media (max-width:960px){
+  .wrap{grid-template-columns:1fr; gap:0; padding:0 20px 80px}
+  .rail{position:static !important; height:auto !important; padding-top:0 !important;
+    border-right:0 !important; margin-bottom:40px}
+}
+
+/* ── шапка ─────────────────────────────────────────────── */
+header.top{
+  border-bottom:1px solid var(--rule); background:var(--surface);
+  padding:64px 32px 40px; margin-bottom:56px;
+}
+.top-inner{max-width:1240px; margin:0 auto; padding:0 0}
+.eyebrow{
+  font-family:"Golos Text",system-ui,sans-serif; font-weight:600;
+  font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--warm); margin:0 0 18px
+}
+h1{
+  font-family:"Golos Text",system-ui,sans-serif; font-weight:700;
+  font-size:clamp(34px,5.2vw,54px); line-height:1.08; letter-spacing:-.02em;
+  margin:0 0 20px; text-wrap:balance; max-width:20ch;
+}
+.standfirst{font-size:19px; color:var(--ink-2); max-width:62ch; margin:0 0 36px}
+.strip{display:flex; flex-wrap:wrap; gap:0; border-top:1px solid var(--rule);
+  padding-top:24px; max-width:900px}
+.stat{padding-right:38px; margin-right:38px; border-right:1px solid var(--rule)}
+.stat:last-child{border-right:0}
+.stat .n{font-family:"IBM Plex Mono",monospace; font-weight:600;
+  font-size:26px; color:var(--ink); font-variant-numeric:tabular-nums; display:block}
+.stat .l{font-family:"Golos Text",system-ui,sans-serif; font-size:12.5px;
+  color:var(--ink-3); letter-spacing:.03em; margin-top:3px; display:block}
+@media (max-width:700px){
+  .stat{padding-right:22px; margin-right:22px; margin-bottom:16px}
+}
+
+/* ── боковая навигация ─────────────────────────────────── */
+.rail{position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+  padding:8px 0 40px; border-right:1px solid var(--rule)}
+.rail h2{font-family:"Golos Text",system-ui,sans-serif; font-size:11px;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3);
+  margin:24px 0 10px; font-weight:600}
+.rail a{display:block; font-family:"Golos Text",system-ui,sans-serif;
+  font-size:14px; color:var(--ink-2); text-decoration:none; padding:5px 14px 5px 0;
+  border-left:2px solid transparent; padding-left:12px; margin-left:-1px;
+  line-height:1.35}
+.rail a:hover{color:var(--ink)}
+.rail a.on{color:var(--warm); border-left-color:var(--warm); font-weight:600}
+.rail a:focus-visible{outline:2px solid var(--cool); outline-offset:2px}
+
+/* ── текст ─────────────────────────────────────────────── */
+main{min-width:0}
+section{margin-bottom:72px; scroll-margin-top:24px}
+h2.sec{font-family:"Golos Text",system-ui,sans-serif; font-weight:700;
+  font-size:clamp(26px,3.4vw,34px); line-height:1.15; letter-spacing:-.015em;
+  margin:0 0 8px; text-wrap:balance}
+h3{font-family:"Golos Text",system-ui,sans-serif; font-weight:600;
+  font-size:20px; margin:44px 0 12px; letter-spacing:-.01em; text-wrap:balance}
+h4{font-family:"Golos Text",system-ui,sans-serif; font-weight:600;
+  font-size:16px; margin:30px 0 8px; color:var(--ink-2)}
+p{margin:0 0 17px; max-width:68ch}
+.lede{font-size:18.5px; color:var(--ink-2); max-width:66ch; margin-bottom:28px}
+strong{font-weight:500; color:var(--ink); background:linear-gradient(transparent 62%, var(--warm-wash) 62%)}
+em{font-style:italic; color:var(--ink-2)}
+code{font-family:"IBM Plex Mono",monospace; font-size:.87em;
+  background:var(--surface-2); padding:1px 5px; border-radius:3px; color:var(--ink-2)}
+ul,ol{max-width:68ch; margin:0 0 18px; padding-left:22px}
+li{margin-bottom:7px}
+a.ref{color:var(--cool); text-decoration:underline; text-decoration-thickness:1px;
+  text-underline-offset:2px}
+
+/* ── ярлык вердикта ────────────────────────────────────── */
+.verdict{display:inline-flex; align-items:center; gap:6px;
+  font-family:"Golos Text",system-ui,sans-serif; font-size:11.5px; font-weight:600;
+  letter-spacing:.08em; text-transform:uppercase; padding:3px 9px; border-radius:3px;
+  vertical-align:middle; white-space:nowrap}
+.v-yes{color:var(--yes); background:color-mix(in srgb, var(--yes) 12%, transparent);
+  border:1px solid color-mix(in srgb, var(--yes) 32%, transparent)}
+.v-no{color:var(--no); background:color-mix(in srgb, var(--no) 12%, transparent);
+  border:1px solid color-mix(in srgb, var(--no) 32%, transparent)}
+.v-open{color:var(--open); background:color-mix(in srgb, var(--open) 14%, transparent);
+  border:1px solid color-mix(in srgb, var(--open) 34%, transparent)}
+.v-mid{color:var(--ink-3); background:var(--surface-2); border:1px solid var(--rule)}
+
+/* ── карточка опыта ────────────────────────────────────── */
+.card{background:var(--surface); border:1px solid var(--rule); border-radius:6px;
+  padding:22px 24px; margin:22px 0; box-shadow:var(--shadow)}
+.card-head{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+  margin-bottom:6px}
+.card-head .t{font-family:"Golos Text",system-ui,sans-serif; font-weight:600;
+  font-size:17.5px; margin:0}
+.card p:last-child{margin-bottom:0}
+.card .date{font-family:"IBM Plex Mono",monospace; font-size:12.5px; color:var(--ink-3);
+  font-variant-numeric:tabular-nums}
+
+/* ── выноска ───────────────────────────────────────────── */
+.note{border-left:3px solid var(--cool); background:var(--cool-wash);
+  padding:16px 20px; margin:24px 0; border-radius:0 4px 4px 0}
+.note .lbl{font-family:"Golos Text",system-ui,sans-serif; font-size:11.5px;
+  font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--cool); display:block; margin-bottom:6px}
+.note p:last-child{margin-bottom:0}
+.note.warn{border-left-color:var(--warm); background:var(--warm-wash)}
+.note.warn .lbl{color:var(--warm)}
+
+/* ── таблицы ───────────────────────────────────────────── */
+.tw{overflow-x:auto; margin:22px 0; border:1px solid var(--rule);
+  border-radius:6px; background:var(--surface)}
+table{border-collapse:collapse; width:100%; font-size:14.5px;
+  font-family:"Golos Text",system-ui,sans-serif}
+caption{text-align:left; font-size:13px; color:var(--ink-3); padding:12px 16px 0;
+  font-family:"Golos Text",system-ui,sans-serif}
+th{text-align:left; font-weight:600; font-size:12px; letter-spacing:.05em;
+  text-transform:uppercase; color:var(--ink-3); padding:12px 16px;
+  border-bottom:1px solid var(--rule-2); white-space:nowrap}
+td{padding:10px 16px; border-bottom:1px solid var(--rule); color:var(--ink-2)}
+tbody tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right; font-family:"IBM Plex Mono",monospace;
+  font-variant-numeric:tabular-nums; white-space:nowrap}
+tr.hi td{background:var(--warm-wash); color:var(--ink); font-weight:500}
+td .u{color:var(--ink-3); font-size:.86em}
+
+/* ── графики ───────────────────────────────────────────── */
+figure{margin:28px 0; background:var(--surface); border:1px solid var(--rule);
+  border-radius:6px; padding:22px 24px 16px; box-shadow:var(--shadow)}
+figure h4{margin:0 0 2px; font-size:16.5px; color:var(--ink)}
+figure .sub{font-size:13.5px; color:var(--ink-3); margin:0 0 18px;
+  font-family:"Golos Text",system-ui,sans-serif}
+figcaption{font-size:13.5px; color:var(--ink-3); margin-top:14px;
+  padding-top:12px; border-top:1px solid var(--rule); max-width:none}
+.chart{width:100%; overflow-x:auto}
+svg{display:block; max-width:100%; height:auto}
+.legend{display:flex; gap:18px; flex-wrap:wrap; margin-bottom:14px;
+  font-family:"Golos Text",system-ui,sans-serif; font-size:13px; color:var(--ink-2)}
+.legend span{display:inline-flex; align-items:center; gap:7px}
+.legend i{width:11px; height:11px; border-radius:2px; display:inline-block}
+.ax{fill:var(--ink-3); font-family:"IBM Plex Mono",monospace; font-size:11px}
+.axl{fill:var(--ink-2); font-family:"Golos Text",system-ui,sans-serif; font-size:12px}
+.grid-l{stroke:var(--rule); stroke-width:1}
+.val{fill:var(--ink); font-family:"IBM Plex Mono",monospace; font-size:12px;
+  font-weight:600}
+.bar{transition:opacity .12s}
+.bar:hover{opacity:.78; cursor:default}
+
+/* ── итоговая полоса ───────────────────────────────────── */
+.ladder{display:grid; gap:2px; margin:24px 0}
+.rung{display:grid; grid-template-columns:minmax(150px,1.1fr) minmax(0,3fr) 78px;
+  gap:14px; align-items:center; font-family:"Golos Text",system-ui,sans-serif;
+  font-size:14px}
+.rung .nm{color:var(--ink-2)}
+.rung .track{background:var(--surface-2); border-radius:2px; height:22px;
+  position:relative; overflow:hidden}
+.rung .fill{height:100%; border-radius:0 2px 2px 0}
+.rung .pc{text-align:right; font-family:"IBM Plex Mono",monospace;
+  font-variant-numeric:tabular-nums; font-size:13px; color:var(--ink)}
+@media (max-width:640px){.rung{grid-template-columns:1fr 60px; gap:6px}
+  .rung .track{grid-column:1/-1}}
+
+footer{border-top:1px solid var(--rule); margin-top:80px; padding-top:28px;
+  color:var(--ink-3); font-size:14px; font-family:"Golos Text",system-ui,sans-serif}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <p class="eyebrow">Рабочая хроника · graphcast-lite · обновлено 30.08.2026</p>
+    <h1>Что мы делали, что думали и что из этого вышло</h1>
+    <p class="standfirst">Не статья и не отчёт. Это внутренняя запись работы над графовой моделью
+      регионального прогноза для Красноярского края: какие вопросы ставились, что показали измерения,
+      где я ошибался и что пришлось переписать. Отрицательные результаты здесь наравне
+      с положительными — их больше, и они полезнее.</p>
+    <div class="strip">
+      <div class="stat"><span class="n">5,9 млн</span><span class="l">параметров модели</span></div>
+      <div class="stat"><span class="n">133 279</span><span class="l">узлов единого графа</span></div>
+      <div class="stat"><span class="n">3 083 614</span><span class="l">строк корпуса постобработки</span></div>
+      <div class="stat"><span class="n">23,8 %</span><span class="l">выигрыш постобработки</span></div>
+      <div class="stat"><span class="n">238</span><span class="l">тестов</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<nav class="rail" aria-label="Содержание">
+  <h2>Основание</h2>
+  <a href="#zadacha">Задача и устройство модели</a>
+  <a href="#masshtab">Порядок величин</a>
+  <h2>Часть I · Модель</h2>
+  <a href="#zamorozka">Заморозка процессора</a>
+  <a href="#mesh">Многоуровневый меш</a>
+  <a href="#temp">Темп обучения</a>
+  <a href="#roiw">Вес области интереса</a>
+  <a href="#chw">Веса каналов</a>
+  <a href="#shum">Шум и длинная развёртка</a>
+  <a href="#ansambl">Ансамбль</a>
+  <h2>Часть II · Усвоение</h2>
+  <a href="#usvoenie">Нуджинг и ОИ</a>
+  <a href="#analiz">Анализ против прогноза</a>
+  <h2>Часть III · Постобработка</h2>
+  <a href="#korpus">Корпус</a>
+  <a href="#lestnica">Лестница результатов</a>
+  <a href="#gde">Где живёт выигрыш</a>
+  <a href="#perenos">Перенос на новые станции</a>
+  <a href="#kalibr">Надёжность прогноза</a>
+  <h2>Часть IV · Ремесло</h2>
+  <a href="#instrument">Инструменты и проверки</a>
+  <h2>Итоги</h2>
+  <a href="#seychas">Где мы сейчас</a>
+  <a href="#neposhlo">Что не сработало</a>
+</nav>
+
+<main>
+
+<!-- ══════════════ ОСНОВАНИЕ ══════════════ -->
+<section id="zadacha">
+  <h2 class="sec">Задача и устройство модели</h2>
+  <p class="lede">Региональный прогноз погоды графовой нейросетью, обучаемой и работающей
+    на одной видеокарте. Область — Красноярский край, 50–60° с.ш. и 83–98° в.д.</p>
+
+  <p>Схема заимствована у GraphCast: <strong>кодировщик — процессор — декодировщик</strong>.
+    Кодировщик переносит поля с регулярной сетки в вершины графа, процессор делает
+    12 раундов обмена сообщениями блоками Interaction Network, декодировщик возвращает
+    приращения полей обратно на сетку. Скрытое представление — 256, веса раундов не
+    разделяются. Прогноз строится авторегрессионно с шагом 6 часов, вход — два
+    последовательных среза.</p>
+
+  <p>Всего <strong>5,9 млн параметров</strong>, и это сознательное решение, а не нехватка
+    ресурсов: обучение и работа помещаются на одну карту, то есть результат воспроизводим
+    в вычислительной среде регионального управления гидрометслужбы. Модели на сотни
+    миллионов параметров требуют многоузловых конфигураций.</p>
+
+  <h3>Главная идея: единого графа вместо граничных условий</h3>
+  <p>Обычно региональную модель делают вырезкой из глобальной сетки с заданием внешних
+    граничных условий на краю. Беда известная: у граничных узлов нет корректного окружения,
+    искажения копятся у края, и приходится отдельно сшивать с внешним полем.</p>
+
+  <p>Мы поступаем иначе. Из глобальной сетки 512×256 (шаг 0,703°) <em>удаляются</em> узлы,
+    попадающие в область интереса, а на их место ставится региональная решётка с шагом
+    0,25° — 61×41 = 2501 узел. Получается один граф на 133 279 узлов, и понятия внешней
+    границы для модели просто не существует. Рёбра строятся поиском ближайших соседей
+    в трёхмерных геоцентрических координатах, одинаково для узлов обоих разрешений;
+    никакой особой обработки переходной зоны нет.</p>
+
+  <div class="note">
+    <span class="lbl">Проверка бесшовности</span>
+    <p>Это утверждение надо было проверить, а не заявить. Ошибка в полосе 0–25 км внутри
+      вставки — 2,12 °C против 2,07 °C в её середине, то есть <strong>на 2,3 % выше</strong>;
+      снаружи в полосе 0–100 км — 1,87 °C. Всплеска у стыка нет: разброс между полосами
+      не превышает различий, вызванных сменой подстилающей поверхности.</p>
+  </div>
+
+  <p>Региональная модель получается дообучением глобальной. При смене геометрии сетки
+    кодировщик и декодировщик оказываются несогласованными со связностью, а процессор
+    несёт выученную на глобальной задаче динамику — и её легко разрушить большими
+    градиентами со стороны неадаптированных интерфейсов. Поэтому две фазы: сначала
+    процессор заморожен, потом размораживается с темпом в десять раз меньше базового.
+    Плюс учебный план по длине развёртки — от одного шага до четырёх.</p>
+</section>
+
+<section id="masshtab">
+  <h2 class="sec">Порядок величин</h2>
+  <p class="lede">Самое полезное, что мы намеряли за месяц, — это не какой-то один приём,
+    а шкала. Она сразу отвечает, стоит ли браться за очередную идею.</p>
+
+  <div class="tw">
+    <table>
+      <caption>Все замеры приведены к одному — выигрышу по области интереса</caption>
+      <thead><tr><th>Что меняем</th><th class="n">Эффект</th><th>Чем это является</th></tr></thead>
+      <tbody>
+        <tr><td>Случайное начальное состояние (жребий)</td><td class="n">0,03 %</td><td>шум измерения</td></tr>
+        <tr><td>Сброс темпа обучения в конце</td><td class="n">1,5 %</td><td>приём обучения</td></tr>
+        <tr class="hi"><td>Вес области интереса в функции потерь</td><td class="n">5,4 %</td><td>лучший приём обучения</td></tr>
+        <tr><td>Веса каналов (по приземной температуре)</td><td class="n">7,2 %</td><td>регулятор, не улучшение</td></tr>
+        <tr class="hi"><td>Усвоение наблюдений, 10 станций</td><td class="n">12,3 %</td><td>новые сведения</td></tr>
+        <tr class="hi"><td>Постобработка в точках станций</td><td class="n">23,8 %</td><td>новые сведения</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Вывод простой и он определил весь дальнейший порядок работы:
+    <strong>приёмы обучения второстепенны, выигрыш даёт только приток новых сведений.</strong>
+    Всё, что находится внутри модели и её обучения, живёт в диапазоне единиц процентов;
+    всё, что приносит наблюдения, — в диапазоне десятков.</p>
+</section>
+
+<!-- ══════════════ ЧАСТЬ I ══════════════ -->
+<section id="zamorozka">
+  <h2 class="sec">Часть I · Заморозка процессора</h2>
+  <p class="lede">Нужна ли вообще региональная адаптация выученной на глобальной задаче
+    динамики? Ставка велика: если не нужна, перенос модели на новый регион сводится
+    к обучению одних интерфейсов.</p>
+
+  <div class="card">
+    <div class="card-head"><p class="t">Процессор заморожен все 32 эпохи</p>
+      <span class="date">07–09.08.2026</span>
+      <span class="verdict v-no">адаптация необходима</span></div>
+    <p>Проигрыш <strong>7,5 %</strong> по ошибке на проверочной выборке, устойчивый на всех
+      стадиях развёртки. Замороженная модель вышла на плато к восьмой эпохе и дальше не
+      улучшалась.</p>
+    <p>Существенно, что у неё выше и ошибка <em>на обучающей</em> выборке (0,02919 против
+      0,02702). Значит это недообучение из-за нехватки свободы подстроить динамику,
+      а не переобучение — диагноз однозначный.</p>
+    <p>Побочное: ускорения заморозка не даёт совсем. Процессор стоит в середине сети,
+      градиент всё равно проходит через все 12 раундов, чтобы достичь кодировщика.
+      Экономится только вычисление градиентов по весам процессора.</p>
+  </div>
+</section>
+
+<section id="mesh">
+  <h2 class="sec">Многоуровневый меш, и как я дважды менял вывод</h2>
+  <p class="lede">Самая поучительная история месяца. Идея: слить все уровни меша 0–6 вместо
+    двух [4, 6]. Вершин столько же, добавляются только рёбра нижних уровней — около +25 %
+    рёбер и ноль новых параметров. Уровень 0 даёт связи порядка 7000 км: сигнал может
+    обойти полмира за один раунд вместо двенадцати.</p>
+
+  <div class="card">
+    <div class="card-head"><p class="t">Первый заход: «идея не работает»</p>
+      <span class="date">09–11.08.2026</span>
+      <span class="verdict v-no">вывод оказался неверен</span></div>
+    <p>Глобальная модель с многоуровневым мешем проиграла по всем без исключения каналам,
+      причём отставание росло со сроком: 13 % на +6 ч, 46 % на сутках. Ошибка на обучающей
+      выборке тоже выше — снова недообучение.</p>
+    <p>Формулировка «многоуровневый меш не окупается» продержалась ровно до разбора кода.</p>
+  </div>
+
+  <div class="note warn">
+    <span class="lbl">Что нашлось при разборе</span>
+    <p>Признаки рёбер нормировались <em>на максимум длины в графе</em>. При уровнях [4, 6]
+      максимум около 440 км, при [0..6] — около 7000 км. Те же самые локальные рёбра стали
+      получать признак расстояния не 0,5–1,0, а около 0,06: вся геометрия мелких масштабов
+      сжалась в полоску у нуля. Мы полагали, что меняем набор рёбер, а поменяли заодно
+      и представление всех прежних.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><p class="t">Второй заход: логарифмическое кодирование рёбер</p>
+      <span class="date">13–15.08.2026</span>
+      <span class="verdict v-mid">меш нейтрален</span></div>
+    <p>Одна правка — <code>edge_feature_mode = unit_log</code>. Стартовая ошибка упала
+      с 0,21405 до 0,03336, <strong>в 6,4 раза</strong>. По области интереса модели стали
+      неразличимы: 1,30 / 1,53 / 1,60 / 1,68 °C против 1,32 / 1,53 / 1,59 / 1,66.</p>
+    <p>Итоговая формулировка: <strong>не работала наша реализация, а сама идея в нашей
+      постановке ничего не даёт.</strong> Это и честнее, и полезнее прежнего «идея плоха».</p>
+  </div>
+
+  <p>Отдельно осталось подозрение на агрегацию усреднением вместо суммы
+    (<code>reduce="mean"</code>). При сумме длинные рёбра <em>добавляют</em> сведения,
+    при среднем — <em>разбавляют</em> локальные. Это объясняло бы ровную деградацию по
+    всем каналам. Проверка не проводилась: после нейтрального результата с правильным
+    кодированием рёбер приоритет упал.</p>
+</section>
+
+<section id="temp">
+  <h2 class="sec">Темп обучения</h2>
+
+  <div class="card">
+    <div class="card-head"><p class="t">Косинусный график на всё обучение</p>
+      <span class="date">11–13.08.2026</span>
+      <span class="verdict v-no">на прогнозе ноль</span></div>
+    <p>На валидации приём работает: 0,01789 против 0,01796, поздние эпохи перестают портиться.
+      А на прогнозе — <strong>72,90 % против 72,96 %</strong>, то есть шесть сотых
+      процентного пункта. Ноль.</p>
+    <p>Это ещё одно свидетельство того, что <strong>одношаговая ошибка на +6 ч плохо
+      предсказывает качество на публикуемых горизонтах</strong>. Улучшение функционала
+      на валидации в 1,6 % не превратилось ни во что.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><p class="t">Резкое снижение темпа в конце обучения</p>
+      <span class="date">16–20.08.2026</span>
+      <span class="verdict v-yes">1,5 %, растёт со сроком</span></div>
+    <p>Восемь эпох на полной развёртке с темпом 7,5e-5 и косинусом до нуля, оптимизатор
+      с нуля. Агрегат 73,81 % против 73,41 %, приземная температура
+      1,31 / 1,52 / 1,56 / 1,62 против 1,32 / 1,53 / 1,59 / 1,66 °C.</p>
+    <p>Главное здесь — форма: выигрыш растёт со сроком (0,75 % на +6 ч, 2,04 % на сутках).
+      На глобальной модели тот же приём даёт втрое больше и выходит на максимум 11 %
+      к трём суткам. Мы меряем ровно там, где он работает слабее всего.</p>
+  </div>
+
+  <div class="note">
+    <span class="lbl">Найденная по дороге ошибка в таблицах статьи</span>
+    <p>Колонка агрегатной успешности была подписана как агрегат по каналам и всем четырём
+      горизонтам, а по факту в двух таблицах из трёх стояла успешность <em>на горизонте
+      +24 ч</em>. Таблицы были посчитаны по разным правилам под одной подписью.
+      Нашлось из-за расхождения: в реестре моделей стояло 75,31 %, в логах выходило
+      73,41 %, и число не сходилось ни с чем. Оказалось — это строка
+      <code>+24h: skill=75.31%</code>. Порядок строк и относительные выигрыши сохранились,
+      изменились только абсолютные значения одной колонки.</p>
+  </div>
+</section>
+
+<section id="roiw">
+  <h2 class="sec">Вес области интереса — лучший приём обучения</h2>
+  <p class="lede">Узлов вставки 2501 из 133 279, то есть 1,9 %. Обучение почти целиком идёт
+    по глобальному полю, а публикуем мы ошибку по вставке. Естественный вопрос: что если
+    дать узлам области больший вес в функции потерь?</p>
+
+  <figure>
+    <h4>Кривая веса области имеет внутренний максимум</h4>
+    <p class="sub">Выигрыш по области и плата испорченным глобальным полем, % относительно основной модели</p>
+    <div class="legend">
+      <span><i style="background:var(--warm)"></i>выигрыш по области</span>
+      <span><i style="background:var(--cool)"></i>плата глобальным полем</span>
+    </div>
+    <div class="chart">
+      <svg viewBox="0 0 640 300" role="img" aria-label="График: выигрыш растёт до W=30 и разворачивается вниз при W=100, плата растёт монотонно">
+        <line class="grid-l" x1="56" y1="30" x2="620" y2="30"/>
+        <line class="grid-l" x1="56" y1="83" x2="620" y2="83"/>
+        <line class="grid-l" x1="56" y1="136" x2="620" y2="136"/>
+        <line class="grid-l" x1="56" y1="189" x2="620" y2="189"/>
+        <line class="grid-l" x1="56" y1="242" x2="620" y2="242"/>
+        <text class="ax" x="48" y="34" text-anchor="end">6</text>
+        <text class="ax" x="48" y="87" text-anchor="end">4,5</text>
+        <text class="ax" x="48" y="140" text-anchor="end">3</text>
+        <text class="ax" x="48" y="193" text-anchor="end">1,5</text>
+        <text class="ax" x="48" y="246" text-anchor="end">0</text>
+        <polyline fill="none" stroke="var(--warm)" stroke-width="2" stroke-linejoin="round"
+          points="110,188 250,75 390,50 570,57"/>
+        <polyline fill="none" stroke="var(--cool)" stroke-width="2" stroke-linejoin="round"
+          stroke-dasharray="0" points="110,242 250,240 390,226 570,197"/>
+        <circle cx="110" cy="188" r="5" fill="var(--warm)"/><circle cx="250" cy="75" r="5" fill="var(--warm)"/>
+        <circle cx="390" cy="50" r="6.5" fill="var(--warm)"/><circle cx="570" cy="57" r="5" fill="var(--warm)"/>
+        <circle cx="110" cy="242" r="4" fill="var(--cool)"/><circle cx="250" cy="240" r="4" fill="var(--cool)"/>
+        <circle cx="390" cy="226" r="4" fill="var(--cool)"/><circle cx="570" cy="197" r="4" fill="var(--cool)"/>
+        <text class="val" x="110" y="178" text-anchor="middle">1,52</text>
+        <text class="val" x="250" y="65" text-anchor="middle">4,72</text>
+        <text class="val" x="390" y="38" text-anchor="middle" fill="var(--warm)">5,43</text>
+        <text class="val" x="570" y="47" text-anchor="middle">5,25</text>
+        <text class="ax" x="110" y="266" text-anchor="middle">W=1</text>
+        <text class="ax" x="250" y="266" text-anchor="middle">W=10</text>
+        <text class="ax" x="390" y="266" text-anchor="middle">W=30</text>
+        <text class="ax" x="570" y="266" text-anchor="middle">W=100</text>
+        <text class="ax" x="110" y="282" text-anchor="middle">1,9 %</text>
+        <text class="ax" x="250" y="282" text-anchor="middle">16 %</text>
+        <text class="ax" x="390" y="282" text-anchor="middle">37 %</text>
+        <text class="ax" x="570" y="282" text-anchor="middle">66 %</text>
+        <text class="axl" x="338" y="298" text-anchor="middle">вес узлов области и её доля в функции потерь</text>
+      </svg>
+    </div>
+    <figcaption>При W=100 плата глобальным полем подскакивает втрое (0,44 → 1,28 %),
+      и агрегат по области разворачивается вниз. Это ровно тот механизм, которого мы
+      опасались с самого начала: прогноз во вставке за сутки живёт притоком извне,
+      и когда глобальное поле портится достаточно, порча возвращается в область
+      через развёртку. Рабочая точка — W=30.</figcaption>
+  </figure>
+
+  <p>Отдельная проверка на пяти сутках показала, что <strong>сброс темпа и вес области
+    ведут себя противоположно</strong>. Сброс темпа набирает со сроком (0,87 % на шести
+    часах, 3,94 % на пяти сутках), вес области даёт максимум на сутках (6,68 %) и затухает
+    до 2,16 %. Кривые пересекаются между +60 и +66 ч. Статья про суточный прогноз, поэтому
+    W=30 — правильный выбор с большим отрывом; для прогноза на трое суток и дальше надо
+    брать W=1.</p>
+</section>
+
+<section id="chw">
+  <h2 class="sec">Веса каналов — и поправка к собственной постановке</h2>
+  <p class="lede">Тот же вопрос, что и с узлами, но по каналам. Функция потерь — квадрат
+    ошибки по нормированным каналам с равным весом, но нормировка делит на разброс
+    <em>самого поля</em>, а модель предсказывает <em>приращение</em>. Разброс приращений
+    у каналов отличается на порядки, значит доля канала в целевой функции задана не нами.</p>
+
+  <div class="tw">
+    <table>
+      <caption>Прямой замер по разбросу шестичасовой невязки на обучающей выборке</caption>
+      <thead><tr><th>Канал</th><th class="n">Доля функции потерь</th><th>Идёт ли в статью</th></tr></thead>
+      <tbody>
+        <tr><td>Осадки</td><td class="n">24,97 %</td><td>нет, и предсказываются плохо</td></tr>
+        <tr><td>Ветер v на 850 гПа</td><td class="n">8,66 %</td><td>нет</td></tr>
+        <tr><td>Давление на уровне моря</td><td class="n">1,16 %</td><td>да</td></tr>
+        <tr class="hi"><td>Приземная температура</td><td class="n">0,46 %</td><td>да, главный канал</td></tr>
+        <tr><td>Приземное давление</td><td class="n">0,02 %</td><td>нет</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Отношение самого тяжёлого канала к самому лёгкому — <strong>1218 раз</strong>.
+    Осадки забирают треть градиента, в статью не идут и предсказываются плохо: это
+    не просто перекос, это шум в градиенте.</p>
+
+  <div class="note warn">
+    <span class="lbl">Поправка к тому, как я это ставил</span>
+    <p>Я говорил, что доли каналов перекошены и это надо чинить. Но агрегат, который мы
+      публикуем, считается как среднее квадрата ошибки по всем каналам <em>поровну</em> —
+      то есть агрегат и есть исходный равномерный лосс. Значит равномерные веса были
+      оптимальны для агрегата <em>по построению</em>, и «починка» увела цель от метрики.
+      Никакой ошибки в исходной схеме не было.</p>
+    <p>Так что это <strong>не исправление дефекта, а регулятор</strong>: чем меняться ради чего.
+      Формулировку пришлось переписать полностью.</p>
+  </div>
+
+  <p>Что вышло на практике. Выравнивание всех каналов ухудшило агрегат на 1,19 %, но
+    улучшило приземную температуру на 4,65 %. Усиленный вариант с множителем 4 на пять
+    публикуемых каналов дал по температуре <strong>7,18 %</strong> при агрегате 74,39 % —
+    всё ещё выше исходных 73,41 %, но ниже пика 74,85 % у чистого W=30.</p>
+
+  <div class="tw">
+    <table>
+      <caption>Приземная температура: от модели, на которой стоят числа статьи, до нынешней лучшей</caption>
+      <thead><tr><th>Модель</th><th class="n">+6 ч</th><th class="n">+12 ч</th><th class="n">+18 ч</th><th class="n">+24 ч</th><th class="n">Среднее</th></tr></thead>
+      <tbody>
+        <tr><td>модель статьи</td><td class="n">1,32</td><td class="n">1,53</td><td class="n">1,59</td><td class="n">1,66</td><td class="n">1,532 °C</td></tr>
+        <tr class="hi"><td>сброс темпа + вес области + веса каналов</td><td class="n">1,14</td><td class="n">1,32</td><td class="n">1,37</td><td class="n">1,42</td><td class="n">1,318 °C</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Итого <strong>14 % по приземной температуре</strong> тремя приёмами. Развилка для
+    статьи осталась открытой: W=30 даёт лучший агрегат, а вариант с весами каналов —
+    лучшую температуру при агрегате всё равно выше исходного. Обе защитимы.</p>
+
+  <div class="note">
+    <span class="lbl">Калибровка, которая не экстраполировалась</span>
+    <p>При мягком перекосе выигрыш канала почти точно определялся его весом:
+      выигрыш ≈ 2,16·ln(вес) + 0,49 при корреляции 0,98. На агрессивном перекосе формула
+      сломалась: канал z@500 при весе 25 оказался <em>хуже</em>, чем при 12,9. Пять каналов
+      забрали 45,8 % целевой функции, динамике досталось меньше, и через четыре шага
+      развёртки это вернулось во все каналы. Тот же механизм, что развернул кривую
+      по весу области.</p>
+  </div>
+</section>
+
+<section id="shum">
+  <h2 class="sec">Шум в авторегрессии и длинная развёртка</h2>
+
+  <div class="card">
+    <div class="card-head"><p class="t">Гауссов шум на выход перед подачей обратно</p>
+      <span class="date">23–24.08.2026</span>
+      <span class="verdict v-no">приём не наш</span></div>
+    <p>Единая сигма 0,05 на все каналы: <strong>ухудшение 15 %</strong>, причём тем сильнее,
+      чем дальше срок (+23,7 % на сутках) — ровно наоборот тому, ради чего приём существует.</p>
+    <p>Причина та же, что и с весами: данные нормированы на разброс <em>поля</em>,
+      а предсказывается <em>приращение</em>, и его масштаб у каналов отличается полсотни раз.
+      Единая сигма для осадков — десятая доля их масштаба, а для z@500 вдвое больше всего
+      сигнала, который там надо предсказать. Спокойные каналы просто затапливаются шумом.</p>
+    <p>Своя сигма на канал оказалась втрое лучше — диагноз верен, — но всё равно проигрывает
+      отсутствию шума на 5 %. Приём защищает от накопления ошибки в длинной развёртке,
+      а мы обучаем и меряем на четыре шага. У GraphCast развёртка двенадцатишаговая,
+      там это окупается.</p>
+  </div>
+
+  <div class="note">
+    <span class="lbl">Общий урок, который пригодился дважды</span>
+    <p><strong>Всё, что задаётся одним числом на все 33 канала, задано неверно.</strong>
+      Сначала это были доли в функции потерь, потом сигма шума. Каналы различаются
+      по масштабу приращений на порядки, и любая единая константа неявно назначает
+      им разный смысл.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><p class="t">Обучение на 12 шагов с отцеплением градиента</p>
+      <span class="date">26.08.2026</span>
+      <span class="verdict v-no">ничья за 33 часа счёта</span></div>
+    <p>Развёртка на 12 шагов не влезала в память: при сквозном пробросе градиента на четырёх
+      шагах занято 70 ГБ из 80. Отцепление входа каждого шага от предыдущего снимает это
+      полностью — память остаётся на уровне одного шага.</p>
+    <p>Агрегат за пять суток 64,38 против 64,49 % — ничья, чуть в минус. Выигрыш появляется
+      только на пятых сутках и только по агрегату; по приземной температуре там проигрыш 3,4 %.</p>
+    <p>Вероятная причина: ради памяти мы отцепили градиент, и модель не учится готовить
+      состояние для следующего шага — а это, похоже, и есть основная польза длинной
+      развёртки. У GraphCast проброс сквозной, и это возможно только при их ресурсах.
+      Направление закрыто.</p>
+  </div>
+</section>
+
+<section id="ansambl">
+  <h2 class="sec">Ансамбль, который объяснил сам себя</h2>
+
+  <div class="card">
+    <div class="card-head"><p class="t">Среднее по нескольким готовым моделям</p>
+      <span class="date">24.08.2026</span>
+      <span class="verdict v-no">хуже лучшего участника</span></div>
+    <p>Обучать было нечего: на дисках лежало несколько региональных моделей, отличающихся
+      весом области и весами каналов. Среднее по прогнозам почти всегда точнее любого
+      отдельного — по крайней мере, так принято считать.</p>
+    <p>Получилось наоборот: один участник 74,85 %, пара 74,80 %, тройка 74,63 %.
+      Чем больше состав, тем хуже.</p>
+    <p>Разбор объяснил всё. Ансамбль немного лучше <em>среднего</em> участника (пара на 0,18 %,
+      тройка на 0,74 %), то есть гашение ошибок есть, но ничтожное. Отсюда оценка корреляции
+      полей ошибок: <strong>0,993</strong>. При некоррелированных ошибках пара дала бы около 29 %.</p>
+  </div>
+
+  <p>Иными словами, <strong>все наши модели — это по сути одна модель.</strong> Все они
+    дообучены от одного родителя восемью эпохами, и родитель определяет поле ошибки почти
+    полностью. Косвенно это было видно и раньше: прогон на другом жребии отличался
+    от основной модели на 0,03 % — жребий ничего не менял, потому что веса пришли от того
+    же предка.</p>
+
+  <p>Для статьи это содержательный отрицательный результат: он объясняет, почему дешёвый
+    ансамбль из вариантов дообучения не работает и чем надо платить за настоящий —
+    участниками, обученными с нуля независимо, другой архитектурой или другими данными.</p>
+</section>
+
+<!-- ══════════════ ЧАСТЬ II ══════════════ -->
+<section id="usvoenie">
+  <h2 class="sec">Часть II · Усвоение наблюдений</h2>
+  <p class="lede">Два метода: нуджинг (притягивание поля к наблюдениям с коэффициентом α)
+    и оптимальная интерполяция с гауссовой ковариацией по расстоянию. Коррекция
+    применяется на каждом шаге авторегрессии.</p>
+
+  <p>Первые числа выглядели прекрасно: выигрыш до 42 % по приземной температуре при десяти
+    станциях, ошибка почти не растёт со сроком. И вот тут Артур задал вопрос, который
+    развернул весь раздел.</p>
+</section>
+
+<section id="analiz">
+  <h2 class="sec">Анализ против прогноза — важнейшая поправка</h2>
+
+  <div class="note warn">
+    <span class="lbl">Вопрос, с которого всё началось</span>
+    <p>«Если усвоение авторегрессионное, то на первом шаге ему неоткуда взяться — начальные
+      поля и так настоящие. Почему тогда выигрыш есть уже на +6 ч?»</p>
+  </div>
+
+  <p>Проверка по коду показала: коррекция применяется на каждом шаге, <em>включая первый</em>,
+    и наблюдениями, действительными <em>на этот же срок</em>. Исправленное поле идёт и в
+    метрику, и в следующий шаг.</p>
+
+  <p>Значит наши числа «с усвоением» — это <strong>анализ, а не прогноз</strong>. Строка
+    «+24 ч, ОИ, 10 станций, 0,89 °C» означает состояние на +24 ч, в которое уже вошли
+    наблюдения на +6, +12, +18 и +24 ч. Величина законная и полезная — точность оценки
+    состояния циклической системой, — но называть её прогнозом нельзя, и сравнивать
+    с прогнозом GraphCast тем более.</p>
+
+  <p>Серию пересчитали с метрикой по полю <em>до</em> коррекции. Настоящие числа:</p>
+
+  <div class="tw">
+    <table>
+      <caption>Приземная температура, °C. В метрику идёт поле до коррекции, вперёд — исправленное</caption>
+      <thead><tr><th>Срок</th><th class="n">Без усвоения</th><th class="n">Нуджинг</th><th class="n">ОИ, 1 ст.</th><th class="n">ОИ, 10 ст.</th><th class="n">Выигрыш</th></tr></thead>
+      <tbody>
+        <tr class="hi"><td>+6 ч</td><td class="n">1,18</td><td class="n">1,18</td><td class="n">1,18</td><td class="n">1,18</td><td class="n">0,0 %</td></tr>
+        <tr><td>+12 ч</td><td class="n">1,36</td><td class="n">1,34</td><td class="n">1,34</td><td class="n">1,26</td><td class="n">7,4 %</td></tr>
+        <tr><td>+18 ч</td><td class="n">1,40</td><td class="n">1,38</td><td class="n">1,37</td><td class="n">1,27</td><td class="n">9,3 %</td></tr>
+        <tr><td>+24 ч</td><td class="n">1,46</td><td class="n">1,43</td><td class="n">1,40</td><td class="n">1,28</td><td class="n">12,3 %</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="lbl">Ноль на +6 ч — это проверка корректности, а не разочарование</span>
+    <p>До первой коррекции усвоению неоткуда взяться: прогноз идёт из настоящих начальных
+      полей. Выигрыш появляется с +12 ч, когда вперёд уходит уже исправленное состояние,
+      и растёт со сроком. Ровно то поведение, которого требует физика — и хороший признак,
+      что теперь мы меряем то, что думаем.</p>
+  </div>
+
+  <h3>Кривая затухания</h3>
+  <p>Если усвоение работает первые четыре шага, а дальше модель идёт свободно, видно,
+    насколько усвоение улучшает <em>последующий</em> прогноз:</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Времени прошло после последнего наблюдения</th><th class="n">Без усвоения</th><th class="n">С усвоением</th><th class="n">Выигрыш</th></tr></thead>
+      <tbody>
+        <tr><td>6 часов</td><td class="n">1,84</td><td class="n">1,48</td><td class="n">19,6 %</td></tr>
+        <tr><td>12 часов</td><td class="n">1,93</td><td class="n">1,70</td><td class="n">11,9 %</td></tr>
+        <tr><td>18 часов</td><td class="n">2,01</td><td class="n">1,84</td><td class="n">8,5 %</td></tr>
+        <tr><td>сутки</td><td class="n">2,10</td><td class="n">1,97</td><td class="n">6,2 %</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note warn">
+    <span class="lbl">Поправка к сравнению с GraphCast</span>
+    <p>25.08 я написал, что с усвоением мы обгоняем GraphCast на 18 %. Это было посчитано
+      в режиме анализа, от которого мы потом отказались. На честной метрике преимущества
+      нет: чистый прогноз отстаёт на 29,4 %, с усвоением десяти станций — на 19,5 %.
+      Усвоение сокращает разрыв, но не закрывает его. В статье писать именно так.</p>
+  </div>
+
+  <h3>Приёмы частично взаимозаменяемы</h3>
+  <p>Улучшив модель, мы обнаружили, что выигрыш усвоения падает: 42,3 % на старой модели
+    против 35,0 % на новой. Из 0,213 °C абсолютного преимущества модели при десяти
+    станциях остаётся всего 0,027 — тринадцать процентов.</p>
+  <p>Значит прогноз и усвоение чинят пересекающиеся части ошибки, и складывать их выигрыши
+    нельзя. Но отсюда же следует довод в пользу работы над моделью:
+    <strong>в разреженной наблюдательной сети — а Красноярский край именно такой —
+    выживает не 13 %, а 8 % при одной станции и все 100 % без усвоения.</strong>
+    Улучшение модели важнее там, где наблюдений мало.</p>
+</section>
+
+<!-- ══════════════ ЧАСТЬ III ══════════════ -->
+<section id="korpus">
+  <h2 class="sec">Часть III · Корпус постобработки</h2>
+  <p class="lede">Отдельная задача: поправить прогноз в точках 71 станции Красноярского края.
+    Это не входит в статью для ГИиП — выносится в отдельную публикацию, чтобы не размывать
+    вклад мультимасштаба и усвоения.</p>
+
+  <p>Корпус — <strong>3 083 614 строк</strong>: одна строка на сочетание станции, момента
+    выпуска и срока. Сроки 6–120 ч, инициализации 00 и 12 UTC, годы 2016–2020. Обучение
+    на 2016–2018, отбор эпохи на 2019, проверка на 2020 — так проверочный год не участвует
+    в обучении вообще никак.</p>
+
+  <p>Строился он так: чекпойнт модели разворачивается по каждому моменту выпуска, на каждом
+    нужном сроке снимаются 13 величин в точках станций, всё это стыкуется с наблюдениями
+    ISD-Lite по станции и действительному времени. Между шагами развёртки статические
+    каналы и форсинги переносятся без изменений — они экзогенные, модель их предсказывает,
+    но истина известна.</p>
+
+  <div class="note">
+    <span class="lbl">Проверка, без которой всё было бы зря</span>
+    <p>Порядок узлов в плоском векторе состояния легко перепутать — широта и долгота могут
+      идти в любом из двух порядков, и ошибка не проявится ничем, кроме того, что все
+      значения окажутся сняты не с тех мест. Поэтому в сборщик встроена проверка:
+      считается корреляция поля с полем его соседей по сетке. Правильный порядок даёт
+      <strong>+0,999 по глобальной части и +0,993 по региональной</strong>; неправильный
+      обрушил бы её до нуля. Пороги зашиты в код, и сборка останавливается, если они
+      не достигнуты.</p>
+  </div>
+</section>
+
+<section id="lestnica">
+  <h2 class="sec">Лестница результатов</h2>
+  <p class="lede">Проверка на 2020 годе, 485 888 строк с полным набором наблюдений.
+    Сырой прогноз на них: 2,978 °C по температуре и 2,353 м/с по вектору ветра.</p>
+
+  <div class="ladder">
+    <div class="rung"><span class="nm">Сырой прогноз</span>
+      <span class="track"><span class="fill" style="width:96.0%;background:var(--neutral)"></span></span>
+      <span class="pc">2,978</span></div>
+    <div class="rung"><span class="nm">Общее смещение <span class="u">(хуже сырого)</span></span>
+      <span class="track"><span class="fill" style="width:100%;background:var(--neutral);opacity:.55"></span></span>
+      <span class="pc">3,101</span></div>
+    <div class="rung"><span class="nm">Поправка по станции</span>
+      <span class="track"><span class="fill" style="width:91.9%;background:var(--cool)"></span></span>
+      <span class="pc">2,849</span></div>
+    <div class="rung"><span class="nm">Станция × месяц × час</span>
+      <span class="track"><span class="fill" style="width:85.6%;background:var(--cool)"></span></span>
+      <span class="pc">2,653</span></div>
+    <div class="rung"><span class="nm">Таблица + регрессия</span>
+      <span class="track"><span class="fill" style="width:80.6%;background:var(--cool)"></span></span>
+      <span class="pc">2,498</span></div>
+    <div class="rung"><span class="nm"><strong>Нейронная сеть</strong></span>
+      <span class="track"><span class="fill" style="width:73.2%;background:var(--warm)"></span></span>
+      <span class="pc">2,269</span></div>
+    <div class="rung"><span class="nm">Потолок семейства</span>
+      <span class="track"><span class="fill" style="width:67.1%;background:var(--warm);opacity:.42"></span></span>
+      <span class="pc">2,080</span></div>
+  </div>
+
+  <p>Сеть берёт <strong>23,8 %</strong> против 16,1 % у лучшего табличного способа. Потолок
+    оценён обучением и проверкой на одном и том же 2020 годе — это не результат, а верхняя
+    граница, включающая шум самого проверочного года. Взято около четырёх пятых от неё,
+    причём истинный потолок ниже оценки.</p>
+
+  <p>Отсюда вывод, определивший остаток работы: <strong>семейство исчерпано настройками.</strong>
+    Четвёртый год данных, явная разность высот, прореживание, спад весов, вероятностная
+    голова — всё дало меньше разброса по жребию, то есть ничего. Дальнейший рост требует
+    не лучших настроек, а новых сведений.</p>
+
+  <div class="note">
+    <span class="lbl">Что считать значимым</span>
+    <p>Разброс по случайному начальному состоянию — <strong>0,004–0,005 °C</strong>
+      (три жребия на каждую из двух настроек). Всё, что меньше, обсуждать нельзя.
+      Этот порог задавался заранее и применялся ко всем последующим опытам.</p>
+  </div>
+</section>
+
+<section id="gde">
+  <h2 class="sec">Где живёт выигрыш</h2>
+
+  <div class="tw">
+    <table>
+      <caption>Разбор по 71 станции: с чем связан выигрыш поправки</caption>
+      <thead><tr><th>Связь выигрыша с</th><th class="n">Коэффициент</th></tr></thead>
+      <tbody>
+        <tr class="hi"><td>сырой ошибкой станции</td><td class="n">+0,91</td></tr>
+        <tr><td>модулем систематического смещения</td><td class="n">+0,85</td></tr>
+        <tr><td>высотой станции</td><td class="n">+0,72</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Медианная станция получает всего <strong>7,3 %</strong>. У 26 станций из 71 выигрыша
+    практически нет, зато у пятнадцати он от 30 до 66 %. Наибольший — у станций на высотах
+    420–1850 м с холодным смещением от −2,9 до −4,7 °C: там 6,17 °C превращается в 2,10.</p>
+
+  <p>Значит поправка почти целиком чинит <strong>несоответствие площадки ячейке сетки
+    в сложном рельефе</strong>. Там, где станция ячейке соответствует, сеть уже у предела
+    представительности. Средние 23,8 % приукрашивают типичный случай, и в статье это надо
+    говорить прямо.</p>
+
+  <h3>Наблюдения станции сети почти не нужны</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th></th><th class="n">Без наблюдений станции</th><th class="n">С наблюдениями</th></tr></thead>
+      <tbody>
+        <tr><td>Линейная регрессия</td><td class="n">0,5 %</td><td class="n">12,1 %</td></tr>
+        <tr class="hi"><td>Нейронная сеть</td><td class="n">21,7 %</td><td class="n">22,9 %</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Линейной модели наблюдения дают почти весь её результат, сети — <strong>1,2 п.п.</strong>
+    По ветру сеть без них даже чуть лучше. Объяснение: режим (инверсия, застой, адвекция)
+    линейная модель может узнать только из прямой подсказки «что станция намерила час
+    назад», а сеть выводит его сама из полей прогноза — вертикального градиента, дефицита
+    точки росы, высоты солнца.</p>
+
+  <p>Практический вывод важнее величины: <strong>постпроцессору не нужен живой поток
+    наблюдений.</strong> Модель, требующая свежих станционных данных, в оперативе живёт
+    только там, где есть телеграммы в реальном времени; модель на одних полях прогноза
+    работает везде и даёт 21,7 % против 16,1 % у таблицы.</p>
+
+  <h3>Окрестность станции: помогает и насыщается</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Соседних узлов сетки</th><th class="n">Радиус</th><th class="n">Ошибка</th><th class="n">Прирост</th><th>Вывод</th></tr></thead>
+      <tbody>
+        <tr><td>нет</td><td class="n">—</td><td class="n">2,297</td><td class="n">—</td><td></td></tr>
+        <tr class="hi"><td>6</td><td class="n">~29 км</td><td class="n">2,277</td><td class="n">+0,020</td><td><span class="verdict v-yes">вчетверо выше шума</span></td></tr>
+        <tr><td>12</td><td class="n">~40 км</td><td class="n">2,271</td><td class="n">+0,006</td><td><span class="verdict v-mid">на грани</span></td></tr>
+        <tr><td>24</td><td class="n">~60 км</td><td class="n">2,269</td><td class="n">+0,002</td><td><span class="verdict v-no">ниже шума</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Разбор по станциям объясняет полку: переход с 6 на 12 узлов даёт +0,34 % в сложном
+    рельефе против +0,26 % на равнине, а 24 узла в сложном рельефе дают <strong>−0,05 %</strong>.
+    Круг радиусом 60 км захватывает соседние долины и хребты, к площадке отношения
+    не имеющие, и признак начинает шуметь.</p>
+</section>
+
+<section id="perenos">
+  <h2 class="sec">Перенос на станции, которых модель не видела</h2>
+  <p class="lede">Самый практический вопрос всей работы: можно ли поставить поправку туда,
+    где её не учили?</p>
+
+  <p>Можно. При обучении на 57 станциях и проверке на 14 придержанных выигрыш составляет
+    <strong>15,9 %</strong> — две трети от домашнего результата и примерно столько же,
+    сколько классическая таблица даёт на станциях, <em>на которых она сама и настроена</em>.
+    Отказ от привязки к конкретной станции стоит всего 0,023 °C: площадку достаточно
+    описать широтой, долготой, высотой и разностью высот с рельефом модели.</p>
+
+  <figure>
+    <h4>Ниже тридцати станций поправка вредит</h4>
+    <p class="sub">Выигрыш на незнакомых станциях в зависимости от размера обучающей выборки</p>
+    <div class="chart">
+      <svg viewBox="0 0 640 290" role="img" aria-label="График: при 15 обучающих станциях выигрыш отрицательный, минус 4,1 процента; при 29 и более выходит на полку около 15 процентов">
+        <line class="grid-l" x1="70" y1="40" x2="620" y2="40"/>
+        <line class="grid-l" x1="70" y1="85" x2="620" y2="85"/>
+        <line class="grid-l" x1="70" y1="130" x2="620" y2="130"/>
+        <line class="grid-l" x1="70" y1="175" x2="620" y2="175"/>
+        <line x1="70" y1="220" x2="620" y2="220" stroke="var(--ink-3)" stroke-width="1.5"/>
+        <line class="grid-l" x1="70" y1="245" x2="620" y2="245"/>
+        <text class="ax" x="62" y="44" text-anchor="end">20</text>
+        <text class="ax" x="62" y="89" text-anchor="end">15</text>
+        <text class="ax" x="62" y="134" text-anchor="end">10</text>
+        <text class="ax" x="62" y="179" text-anchor="end">5</text>
+        <text class="ax" x="62" y="224" text-anchor="end">0</text>
+        <text class="ax" x="62" y="249" text-anchor="end">−5</text>
+        <rect x="120" y="220" width="66" height="37" fill="var(--warm)" class="bar"><title>15 станций: −4,1 %</title></rect>
+        <rect x="250" y="96" width="66" height="124" fill="var(--cool)" class="bar"><title>29 станций: +13,8 %</title></rect>
+        <rect x="380" y="85" width="66" height="135" fill="var(--cool)" class="bar"><title>43 станции: +15,0 %</title></rect>
+        <rect x="510" y="77" width="66" height="143" fill="var(--cool)" class="bar"><title>57 станций: +15,9 %</title></rect>
+        <text class="val" x="153" y="272" text-anchor="middle" fill="var(--warm)">−4,1</text>
+        <text class="val" x="283" y="88" text-anchor="middle">13,8</text>
+        <text class="val" x="413" y="77" text-anchor="middle">15,0</text>
+        <text class="val" x="543" y="69" text-anchor="middle">15,9</text>
+        <text class="ax" x="153" y="236" text-anchor="middle">15</text>
+        <text class="ax" x="283" y="236" text-anchor="middle">29</text>
+        <text class="ax" x="413" y="236" text-anchor="middle">43</text>
+        <text class="ax" x="543" y="236" text-anchor="middle">57</text>
+        <text class="axl" x="345" y="286" text-anchor="middle">станций в обучающей выборке</text>
+      </svg>
+    </div>
+    <figcaption>Придержаны одни и те же 14 станций, меняется только размер обучающей выборки —
+      поэтому проверка у всех настроек одна и числа сравнимы напрямую. При пятнадцати
+      обучающих станциях поправка <em>ухудшает</em> прогноз на 4,1 % в среднем и на 8,5 %
+      по худшему жребию. Это не «перестала помогать», а активный вред: модель выучивает
+      поправки, верные для своих немногих площадок, и переносит их туда, где они неуместны.
+      Для оперативного применения это главное предостережение из всей работы.</figcaption>
+  </figure>
+
+  <div class="note warn">
+    <span class="lbl">Первая постановка была неразрешимой</span>
+    <p>Сначала опыт ставился иначе: менялось число <em>придержанных</em> станций, а вместе
+      с ним и состав проверки. Сырая ошибка проверочных наборов гуляла от 2,54 до 3,27 —
+      это разные совокупности, и кривая вышла немонотонной: при 64 обучающих станциях
+      перенос оказался хуже, чем при 57. Постановка не позволяла ответить на вопрос вообще,
+      и полученные по ней числа выброшены.</p>
+  </div>
+
+  <div class="note warn">
+    <span class="lbl">Отменённая гипотеза — мой прогноз был неверен</span>
+    <p>Я предполагал, что зависимость от числа станций далека от насыщения и общероссийская
+      сеть из сотен площадок дала бы много. Измерение показало обратное: от 29 до 57 станций
+      добавляется всего 2 п.п., полка близко. Направление помечено как отменённое.</p>
+  </div>
+
+  <h3>Зависимость от срока прогноза</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Выигрыш поправки</th><th class="n">+6 ч</th><th class="n">+24 ч</th><th class="n">+48 ч</th><th class="n">+72 ч</th><th class="n">+96 ч</th><th class="n">+120 ч</th></tr></thead>
+      <tbody>
+        <tr><td>Температура</td><td class="n">34,1 %</td><td class="n">31,6 %</td><td class="n">27,7 %</td><td class="n">22,2 %</td><td class="n">17,3 %</td><td class="n">14,6 %</td></tr>
+        <tr><td>Ветер</td><td class="n">32,7 %</td><td class="n">30,6 %</td><td class="n">28,3 %</td><td class="n">24,9 %</td><td class="n">22,8 %</td><td class="n">21,1 %</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Разница объясняется сырой ошибкой. У температуры она за пять суток растёт в полтора
+    раза: накапливается синоптическая ошибка, а её станционная поправка не снимает.
+    У ветра сырая ошибка растёт всего на 13 % — она с самого начала не синоптическая,
+    а от несоответствия станции ячейке, то есть постоянная.</p>
+
+  <p><strong>Постобработка температуры — инструмент коротких сроков; постобработка ветра
+    работает на всей заблаговременности.</strong></p>
+</section>
+
+<section id="kalibr">
+  <h2 class="sec">Можно ли верить заявленной надёжности</h2>
+  <p class="lede">Вероятностная настройка выдаёт не только поправку, но и σ — свою оценку
+    уверенности. Вопрос в том, чего эта оценка стоит.</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Проверка на 2020</th><th class="n">Значение</th><th class="n">Должно быть</th></tr></thead>
+      <tbody>
+        <tr><td>Действительная ошибка</td><td class="n">2,289 °C</td><td class="n"></td></tr>
+        <tr><td>Заявленный разброс</td><td class="n">1,942 °C</td><td class="n">2,289</td></tr>
+        <tr class="hi"><td>Отношение</td><td class="n">1,179</td><td class="n">1,000</td></tr>
+        <tr><td>Попадание в ±1σ</td><td class="n">64,4 %</td><td class="n">68,3 %</td></tr>
+        <tr><td>Попадание в ±2σ</td><td class="n">91,9 %</td><td class="n">95,4 %</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Модель самоуверенна на 18 %. Но главное — в разбивке по корзинам: отношение
+    действительной ошибки к заявленной составляет 1,14 / 1,14 / 1,16 / 1,19 / 1,18 /
+    1,18 / 1,18 / 1,18 / 1,20 / 1,20 — <strong>почти постоянно во всех десяти</strong>.</p>
+
+  <p>Это лучший из возможных исходов. Модель <strong>правильно упорядочивает</strong> свою
+    неуверенность: там, где она объявляет больший разброс, ошибка и правда больше. Занижена
+    лишь величина, и притом равномерно — а такое чинится одним числом. Множитель
+    настраивается на 2019 годе и применяется к 2020, чтобы это не было подгонкой.</p>
+
+  <p>Разброс не декоративен: непрерывная оценка с переменной σ равна 1,157 против 1,201
+    у той же модели с постоянной — переменная лучше на 3,7 %. <strong>Прогноз с оценкой
+    собственной надёжности достаётся даром</strong>, без потери точности и ценой одного
+    поправочного множителя.</p>
+</section>
+
+<!-- ══════════════ ЧАСТЬ IV ══════════════ -->
+<section id="instrument">
+  <h2 class="sec">Часть IV · Ремесло</h2>
+  <p class="lede">Половина времени ушла не на модели, а на то, чтобы измерения были
+    воспроизводимы, а ошибки находились раньше, чем портили результат.</p>
+
+  <h3>Раннеры</h3>
+  <p>Каждый опыт запускается одной строкой — терминал на виртуалке переносит многострочные
+    вставки, и хвост уходит отдельной командой. Раннеры уходят в фон, пишут в общий журнал
+    и умеют переживать перезапуск машины: <code>/data</code> стирается вместе с окружением,
+    поэтому venv восстанавливается сам, а наличие <code>pyarrow</code> проверяется по факту,
+    а не по списку зависимостей.</p>
+
+  <p>Каждая из этих мелочей — след настоящей поломки:</p>
+  <ul>
+    <li><code>flock</code> — потому что 28.08 запустились два раннера одновременно
+      и полдня счёта ушло впустую;</li>
+    <li><code>grep --line-buffered</code> — потому что без него вывод копится в буфере
+      и идущий прогон выглядит зависшим;</li>
+    <li>проверка чтения parquet — потому что окружение однажды пережило обновление
+      зависимостей и падало на первом же файле.</li>
+  </ul>
+
+  <h3>Учёт прогонов</h3>
+  <p>Числа попадают в реестр автоматически, сразу после проверки. Иначе они живут только
+    в журнале, и через неделю связь между настройкой и результатом теряется. В реестре
+    есть графа «число признаков» — она в первый же день поймала подвох: у настройки
+    с другим жребием оказалось 62 признака против 60 у основной, и сравнивать их напрямую
+    было нельзя.</p>
+
+  <h3>Проверки</h3>
+  <p><strong>238 тестов и два уровня линтера</strong>, всё запускается одной командой перед
+    пушем. Заведены они не для галочки — вот настоящие дефекты, которые они нашли:</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Что сломалось</th><th>Как проявлялось бы</th></tr></thead>
+      <tbody>
+        <tr><td>Поворот только по долготе</td><td>новые версии scipy понимают одномерный массив углов как один поворот с N углами — построение графа падало бы молча на другой машине</td></tr>
+        <tr><td>Смещение в пространственной корреляции</td><td>идеально совпадающие поля давали 0,9975 вместо 1,0 — деление на N вместо N−1</td></tr>
+        <tr><td>Транспонированная маска затухания</td><td>усвоение притягивало поле не там, где нужно</td></tr>
+        <tr><td>Изолированные узлы графа</td><td>тихо выпадали из обмена сообщениями</td></tr>
+        <tr><td>Обрезанный лист матрицы высот</td><td>прерванная загрузка оставляла битый архив, повторный запуск считал его готовым</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="lbl">Правило, выведенное на своих ошибках</span>
+    <p>Тест, который проходит на сломанном коде, — это не тест. Каждый раз, когда проверка
+      претендует на важность, код ломается намеренно, и смотрится, падает ли она.
+      Так однажды выяснилось, что проверка зависимости от станции была
+      <em>пустой</em>: голова модели инициализируется нулями, и утверждение выполнялось
+      само собой.</p>
+  </div>
+</section>
+
+<!-- ══════════════ ИТОГИ ══════════════ -->
+<section id="seychas">
+  <h2 class="sec">Где мы сейчас</h2>
+
+  <h3>В работе</h3>
+  <p><span class="verdict v-open">считается</span> <strong>Признаки рельефа по матрице высот.</strong>
+    106 листов с шагом в одну угловую секунду скачаны (862 МБ). Описатели — топографический
+    индекс положения, шероховатость, размах рельефа, уклон, экспозиция, закрытость
+    горизонта — считаются в кругах 1, 5 и 20 км. Проверено, что они не зависят от
+    разрешения сетки: тот же рельеф на сетках 3″ и 1″ даёт расхождение до 1,75 %.
+    Раннер гоняет три жребия и сам выносит вердикт по порогу 0,010 °C.</p>
+
+  <p>Ожидание умеренное: признаки окрестности узлов сетки дали 0,020 °C, а это тот же класс
+    сведений, но подробнее на два порядка. Если рельеф даст столько же — последний открытый
+    вопрос по постобработке закрыт. Если не даст, это тоже ответ: значит выигрыш в сложном
+    рельефе сеть уже вытягивает из самих полей прогноза.</p>
+
+  <h3>Не начато</h3>
+  <p><span class="verdict v-open">открыто</span> <strong>Постпроцессор для осадков.</strong>
+    Совсем другая работа: другое распределение, больше половины нулей, и среднеквадратичная
+    ошибка как мера не годится.</p>
+
+  <h3>Открыто по статье</h3>
+  <ul>
+    <li>Развилка между лучшим агрегатом (W=30) и лучшей приземной температурой — обе
+      конфигурации защитимы, надо выбрать, что показывать основным.</li>
+    <li>Строка «внутренняя зона, 19 каналов» не прослеживается до логов: прогона
+      в репозитории нет, агрегат восстановить не из чего.</li>
+    <li>Две ссылки на русскоязычные работы по машинному обучению в прогнозе погоды.</li>
+  </ul>
+</section>
+
+<section id="neposhlo">
+  <h2 class="sec">Что не сработало</h2>
+  <p class="lede">Самый полезный раздел. Здесь собрано всё проверенное и отвергнутое —
+    чтобы не возвращаться к этому по второму разу и чтобы было видно, на чём основаны
+    решения.</p>
+
+  <div class="tw">
+    <table>
+      <caption>Отрицательные результаты, каждый с измерением</caption>
+      <thead><tr><th>Идея</th><th>Чем кончилось</th><th>Почему</th></tr></thead>
+      <tbody>
+        <tr><td>Заморозить процессор навсегда</td><td class="n">−7,5 %</td><td>недообучение: не хватает свободы подстроить динамику</td></tr>
+        <tr><td>Многоуровневый меш</td><td class="n">±0</td><td>с правильным кодированием рёбер догоняет, но не обгоняет</td></tr>
+        <tr><td>Косинусный график темпа на всё обучение</td><td class="n">±0</td><td>выигрыш на валидации не переходит в прогноз</td></tr>
+        <tr><td>Вес области W=100</td><td class="n">хуже W=30</td><td>порча глобального поля возвращается через приток</td></tr>
+        <tr><td>Гауссов шум в авторегрессии</td><td class="n">−5…−15 %</td><td>приём для длинной развёртки, а мы учим на четыре шага</td></tr>
+        <tr><td>Обучение на 12 шагов</td><td class="n">ничья</td><td>отцепление градиента убирает основную пользу приёма</td></tr>
+        <tr><td>Ансамбль из вариантов дообучения</td><td class="n">−0,2…−0,7 %</td><td>корреляция ошибок 0,993 — это одна модель</td></tr>
+        <tr><td>Четвёртый год данных в постобработке</td><td class="n">0,000</td><td>данные насыщаются между одним и тремя годами</td></tr>
+        <tr><td>Явная разность высот как признак</td><td class="n">0,000</td><td>сеть извлекает её из двух высот сама</td></tr>
+        <tr><td>Прореживание и спад весов</td><td class="n">−0,002…−0,017</td><td>ёмкость не была узким местом</td></tr>
+        <tr><td>Окрестность в 24 узла</td><td class="n">ниже шума</td><td>круг в 60 км захватывает чужие долины</td></tr>
+        <tr><td>Обучение на общероссийской сети станций</td><td class="n">отменено</td><td>разнообразие площадок насыщается к тридцати станциям</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Ошибки в собственных рассуждениях, которые пришлось признать</h3>
+  <ol>
+    <li><strong>«Многоуровневый меш не работает»</strong> — на деле не работала наша
+      нормировка признаков рёбер. Вывод переписан дважды.</li>
+    <li><strong>«Доли каналов перекошены, это надо чинить»</strong> — агрегат и есть
+      равномерный лосс по построению, значит равномерные веса были оптимальны.
+      Не дефект, а регулятор.</li>
+    <li><strong>«С усвоением мы обгоняем GraphCast на 18 %»</strong> — посчитано в режиме
+      анализа. На честной метрике отстаём на 19,5 %.</li>
+    <li><strong>«Общероссийская сеть станций даст много»</strong> — измерение показало
+      насыщение к тридцати станциям.</li>
+    <li><strong>Постановка опыта с переносом</strong> — менялся состав проверки вместе
+      с размером обучающей выборки, вопрос был неразрешим. Переделано.</li>
+  </ol>
+
+  <div class="note">
+    <span class="lbl">Что из этого следует</span>
+    <p>Отрицательных результатов здесь больше, чем положительных, и это нормальное
+      соотношение. Ценность не в том, что идеи не сработали, а в том, что для каждой
+      есть измерение и объяснение механизма — поэтому к ним не нужно возвращаться,
+      а из объяснений складывается связная картина: <em>приёмы обучения второстепенны,
+      выигрыш даёт приток новых сведений, и всё, что задано одним числом на все каналы,
+      задано неверно.</em></p>
+  </div>
+</section>
+
+<footer>
+  <p>Записано по документам репозитория: <code>docs/postproc_findings.md</code>,
+    <code>docs/ablations_2026-08.md</code>, <code>docs/postproc_runs.md</code>,
+    <code>docs/model_roadmap.md</code> и истории коммитов. Числа не пересказаны по памяти,
+    а сверены с этими источниками.</p>
+</footer>
+
+</main>
+</div>
+
+<script>
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('.rail a'));
+  var map = {};
+  links.forEach(function(a){
+    var el = document.getElementById(a.getAttribute('href').slice(1));
+    if (el) map[a.getAttribute('href').slice(1)] = a;
+  });
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  if (!('IntersectionObserver' in window)) return;
+  var seen = {};
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ seen[e.target.id] = e.isIntersecting ? e.intersectionRatio : 0; });
+    var best = null, bestV = 0;
+    sections.forEach(function(s){
+      var v = seen[s.id] || 0;
+      if (v > bestV) { bestV = v; best = s.id; }
+    });
+    links.forEach(function(a){ a.classList.remove('on'); });
+    if (best && map[best]) map[best].classList.add('on');
+  }, {rootMargin:'-10% 0px -70% 0px', threshold:[0,0.1,0.3,0.6,1]});
+  sections.forEach(function(s){ io.observe(s); });
+})();
+</script>
