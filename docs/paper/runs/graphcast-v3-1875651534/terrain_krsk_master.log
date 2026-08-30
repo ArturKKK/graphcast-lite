@@ -1,0 +1,264 @@
+[30.08 13:30:23] === ПРИЗНАКИ РЕЛЬЕФА (окрестность 12 узлов) ===
+[30.08 13:30:23] окружения нет (стёрлось с /data) — восстанавливаю, это несколько минут
+[30.08 13:34:17] восстановление rc=0 (подробности в venv_restore.log)
+[30.08 13:34:17] нет листов высот — залей их в /data/dem (см. list_dem_tiles.py)
+[30.08 13:44:27] === ПРИЗНАКИ РЕЛЬЕФА (окрестность 12 узлов) ===
+[30.08 13:44:27] листы высот: /data/datasets/dem (106 шт., 808M)
+[30.08 13:44:27] нет корпуса — сначала _run_night_krsk.sh 12
+[30.08 21:11:41] === ПРИЗНАКИ РЕЛЬЕФА (окрестность 6 узлов) ===
+[30.08 21:11:41] окружения нет (стёрлось с /data) — восстанавливаю, это несколько минут
+[30.08 21:15:49] восстановление rc=0 (подробности в venv_restore.log)
+[30.08 21:15:49] листы высот: /data/datasets/dem (106 шт., 808M)
+[30.08 21:15:49] корпус: /workdir/graphcast-lite/data/postproc/corpus_krsk_lags2_nb6.parquet (594M)
+[30.08 21:15:49] шаг 1: считаю описатели рельефа и клею к корпусу
+Traceback (most recent call last):
+  File "/workdir/graphcast-lite/scripts/postproc/add_terrain.py", line 105, in <module>
+    main()
+  File "/workdir/graphcast-lite/scripts/postproc/add_terrain.py", line 73, in main
+    table = build_table(stations, a.dem_dir, [r * 1000 for r in a.radii_km])
+  File "/workdir/graphcast-lite/scripts/postproc/add_terrain.py", line 35, in build_table
+    usaf = str(s["usaf"])
+KeyError: 'usaf'
+[30.08 21:15:49] приклейка не удалась — стоп
+[30.08 21:21:51] === ПРИЗНАКИ РЕЛЬЕФА (окрестность 6 узлов) ===
+[30.08 21:21:51] листы высот: /data/datasets/dem (106 шт., 808M)
+[30.08 21:21:51] корпус: /workdir/graphcast-lite/data/postproc/corpus_krsk_lags2_nb6.parquet (594M)
+[30.08 21:21:51] шаг 1: считаю описатели рельефа и клею к корпусу
+[рельеф] станций посчитано: 71, признаков: 18
+    terr_tpi_1km           от   -104.0 до     75.6, медиана    -0.5
+    terr_tpi_20km          от   -527.5 до     74.4, медиана   -50.7
+    terr_slope             от      0.0 до     38.9, медиана     2.5
+    terr_horizon           от      0.5 до     17.0, медиана     2.3
+    terr_elev_mismatch     от   -410.3 до    435.1, медиана    -6.0
+Traceback (most recent call last):
+  File "/workdir/graphcast-lite/scripts/postproc/add_terrain.py", line 102, in <module>
+    main()
+  File "/workdir/graphcast-lite/scripts/postproc/add_terrain.py", line 87, in main
+    tj.write_text(table.to_json(orient="records", force_ascii=False, indent=1))
+  File "/home/mlcore/conda/lib/python3.10/pathlib.py", line 1154, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+  File "/home/mlcore/conda/lib/python3.10/pathlib.py", line 1119, in open
+    return self._accessor.open(self, mode, buffering, encoding, errors,
+FileNotFoundError: [Errno 2] No such file or directory: '/data/postproc/terrain_krsk.json'
+[30.08 21:23:48] приклейка не удалась — стоп
+[30.08 21:29:35] === ПРИЗНАКИ РЕЛЬЕФА (окрестность 6 узлов) ===
+[30.08 21:29:36] листы высот: /data/datasets/dem (106 шт., 808M)
+[30.08 21:29:36] корпус: /workdir/graphcast-lite/data/postproc/corpus_krsk_lags2_nb6.parquet (594M)
+[30.08 21:29:36] шаг 1: считаю описатели рельефа и клею к корпусу
+[рельеф] станций посчитано: 71, признаков: 18
+    terr_tpi_1km           от   -104.0 до     75.6, медиана    -0.5
+    terr_tpi_20km          от   -527.5 до     74.4, медиана   -50.7
+    terr_slope             от      0.0 до     38.9, медиана     2.5
+    terr_horizon           от      0.5 до     17.0, медиана     2.3
+    terr_elev_mismatch     от   -410.3 до    435.1, медиана    -6.0
+[рельеф] таблица по станциям: /data/postproc/terrain_krsk.json
+[рельеф] строк 3,083,614, без рельефа 0.0 %
+[рельеф] записано /data/postproc/corpus_krsk_lags2_nb6_terr.parquet
+[30.08 21:31:44] корпус с рельефом: 602M
+[30.08 21:31:44] шаг 2: деление по годам (обучение 2016-2018, отбор 2019, проверка 2020)
+  train: 1,848,824 строк -> /data/postproc/terr6_train.parquet
+  val: 616,554 строк -> /data/postproc/terr6_val.parquet
+  test: 618,236 строк -> /data/postproc/terr6_test.parquet
+[30.08 21:31:57] --- жребий 42: обучение, эпох 20
+[cfg] num_stations=71  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] добавлен признак nb_t2m_dev
+[dataset] добавлен признак nb_t2m_mean
+[dataset] добавлен признак nb_t2m_std
+[dataset] добавлен признак nb_u10_dev
+[dataset] добавлен признак nb_u10_mean
+[dataset] добавлен признак nb_u10_std
+[dataset] добавлен признак nb_v10_dev
+[dataset] добавлен признак nb_v10_mean
+[dataset] добавлен признак nb_v10_std
+[dataset] добавлен признак nb_z_surf_range
+[dataset] добавлен признак nb_z_surf_std
+[dataset] добавлен признак terr_above_min_1km
+[dataset] добавлен признак terr_above_min_20km
+[dataset] добавлен признак terr_above_min_5km
+[dataset] добавлен признак terr_aspect_cos
+[dataset] добавлен признак terr_aspect_sin
+[dataset] добавлен признак terr_below_max_1km
+[dataset] добавлен признак terr_below_max_20km
+[dataset] добавлен признак terr_below_max_5km
+[dataset] добавлен признак terr_dem_elev
+[dataset] добавлен признак terr_elev_mismatch
+[dataset] добавлен признак terr_horizon
+[dataset] добавлен признак terr_rough_1km
+[dataset] добавлен признак terr_rough_20km
+[dataset] добавлен признак terr_rough_5km
+[dataset] добавлен признак terr_slope
+[dataset] добавлен признак terr_tpi_1km
+[dataset] добавлен признак terr_tpi_20km
+[dataset] добавлен признак terr_tpi_5km
+[dataset] пропусков в признаках: 5,792,039 (4.49%) — заменены средним
+[cfg] признаков: 26 -> 91 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,899,185 (4.30%) — заменены средним
+[model] StationLeadBiasResidualMLP params=113,912  (station_emb=32 hidden=[192, 192, 128] bias_head=Embedding(71,3))
+[ep 001] train loss=4.8578 val loss=4.5208 val rmse_t2m=2.406°C val bias_t2m=+0.038°C val vec_rmse_wind=1.717m/s
+[ep 002] train loss=4.3128 val loss=4.3965 val rmse_t2m=2.362°C val bias_t2m=-0.017°C val vec_rmse_wind=1.693m/s
+[ep 003] train loss=4.2134 val loss=4.3537 val rmse_t2m=2.344°C val bias_t2m=+0.075°C val vec_rmse_wind=1.686m/s
+[ep 004] train loss=4.1243 val loss=4.3300 val rmse_t2m=2.334°C val bias_t2m=+0.042°C val vec_rmse_wind=1.682m/s
+[ep 005] train loss=4.0862 val loss=4.3130 val rmse_t2m=2.328°C val bias_t2m=-0.008°C val vec_rmse_wind=1.679m/s
+[ep 006] train loss=4.0427 val loss=4.2899 val rmse_t2m=2.322°C val bias_t2m=-0.025°C val vec_rmse_wind=1.674m/s
+[ep 007] train loss=4.0280 val loss=4.2991 val rmse_t2m=2.330°C val bias_t2m=-0.014°C val vec_rmse_wind=1.676m/s
+[ep 008] train loss=4.0044 val loss=4.2935 val rmse_t2m=2.336°C val bias_t2m=-0.059°C val vec_rmse_wind=1.673m/s
+[ep 009] train loss=3.9839 val loss=4.2896 val rmse_t2m=2.324°C val bias_t2m=+0.023°C val vec_rmse_wind=1.674m/s
+[ep 010] train loss=3.9567 val loss=4.2831 val rmse_t2m=2.319°C val bias_t2m=+0.008°C val vec_rmse_wind=1.674m/s
+[ep 011] train loss=3.9452 val loss=4.2812 val rmse_t2m=2.319°C val bias_t2m=-0.010°C val vec_rmse_wind=1.673m/s
+[ep 012] train loss=3.9258 val loss=4.2835 val rmse_t2m=2.319°C val bias_t2m=-0.011°C val vec_rmse_wind=1.674m/s
+[ep 013] train loss=3.9271 val loss=4.2786 val rmse_t2m=2.319°C val bias_t2m=+0.001°C val vec_rmse_wind=1.673m/s
+[ep 014] train loss=3.9103 val loss=4.2752 val rmse_t2m=2.319°C val bias_t2m=-0.008°C val vec_rmse_wind=1.672m/s
+[ep 015] train loss=3.8980 val loss=4.2731 val rmse_t2m=2.321°C val bias_t2m=-0.009°C val vec_rmse_wind=1.671m/s
+[ep 016] train loss=3.9036 val loss=4.2714 val rmse_t2m=2.317°C val bias_t2m=+0.014°C val vec_rmse_wind=1.672m/s
+[ep 017] train loss=3.8900 val loss=4.2695 val rmse_t2m=2.320°C val bias_t2m=-0.019°C val vec_rmse_wind=1.671m/s
+[ep 018] train loss=3.8835 val loss=4.2670 val rmse_t2m=2.316°C val bias_t2m=+0.003°C val vec_rmse_wind=1.670m/s
+[ep 019] train loss=3.8931 val loss=4.2679 val rmse_t2m=2.318°C val bias_t2m=-0.010°C val vec_rmse_wind=1.670m/s
+[ep 020] train loss=3.8750 val loss=4.2673 val rmse_t2m=2.317°C val bias_t2m=-0.005°C val vec_rmse_wind=1.670m/s
+Done: {'best_val_combined': 3.9858485255905, 'epochs_run': 20}
+[30.08 21:39:21]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.278°C, wind vec=1.712m/s
+[учёт] neural_postproc_krsk_terr6_s42: t2m 2.278 (23.5 %), ветер 1.712 (27.2 %) -> postproc_runs.md
+[30.08 21:39:36] --- жребий 43: обучение, эпох 20
+[cfg] num_stations=71  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] добавлен признак nb_t2m_dev
+[dataset] добавлен признак nb_t2m_mean
+[dataset] добавлен признак nb_t2m_std
+[dataset] добавлен признак nb_u10_dev
+[dataset] добавлен признак nb_u10_mean
+[dataset] добавлен признак nb_u10_std
+[dataset] добавлен признак nb_v10_dev
+[dataset] добавлен признак nb_v10_mean
+[dataset] добавлен признак nb_v10_std
+[dataset] добавлен признак nb_z_surf_range
+[dataset] добавлен признак nb_z_surf_std
+[dataset] добавлен признак terr_above_min_1km
+[dataset] добавлен признак terr_above_min_20km
+[dataset] добавлен признак terr_above_min_5km
+[dataset] добавлен признак terr_aspect_cos
+[dataset] добавлен признак terr_aspect_sin
+[dataset] добавлен признак terr_below_max_1km
+[dataset] добавлен признак terr_below_max_20km
+[dataset] добавлен признак terr_below_max_5km
+[dataset] добавлен признак terr_dem_elev
+[dataset] добавлен признак terr_elev_mismatch
+[dataset] добавлен признак terr_horizon
+[dataset] добавлен признак terr_rough_1km
+[dataset] добавлен признак terr_rough_20km
+[dataset] добавлен признак terr_rough_5km
+[dataset] добавлен признак terr_slope
+[dataset] добавлен признак terr_tpi_1km
+[dataset] добавлен признак terr_tpi_20km
+[dataset] добавлен признак terr_tpi_5km
+[dataset] пропусков в признаках: 5,792,039 (4.49%) — заменены средним
+[cfg] признаков: 26 -> 91 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,899,185 (4.30%) — заменены средним
+[model] StationLeadBiasResidualMLP params=113,912  (station_emb=32 hidden=[192, 192, 128] bias_head=Embedding(71,3))
+[ep 001] train loss=4.8612 val loss=4.5125 val rmse_t2m=2.408°C val bias_t2m=-0.030°C val vec_rmse_wind=1.714m/s
+[ep 002] train loss=4.3237 val loss=4.4033 val rmse_t2m=2.369°C val bias_t2m=+0.019°C val vec_rmse_wind=1.694m/s
+[ep 003] train loss=4.2028 val loss=4.3462 val rmse_t2m=2.337°C val bias_t2m=-0.008°C val vec_rmse_wind=1.685m/s
+[ep 004] train loss=4.1263 val loss=4.3306 val rmse_t2m=2.343°C val bias_t2m=-0.004°C val vec_rmse_wind=1.680m/s
+[ep 005] train loss=4.0949 val loss=4.3195 val rmse_t2m=2.338°C val bias_t2m=-0.034°C val vec_rmse_wind=1.679m/s
+[ep 006] train loss=4.0551 val loss=4.2914 val rmse_t2m=2.323°C val bias_t2m=-0.027°C val vec_rmse_wind=1.674m/s
+[ep 007] train loss=4.0399 val loss=4.2878 val rmse_t2m=2.330°C val bias_t2m=-0.030°C val vec_rmse_wind=1.672m/s
+[ep 008] train loss=4.0023 val loss=4.2898 val rmse_t2m=2.327°C val bias_t2m=-0.065°C val vec_rmse_wind=1.672m/s
+[ep 009] train loss=3.9965 val loss=4.2815 val rmse_t2m=2.320°C val bias_t2m=+0.007°C val vec_rmse_wind=1.672m/s
+[ep 010] train loss=3.9565 val loss=4.2849 val rmse_t2m=2.325°C val bias_t2m=-0.006°C val vec_rmse_wind=1.672m/s
+[ep 011] train loss=3.9565 val loss=4.2738 val rmse_t2m=2.316°C val bias_t2m=+0.004°C val vec_rmse_wind=1.671m/s
+[ep 012] train loss=3.9418 val loss=4.2750 val rmse_t2m=2.318°C val bias_t2m=+0.030°C val vec_rmse_wind=1.672m/s
+[ep 013] train loss=3.9162 val loss=4.2679 val rmse_t2m=2.313°C val bias_t2m=+0.051°C val vec_rmse_wind=1.671m/s
+[ep 014] train loss=3.9105 val loss=4.2672 val rmse_t2m=2.315°C val bias_t2m=-0.007°C val vec_rmse_wind=1.670m/s
+[ep 015] train loss=3.8980 val loss=4.2685 val rmse_t2m=2.313°C val bias_t2m=+0.011°C val vec_rmse_wind=1.671m/s
+[ep 016] train loss=3.8996 val loss=4.2607 val rmse_t2m=2.313°C val bias_t2m=+0.003°C val vec_rmse_wind=1.669m/s
+[ep 017] train loss=3.8962 val loss=4.2626 val rmse_t2m=2.314°C val bias_t2m=+0.018°C val vec_rmse_wind=1.669m/s
+[ep 018] train loss=3.8996 val loss=4.2632 val rmse_t2m=2.314°C val bias_t2m=+0.001°C val vec_rmse_wind=1.669m/s
+[ep 019] train loss=3.8781 val loss=4.2619 val rmse_t2m=2.312°C val bias_t2m=-0.006°C val vec_rmse_wind=1.669m/s
+[ep 020] train loss=3.8862 val loss=4.2613 val rmse_t2m=2.313°C val bias_t2m=-0.001°C val vec_rmse_wind=1.669m/s
+Done: {'best_val_combined': 3.9814802166170584, 'epochs_run': 20}
+[30.08 21:47:08]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.279°C, wind vec=1.711m/s
+[учёт] neural_postproc_krsk_terr6_s43: t2m 2.279 (23.5 %), ветер 1.711 (27.3 %) -> postproc_runs.md
+[30.08 21:47:23] --- жребий 44: обучение, эпох 20
+[cfg] num_stations=71  features=26
+[dataset] признаков-наблюдений добавлено: 34
+[dataset] добавлен признак dz_station
+[dataset] добавлен признак dz_lapse
+[dataset] добавлен признак nb_t2m_dev
+[dataset] добавлен признак nb_t2m_mean
+[dataset] добавлен признак nb_t2m_std
+[dataset] добавлен признак nb_u10_dev
+[dataset] добавлен признак nb_u10_mean
+[dataset] добавлен признак nb_u10_std
+[dataset] добавлен признак nb_v10_dev
+[dataset] добавлен признак nb_v10_mean
+[dataset] добавлен признак nb_v10_std
+[dataset] добавлен признак nb_z_surf_range
+[dataset] добавлен признак nb_z_surf_std
+[dataset] добавлен признак terr_above_min_1km
+[dataset] добавлен признак terr_above_min_20km
+[dataset] добавлен признак terr_above_min_5km
+[dataset] добавлен признак terr_aspect_cos
+[dataset] добавлен признак terr_aspect_sin
+[dataset] добавлен признак terr_below_max_1km
+[dataset] добавлен признак terr_below_max_20km
+[dataset] добавлен признак terr_below_max_5km
+[dataset] добавлен признак terr_dem_elev
+[dataset] добавлен признак terr_elev_mismatch
+[dataset] добавлен признак terr_horizon
+[dataset] добавлен признак terr_rough_1km
+[dataset] добавлен признак terr_rough_20km
+[dataset] добавлен признак terr_rough_5km
+[dataset] добавлен признак terr_slope
+[dataset] добавлен признак terr_tpi_1km
+[dataset] добавлен признак terr_tpi_20km
+[dataset] добавлен признак terr_tpi_5km
+[dataset] пропусков в признаках: 5,792,039 (4.49%) — заменены средним
+[cfg] признаков: 26 -> 91 (датасет дополнил список)
+[dataset] пропусков в признаках: 1,899,185 (4.30%) — заменены средним
+[model] StationLeadBiasResidualMLP params=113,912  (station_emb=32 hidden=[192, 192, 128] bias_head=Embedding(71,3))
+[ep 001] train loss=4.8380 val loss=4.5143 val rmse_t2m=2.411°C val bias_t2m=-0.057°C val vec_rmse_wind=1.714m/s
+[ep 002] train loss=4.3043 val loss=4.3992 val rmse_t2m=2.363°C val bias_t2m=-0.015°C val vec_rmse_wind=1.694m/s
+[ep 003] train loss=4.1884 val loss=4.3442 val rmse_t2m=2.345°C val bias_t2m=+0.021°C val vec_rmse_wind=1.684m/s
+[ep 004] train loss=4.1301 val loss=4.3310 val rmse_t2m=2.335°C val bias_t2m=+0.034°C val vec_rmse_wind=1.682m/s
+[ep 005] train loss=4.0935 val loss=4.3279 val rmse_t2m=2.336°C val bias_t2m=-0.040°C val vec_rmse_wind=1.682m/s
+[ep 006] train loss=4.0580 val loss=4.2993 val rmse_t2m=2.322°C val bias_t2m=-0.059°C val vec_rmse_wind=1.676m/s
+[ep 007] train loss=4.0316 val loss=4.2992 val rmse_t2m=2.328°C val bias_t2m=-0.034°C val vec_rmse_wind=1.676m/s
+[ep 008] train loss=3.9993 val loss=4.2882 val rmse_t2m=2.321°C val bias_t2m=-0.005°C val vec_rmse_wind=1.674m/s
+[ep 009] train loss=3.9887 val loss=4.2922 val rmse_t2m=2.322°C val bias_t2m=-0.094°C val vec_rmse_wind=1.675m/s
+[ep 010] train loss=3.9699 val loss=4.2874 val rmse_t2m=2.318°C val bias_t2m=-0.028°C val vec_rmse_wind=1.675m/s
+[ep 011] train loss=3.9622 val loss=4.2907 val rmse_t2m=2.316°C val bias_t2m=-0.034°C val vec_rmse_wind=1.677m/s
+[ep 012] train loss=3.9443 val loss=4.2764 val rmse_t2m=2.310°C val bias_t2m=+0.017°C val vec_rmse_wind=1.673m/s
+[ep 013] train loss=3.9220 val loss=4.2812 val rmse_t2m=2.313°C val bias_t2m=+0.016°C val vec_rmse_wind=1.674m/s
+[ep 014] train loss=3.9232 val loss=4.2814 val rmse_t2m=2.318°C val bias_t2m=-0.019°C val vec_rmse_wind=1.674m/s
+[ep 015] train loss=3.9007 val loss=4.2739 val rmse_t2m=2.314°C val bias_t2m=-0.021°C val vec_rmse_wind=1.673m/s
+[ep 016] train loss=3.9023 val loss=4.2813 val rmse_t2m=2.315°C val bias_t2m=-0.004°C val vec_rmse_wind=1.674m/s
+[ep 017] train loss=3.8986 val loss=4.2733 val rmse_t2m=2.314°C val bias_t2m=-0.010°C val vec_rmse_wind=1.673m/s
+[ep 018] train loss=3.8970 val loss=4.2718 val rmse_t2m=2.312°C val bias_t2m=-0.017°C val vec_rmse_wind=1.672m/s
+[ep 019] train loss=3.8860 val loss=4.2729 val rmse_t2m=2.312°C val bias_t2m=-0.004°C val vec_rmse_wind=1.673m/s
+[ep 020] train loss=3.8817 val loss=4.2725 val rmse_t2m=2.313°C val bias_t2m=-0.008°C val vec_rmse_wind=1.672m/s
+Done: {'best_val_combined': 3.983512084413726, 'epochs_run': 20}
+[30.08 21:54:48]     проверка на 2020
+[eval] модель: StationLeadBiasResidualMLP
+Overall: t2m RMSE=2.272°C, wind vec=1.715m/s
+[учёт] neural_postproc_krsk_terr6_s44: t2m 2.272 (23.7 %), ветер 1.715 (27.1 %) -> postproc_runs.md
+[30.08 21:55:02] шаг 3: сводка по трём жребиям
+с рельефом:  ['2.2780', '2.2790', '2.2719']
+без рельефа: ['2.2771', '2.2821', '2.2806']
+среднее: 2.2799 -> 2.2763, выигрыш +0.0036 °C
+ВЫВОД: НЕТ — в пределах шума по жребию (0,004-0,005 °C)
+[30.08 21:55:02] шаг 4: разбор по станциям для лучшего жребия
+[eval] модель: StationLeadBiasResidualMLP
+Saved: experiments/neural_postproc_krsk_terr6_s42/eval_stations/eval_per_station_krsk.json
+Saved: experiments/neural_postproc_krsk_terr6_s42/eval_stations/eval_per_station_krsk.md
+Stations in box: 71 / 50; region n=485,888
+Region pp T2m RMSE = 2.278°C (GNN 2.978°C)
+Region pp wind vec-RMSE = 1.712m/s (GNN 2.353m/s)
+[30.08 21:55:17] === ALL DONE ===
+[30.08 21:55:17] сравнивать с: сеть без рельефа 2,269 (23,8 %); лучшая таблица 2,498 (16,1 %)
