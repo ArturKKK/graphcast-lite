@@ -130,8 +130,12 @@ TEMPLATE = """<title>Графовый прогноз Красноярска</tit
   .fig { margin:1.4em 0; }
   .fig svg { width:100%; height:auto; background:#fff; }
   figcaption { font-size:.85em; color:var(--ink-2); margin-top:.5em; text-align:left; }
-  ul, ol { padding-left:1.2em; }
-  li { margin-bottom:.25em; }
+  /* Отступа 1,2em маркеру не хватает: он выносится влево за пределы печатной
+     области и обрезается по краю страницы. У списка выводов от «1.» оставалась
+     одна точка, а в списке литературы обрезались бы и двузначные номера.
+     2,4em хватает на «11.» с запасом. */
+  ul, ol { padding-left:2.4em; margin-left:0; }
+  li { margin-bottom:.25em; padding-left:.15em; }
   hr { border:0; border-top:1px solid var(--rule); margin:1.8em 0; }
 __MATHCSS__
   @media print {

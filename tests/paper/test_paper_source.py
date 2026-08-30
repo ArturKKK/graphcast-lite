@@ -79,3 +79,19 @@ def test_service_section_list_is_not_empty():
     """Список служебных разделов не должен опустеть по недосмотру."""
     assert SERVICE_SECTIONS
     assert all(m.startswith("## ") for m in SERVICE_SECTIONS)
+
+
+def test_list_indent_leaves_room_for_two_digit_markers():
+    """Отступ списка вмещает маркер «11.», а не обрезает его.
+
+    При padding-left 1,2em маркер выносился влево за печатную область и
+    обрезался по краю страницы: у списка выводов от «1.» оставалась одна точка,
+    а двузначные номера списка литературы пропали бы целиком. Проверять это
+    глазами каждый раз нельзя, поэтому значение закреплено здесь.
+    """
+    import re
+    css = (ROOT / "scripts" / "paper_artifact.py").read_text()
+    m = re.search(r"ul,\s*ol\s*\{[^}]*padding-left:\s*([\d.]+)em", css)
+    assert m, "не нашёл отступ списков в стилях"
+    assert float(m.group(1)) >= 2.0, (
+        f"отступ {m.group(1)}em мал для маркера «11.» — номера обрежутся")
