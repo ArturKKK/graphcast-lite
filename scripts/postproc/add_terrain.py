@@ -53,6 +53,26 @@ def build_table(stations, dem_dir, radii_m, margin_deg=0.35) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def prepare_outputs(*paths) -> None:
+    """Создать каталоги и убедиться, что запись пройдёт — ДО тяжёлого счёта.
+
+    30.08.2026 описатели на 71 станцию считались две минуты и были выброшены,
+    потому что каталога для побочной таблицы не существовало. Условие, которое
+    проверяется за миллисекунду, не должно обнаруживаться в конце работы.
+    """
+    for pth in paths:
+        if pth is None:
+            continue
+        pth = Path(pth)
+        pth.parent.mkdir(parents=True, exist_ok=True)
+        probe = pth.parent / (".write_probe_" + pth.name)
+        try:
+            probe.write_text("ok")
+            probe.unlink()
+        except OSError as e:
+            raise SystemExit(f"не могу писать в {pth.parent}: {e}") from e
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--corpus", required=True)
@@ -65,6 +85,12 @@ def main() -> None:
                     help="радиусы окрестности: 1 км — сама площадка, 5 км — форма "
                          "долины, 20 км — положение в крупном рельефе")
     a = ap.parse_args()
+
+    # Проверяем условия ДО счёта: описатели считаются минуты, и терять их
+    # из-за отсутствующего каталога недопустимо.
+    tj = Path(a.terrain_json) if a.terrain_json else \
+        Path(a.out).with_name(Path(a.out).stem + "_terrain.json")
+    prepare_outputs(a.out, tj)
 
     stations = load_stations(a.stations)
     table = build_table(stations, a.dem_dir, [r * 1000 for r in a.radii_km])
@@ -82,8 +108,6 @@ def main() -> None:
                 print(f"    {c:<22} от {v.min():8.1f} до {v.max():8.1f}, "
                       f"медиана {v.median():7.1f}", flush=True)
 
-    tj = Path(a.terrain_json) if a.terrain_json else \
-        Path(a.out).with_name(Path(a.out).stem + "_terrain.json")
     tj.write_text(table.to_json(orient="records", force_ascii=False, indent=1))
     print(f"[рельеф] таблица по станциям: {tj}", flush=True)
 

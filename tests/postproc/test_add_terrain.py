@@ -187,3 +187,39 @@ def test_station_numbers_match_the_corpus_column(tmp_path):
     from src.postprocessing.stations import load_stations
     for s in load_stations(real):
         assert isinstance(s["usaf"], str)
+
+
+def test_output_directory_is_created(scene):
+    """Каталога вывода нет — он создаётся, а не роняет прогон в самом конце.
+
+    30.08.2026 описатели на 71 станцию посчитались за две минуты и были
+    выброшены: каталога для побочной таблицы не существовало, и падение
+    случилось ПОСЛЕ всего счёта. Условие проверяется за миллисекунду и должно
+    проверяться в начале.
+    """
+    tmp, dem = scene
+    out = tmp / "нет" / "такого" / "out.parquet"
+    r = subprocess.run(
+        [sys.executable, str(SCRIPT), "--corpus", str(tmp / "corpus.parquet"),
+         "--out", str(out), "--stations", str(tmp / "st.json"),
+         "--dem-dir", str(dem), "--terrain-json", str(tmp / "нет" / "t.json")],
+        capture_output=True, text=True, cwd=ROOT)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert out.exists() and (tmp / "нет" / "t.json").exists()
+
+
+def test_unwritable_output_fails_before_computing(scene):
+    """Писать некуда — отказ ДО счёта описателей, а не после.
+
+    Признак того, что проверка стоит в начале: в выводе нет ни одной строки
+    про посчитанные станции. Иначе минуты работы уходят впустую.
+    """
+    tmp, dem = scene
+    r = subprocess.run(
+        [sys.executable, str(SCRIPT), "--corpus", str(tmp / "corpus.parquet"),
+         "--out", "/proc/нельзя/out.parquet", "--stations", str(tmp / "st.json"),
+         "--dem-dir", str(dem)],
+        capture_output=True, text=True, cwd=ROOT)
+    assert r.returncode != 0
+    assert "станций посчитано" not in r.stdout, (
+        "счёт начался до проверки записи — работа выброшена впустую")
