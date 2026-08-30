@@ -419,3 +419,73 @@ def test_terrain_features_are_picked_up_by_the_dataset(tmp_path):
 
     got = ds.StationCorpusDataset(p, station_to_idx={"20001": 0})
     assert "terr_tpi_1km" in got.feature_cols and "terr_slope" in got.feature_cols
+
+
+def cone_metric(n, cell_deg, lat=LAT, peak=500.0, drop=0.05):
+    """Конус на сетке с настоящим шагом по каждой оси.
+
+    В градусах ячейка квадратная, в метрах — нет: градус долготы короче. Синтетика
+    обязана это повторять, иначе сравнение разрешений сравнивало бы разный рельеф.
+    """
+    from src.postprocessing.terrain import meters_per_degree
+    m_lat, m_lon = meters_per_degree(lat)
+    dy, dx = cell_deg * m_lat, cell_deg * m_lon
+    i = np.arange(n) - n // 2
+    yy, xx = np.meshgrid(i * dy, i * dx, indexing="ij")
+    return np.maximum(0.0, peak - np.hypot(yy, xx) * drop) + 100.0
+
+
+def test_descriptors_do_not_depend_on_grid_resolution():
+    """Один рельеф на сетке 3\u2033 и 1\u2033 даёт те же признаки.
+
+    Не отвлечённая аккуратность: скачанные листы оказались в 1 угловую секунду,
+    а не в 3, как закладывалось при разработке. Радиусы задаются в метрах и
+    переводятся в точки через шаг сетки — если бы где-то остался счёт в точках,
+    все описатели поехали бы втрое и молча, ничем себя не выдав.
+
+    Станция стоит НЕ на вершине, иначе уклон, экспозиция и горизонт вышли бы
+    нулями и проверка их не касалась бы вовсе.
+    """
+    from src.postprocessing.terrain import meters_per_degree, station_terrain
+    m_lat, m_lon = meters_per_degree(LAT)
+    got = {}
+    for cell_deg, n in ((1.0 / 1200.0, 161), (1.0 / 3600.0, 481)):
+        dy, dx = cell_deg * m_lat, cell_deg * m_lon
+        c = (n // 2 + int(round(1800 / dy)), n // 2 + int(round(900 / dx)))
+        got[n] = station_terrain(cone_metric(n, cell_deg), c, LAT, cell_deg,
+                                 radii_m=(1000.0, 3000.0))
+    coarse, fine = got[161], got[481]
+    assert set(coarse) == set(fine)
+    for k in coarse:
+        scale = max(abs(coarse[k]), 1.0)
+        assert abs(fine[k] - coarse[k]) / scale < 0.03, (
+            f"{k}: {coarse[k]:.4f} против {fine[k]:.4f} — зависит от разрешения")
+    # проверка не пустая: величины, которые могли бы выйти нулями, ненулевые
+    assert coarse["terr_slope"] > 1.0 and coarse["terr_horizon"] > 0.5
+
+
+def test_tiles_of_different_resolution_are_refused(tmp_path):
+    """Смесь листов 1\u2033 и 3\u2033 в одном каталоге — внятный отказ.
+
+    Шаг сетки берётся от последнего прочитанного листа, поэтому часть мозаики
+    оказалась бы растянута втрое. numpy упал бы и сам, но на несовпадении
+    размеров массивов — по такому сообщению причину не найти.
+    """
+    import pytest as _pytest
+
+    from src.postprocessing.terrain import load_mosaic
+    write_hgt(tmp_path / "N55E093.hgt", synth_tile(n=121))
+    write_hgt(tmp_path / "N55E094.hgt", synth_tile(n=61))
+    with _pytest.raises(ValueError, match="разного разрешения"):
+        load_mosaic(tmp_path, 55.5, 93.9, margin_deg=0.3)
+
+
+def test_mosaic_step_follows_the_tile_size(tmp_path):
+    """Шаг сетки выводится из размера листа, а не задан числом."""
+    from src.postprocessing.terrain import load_mosaic
+    for n in (121, 361):
+        d = tmp_path / f"t{n}"
+        d.mkdir()
+        write_hgt(d / "N55E093.hgt", synth_tile(n=n))
+        _, _, cell = load_mosaic(d, 55.5, 93.5, margin_deg=0.1)
+        assert cell == pytest.approx(1.0 / (n - 1))
