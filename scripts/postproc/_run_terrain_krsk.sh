@@ -48,12 +48,32 @@ export PYTHONPATH="$REPO"
 DIR=/data/postproc
 
 # 1. Листы матрицы высот. Без них считать нечего, и лучше сказать это сразу.
+#    Каталог ищем в нескольких местах: наборы данных на этой виртуалке лежат
+#    в /data/datasets, а не в /data, и на этом уже споткнулись 30.08.2026.
+#    Можно задать явно: DEM_DIR=/куда/угодно bash scripts/postproc/_run_terrain_krsk.sh
 DEM=""
-for d in /data/dem "$REPO/data/dem" /workdir/dem; do
-  [[ -d "$d" ]] && [[ -n "$(ls "$d"/*.hgt.gz "$d"/*.hgt 2>/dev/null | head -1)" ]] && { DEM="$d"; break; }
+CANDIDATES=("${DEM_DIR:-}" /data/datasets/dem /data/dem "$REPO/data/dem"
+            /workdir/dem /workdir/graphcast-lite/data/dem)
+for d in "${CANDIDATES[@]}"; do
+  [[ -z "$d" ]] && continue
+  if [[ -d "$d" ]] && compgen -G "$d/*.hgt*" >/dev/null 2>&1; then DEM="$d"; break; fi
 done
-[[ -z "$DEM" ]] && { log "нет листов высот — залей их в /data/dem (см. list_dem_tiles.py)"; exit 1; }
-log "листы высот: $DEM ($(ls "$DEM" | wc -l) шт., $(du -sh "$DEM" | cut -f1))"
+if [[ -z "$DEM" ]]; then
+  log "нет листов высот. Искал здесь:"
+  for d in "${CANDIDATES[@]}"; do
+    [[ -z "$d" ]] && continue
+    if [[ -d "$d" ]]; then log "    $d — каталог есть, но файлов *.hgt* в нём нет"
+    else log "    $d — нет такого каталога"; fi
+  done
+  log "  положи листы в любой из них или задай DEM_DIR=/путь (см. list_dem_tiles.py)"
+  exit 1
+fi
+NTILES=$(compgen -G "$DEM/*.hgt*" | wc -l)
+log "листы высот: $DEM ($NTILES шт., $(du -sh "$DEM" | cut -f1))"
+if [[ "$NTILES" -lt 100 ]]; then
+  log "  ВНИМАНИЕ: листов меньше сотни, а для 71 станции нужно 106."
+  log "  Станции без листов останутся без рельефа — смотри строку [рельеф] ниже."
+fi
 
 # 2. Исходный корпус с признаками окрестности.
 LAGS="$DIR/corpus_krsk_lags2_nb${NB}.parquet"
