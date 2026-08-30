@@ -54,20 +54,34 @@ def main() -> None:
     print(f"нужно листов: {len(tiles)} (примерно {len(tiles) * 3} МБ в сжатом виде)")
     print(" ".join(tiles))
 
+    total = len(tiles)
     lines = ["#!/usr/bin/env bash",
              "# Загрузка листов матрицы высот. Запускать там, где есть интернет.",
              "# Потом перенести каталог на виртуалку: rsync -a data/dem/ ...",
              "set -uo pipefail",
              f'OUT="${{1:-{a.out_dir}}}"', 'mkdir -p "$OUT"',
-             'ok=0; fail=0']
-    for t in tiles:
+             'ok=0; fail=0; had=0',
+             f'echo "листов: {total}, каталог: $OUT"']
+    for i, t in enumerate(tiles, 1):
+        # Ход загрузки печатается ДО curl и без перевода строки: иначе на
+        # несколько минут молчания не отличить работу от зависания. curl -fsS
+        # сам не выводит ничего, и это уже один раз сбило с толку.
+        #
+        # Готовность листа проверяется gzip -t, а не наличием файла: прерванная
+        # загрузка оставляет обрезанный архив, и проверка «файл есть» пропустила
+        # бы его. Обнаружилось бы это уже на виртуалке, порчей мозаики высот.
         lines.append(
-            f'if [[ ! -f "$OUT/{t}.hgt.gz" ]]; then '
-            f'curl -fsS -o "$OUT/{t}.hgt.gz" {BASE}/{t[:3]}/{t}.hgt.gz '
-            f'&& ok=$((ok+1)) || {{ fail=$((fail+1)); rm -f "$OUT/{t}.hgt.gz"; '
-            f'echo "нет листа {t} (бывает: над морем их не существует)"; }}; '
-            f'else ok=$((ok+1)); fi')
-    lines += ['echo "скачано: $ok, не найдено: $fail"',
+            f'printf "[%s/{total}] {t} " "{i}"; '
+            f'if gzip -t "$OUT/{t}.hgt.gz" 2>/dev/null; then '
+            f'had=$((had+1)); echo "уже есть"; '
+            f'elif curl -fsS --retry 3 --retry-delay 2 -o "$OUT/{t}.hgt.gz" '
+            f'{BASE}/{t[:3]}/{t}.hgt.gz && gzip -t "$OUT/{t}.hgt.gz" 2>/dev/null; '
+            f'then ok=$((ok+1)); echo "ок"; '
+            f'else fail=$((fail+1)); rm -f "$OUT/{t}.hgt.gz"; '
+            f'echo "НЕТ (бывает: над морем листов не существует)"; fi')
+    lines += ['echo "скачано: $ok, уже было: $had, не найдено: $fail"',
+              'echo "перенести на виртуалку:"',
+              'echo "  rsync -avz \\"$OUT/\\" root@ВИРТУАЛКА:/data/dem/"',
               '# Отсутствие отдельных листов не беда, если они над водой или вне области.']
     text = "\n".join(lines) + "\n"
 
@@ -75,7 +89,8 @@ def main() -> None:
         Path(a.script).write_text(text)
         Path(a.script).chmod(0o755)
         print(f"\nкоманды загрузки записаны: {a.script}")
-        print(f"запустить:  bash {a.script} [каталог]")
+        print("САМИ ДАННЫЕ ЕЩЁ НЕ СКАЧАНЫ. Загрузка — отдельный шаг:")
+        print(f"    bash {a.script} {a.out_dir}")
     else:
         print("\nчтобы получить готовый скрипт загрузки, добавь --script fetch_dem.sh")
 
