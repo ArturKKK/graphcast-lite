@@ -16,6 +16,7 @@ import re
 from pathlib import Path
 
 import markdown
+from paper_source import prepare
 
 ROOT = Path(__file__).resolve().parents[1]
 PAPER = ROOT / "docs" / "paper"
@@ -60,31 +61,14 @@ def main():
     a = ap.parse_args()
 
     text = Path(a.src).read_text()
-    if a.no_appendix:
-        text = text.split("## Перечень рисунков")[0]
-
-    # Служебные разделы отрезаются ВСЕГДА, а не по флагу: они не часть рукописи
-    # и в PDF для журнала попасть не должны ни при каких обстоятельствах.
-    # Раздел с промптом для проверяющей нейросети лежит в том же файле, чтобы
-    # не терялся, но подавать его вместе со статьёй нельзя.
-    for marker in ("## Промпт для независимой проверки",
-                   "## Перечень рисунков"):
-        if marker in text:
-            text = text.split(marker)[0]
-            print(f"   отрезан служебный раздел: {marker}")
+    text, done = prepare(text)
+    for marker in done["cut"]:
+        print(f"   отрезан служебный раздел: {marker}")
+    n_sup = done["superscripts"]
 
     n_todo = len(re.findall(r"\{\{ЗАПОЛНИТЬ", text))
     # подсветить плейсхолдеры, чтобы их было видно на печати
     text = re.sub(r"(\{\{ЗАПОЛНИТЬ[^}]*\}\})", r'<span class="todo">\1</span>', text)
-
-    # Надстрочные знаки аффиляций: Табаков^1,2^ -> Табаков<sup>1,2</sup>.
-    # Python-Markdown такой разметки не знает, и до 30.08.2026 крышки уезжали
-    # в вёрстку буквально — в рукописи, идущей в журнал.
-    #
-    # Шаблон нарочно узкий: между крышками только цифры и запятые. Формулы
-    # вида ^{2}, ^{(r)}, ^{b} начинаются с фигурной скобки и под него не
-    # подпадают, иначе правка молча испортила бы всю математику статьи.
-    text, n_sup = re.subn(r"\^(\d+(?:,\d+)*)\^", r"<sup>\1</sup>", text)
 
     html_body = markdown.markdown(text, extensions=["tables", "fenced_code", "sane_lists"])
     doc = (f'<!doctype html><html lang="ru"><head><meta charset="utf-8">'

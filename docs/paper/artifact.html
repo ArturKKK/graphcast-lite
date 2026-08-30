@@ -88,22 +88,22 @@ sub, sup { font-size:.72em; line-height:0; }
 </style>
 <div class="bar">
   <span class="t">Рукопись для «Гидрометеорологических исследований и прогнозов»</span>
-  <span>слов <b>9 413</b></span>
+  <span>слов <b>9 434</b></span>
   <span>не заполнено: <b>2</b></span>
 </div>
 <div class="wrap">
 <p>УДК 551.509.313:004.032.26</p>
 <h1>Мультимасштабная графовая нейросетевая модель регионального прогноза погоды с усвоением данных наблюдений</h1>
-<p>А.С. Табаков^1,2^, А.В. Пененко^1^</p>
-<p>^1^Институт вычислительной математики и математической геофизики СО РАН, г. Новосибирск, Россия;
-^2^Новосибирский государственный университет, г. Новосибирск, Россия</p>
+<p>А.С. Табаков<sup>1,2</sup>, А.В. Пененко<sup>1</sup></p>
+<p><sup>1</sup>Институт вычислительной математики и математической геофизики СО РАН, г. Новосибирск, Россия;
+<sup>2</sup>Новосибирский государственный университет, г. Новосибирск, Россия</p>
 <p>artur.tabakov11@gmail.com</p>
 <p>Представлена региональная нейросетевая модель прогноза погоды над югом Красноярского края, построенная на графовом представлении атмосферного состояния. Глобальная расчётная сетка с шагом 0.703° и региональная вставка с шагом 0.25° объединены в единый граф из 133 279 узлов, что устраняет необходимость задания внешних граничных условий: согласование разрешений на стыке достигается механизмом обмена сообщениями в процессе обучения. Модель содержит 5.9 млн обучаемых параметров, обучение и выпуск прогноза выполняются на одном графическом ускорителе. Оценка на независимой выборке из 1607 сроков (все сезоны) показала среднеквадратическую ошибку прогноза приземной температуры 1,46 °C на суточном сроке при агрегатной успешности 74,6 % относительно инерционного прогноза. Показано, что распределение обучающего сигнала по узлам графа и по каналам, возникающее при равномерном усреднении функции потерь, далеко от постановки задачи; явное взвешивание снижает ошибку приземной температуры на 12 % без изменения архитектуры и объёма обучения. В контрольном эксперименте с равным бюджетом обучения установлено, что ошибка на проверочной выборке при одношаговом прогнозе является ненадёжным критерием отбора модели для многошагового прогноза. Исследовано усвоение наблюдений методами релаксации и оптимальной интерполяции внутри авторегрессионного цикла: непрерывное усвоение ограничивает рост ошибки при развёртке до 336 ч, тогда как «память» модели о прекратившемся поступлении наблюдений составляет порядка суток.</p>
 <p>Ключевые слова: численный прогноз погоды, графовая нейронная сеть, региональный прогноз, мультимасштабная сетка, усвоение данных, оптимальная интерполяция, авторегрессионный прогноз, машинное обучение</p>
 <h1>A multiscale graph neural network for regional weather forecasting with data assimilation</h1>
-<p>A.S. Tabakov^1,2^, A.V. Penenko^1^</p>
-<p>^1^Institute of Computational Mathematics and Mathematical Geophysics SB RAS, Novosibirsk, Russia;
-^2^Novosibirsk State University, Novosibirsk, Russia</p>
+<p>A.S. Tabakov<sup>1,2</sup>, A.V. Penenko<sup>1</sup></p>
+<p><sup>1</sup>Institute of Computational Mathematics and Mathematical Geophysics SB RAS, Novosibirsk, Russia;
+<sup>2</sup>Novosibirsk State University, Novosibirsk, Russia</p>
 <p>artur.tabakov11@gmail.com</p>
 <p>A regional neural network weather forecasting model for the south of Krasnoyarsk Krai based on a graph representation of the atmospheric state is presented. A global mesh with a 0.703° spacing and a regional insert with a 0.25° spacing are combined into a single graph of 133,279 nodes, which removes the need for external lateral boundary conditions: the resolutions are reconciled at the interface by the message passing mechanism during training. The model has 5.9 million trainable parameters; both training and forecast production run on a single GPU. Evaluation on an independent sample of 1607 initial times covering all seasons yields a root-mean-square error of the 2-m temperature forecast of 1.46 °C at the 24-h lead time with an aggregate skill score of 74.6 % relative to persistence. The distribution of the training signal over graph nodes and channels that arises from uniform averaging of the loss is shown to be far from the task at hand; explicit weighting reduces the 2-m temperature error by 12 % with no change to the architecture or the training budget. A controlled experiment with an equal training budget shows that the single-step validation error is an unreliable criterion for selecting a model intended for multi-step forecasting. Observation assimilation by relaxation (nudging) and optimal interpolation within the autoregressive cycle is examined: continuous assimilation limits error growth over a 336-h rollout, whereas the model's memory of discontinued observations lasts about one day.</p>
 <p>Keywords: numerical weather prediction, graph neural network, regional forecasting, multiscale mesh, data assimilation, optimal interpolation, autoregressive forecast, machine learning</p>
@@ -3874,7 +3874,7 @@ sub, sup { font-size:.72em; line-height:0; }
 <h2>Список литературы</h2>
 <ol>
 <li>Гандин Л. С. Объективный анализ метеорологических полей. Л.: Гидрометеоиздат, 1963. 286 с.</li>
-<li>Толстых М. А., Фадеев Р. Ю., Шашкин В. В. и др. Система моделирования атмосферы для бесшовного прогноза. М.: Триада ЛТД, 2017. 166 с. <span class="gap">сверить по бумажному экземпляру или РИНЦ</span></li>
+<li>Толстых М. А., Фадеев Р. Ю., Шашкин В. В. и др. Система моделирования атмосферы для бесшовного прогноза. М.: Триада ЛТД, 2017. 166 с. <span class="gap">издательство сверить по бумажному экземпляру или РИНЦ. Год, город, 166 с. и ISBN 978-5-9908623-3-3 подтверждены независимо; «Триада ЛТД» — нет</span></li>
 <li>Lam R., Sanchez-Gonzalez A., Willson M. et al. Learning skillful medium-range global weather forecasting // Science. 2023. Vol. 382, No. 6677. P. 1416–1421.</li>
 <li>Bi K., Xie L., Zhang H. et al. Accurate medium-range global weather forecasting with 3D neural networks // Nature. 2023. Vol. 619. P. 533–538.</li>
 <li>Pathak J., Subramanian S., Harrington P. et al. FourCastNet: A global data-driven high-resolution weather model using adaptive Fourier neural operators // arXiv:2202.11214. 2022.</li>
@@ -3882,7 +3882,7 @@ sub, sup { font-size:.72em; line-height:0; }
 <li>Oskarsson J., Landelius T., Lindsten F. Graph-based neural weather prediction for limited area modeling // arXiv:2309.17370. 2023.</li>
 <li>Nipen T. N., Haugen H. H., Ingstad M. S. et al. Regional data-driven weather modeling with a global stretched-grid // Artificial Intelligence for the Earth Systems. 2026. Vol. 5, No. 2. DOI: 10.1175/AIES-D-25-0001.1.</li>
 <li>Gao Y., Wu H., Shu K. et al. OneForecast: A universal framework for global and regional weather forecasting // Proceedings of the 42nd International Conference on Machine Learning (ICML). 2025. arXiv:2502.00338.</li>
-<li>Wijnands J. S., Van Ginderachter M., François B. et al. Data-driven regional weather forecasting: A comparison of stretched-grid and limited-area modelling // Machine Learning with Applications. 2026. Article 100526. DOI: 10.1016/j.mlwa.2026.100526.</li>
+<li>Wijnands J. S., Van Ginderachter M., François B. et al. Data-driven regional weather forecasting: A comparison of stretched-grid and limited-area modelling // Machine Learning with Applications. 2026. Vol. 24. Article 100887. DOI: 10.1016/j.mlwa.2026.100887.</li>
 <li>Hersbach H., Bell B., Berrisford P. et al. The ERA5 global reanalysis // Quarterly Journal of the Royal Meteorological Society. 2020. Vol. 146, No. 730. P. 1999–2049.</li>
 </ol>
 <h2>References</h2>
@@ -3896,7 +3896,8 @@ sub, sup { font-size:.72em; line-height:0; }
 <li>Oskarsson J., Landelius T., Lindsten F. Graph-based neural weather prediction for limited area modeling. arXiv:2309.17370, 2023.</li>
 <li>Nipen T.N., Haugen H.H., Ingstad M.S. et al. Regional data-driven weather modeling with a global stretched-grid. Artificial Intelligence for the Earth Systems, 2026, vol. 5, no. 2, DOI: 10.1175/AIES-D-25-0001.1.</li>
 <li>Gao Y., Wu H., Shu K. et al. OneForecast: A universal framework for global and regional weather forecasting. Proceedings of the 42nd International Conference on Machine Learning (ICML), 2025, arXiv:2502.00338.</li>
-<li>Wijnands J.S., Van Ginderachter M., François B. et al. Data-driven regional weather forecasting: A comparison of stretched-grid and limited-area modelling. Machine Learning with Applications, 2026, article 100526, DOI: 10.1016/j.mlwa.2026.100526.</li>
+<li>Wijnands J.S., Van Ginderachter M., François B. et al. Data-driven regional weather forecasting: A comparison of stretched-grid and limited-area modelling. Machine Learning with Applications, 2026, vol. 24, article 100887, DOI: 10.1016/j.mlwa.2026.100887.</li>
 <li>Hersbach H., Bell B., Berrisford P. et al. The ERA5 global reanalysis. Quarterly Journal of the Royal Meteorological Society, 2020, vol. 146, no. 730, pp. 1999–2049.</li>
 </ol>
+<hr />
 </div>

@@ -21,7 +21,9 @@ import markdown
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from paper_math import tex_to_html, CSS as MATH_CSS  # noqa: E402
+from paper_math import CSS as MATH_CSS
+from paper_math import tex_to_html  # noqa: E402
+from paper_source import prepare  # noqa: E402
 
 SRC = ROOT / "docs" / "paper" / "article_gip.md"
 FIG = ROOT / "docs" / "paper" / "figures" / "fig_seam.svg"
@@ -30,6 +32,9 @@ OUT = ROOT / "docs" / "paper" / "artifact.html"
 
 def build():
     md = SRC.read_text()
+    md, done = prepare(md)
+    for marker in done["cut"]:
+        print(f"   отрезан служебный раздел: {marker}")
 
     blocks = []
 
