@@ -26,7 +26,23 @@ from paper_math import tex_to_html  # noqa: E402
 from paper_source import prepare  # noqa: E402
 
 SRC = ROOT / "docs" / "paper" / "article_gip.md"
-FIG = ROOT / "docs" / "paper" / "figures" / "fig_seam.svg"
+FIGDIR = ROOT / "docs" / "paper" / "figures"
+# Рисунки вставляются после абзаца, содержащего опорную фразу. Порядок в списке
+# задаёт нумерацию; вставка идёт с конца, чтобы смещения не поехали.
+FIGURES = [
+    ("fig_arch.svg",
+     "Используется схема «кодировщик — процессор — декодировщик»",
+     "Рис. 1. Устройство модели. (а) поток данных: значения расчётной сетки "
+     "переносятся кодировщиком в вершины графа-мозаики, процессор выполняет 12 раундов "
+     "обмена сообщениями, декодировщик возвращает приращения полей на сетку; выход "
+     "подаётся на вход следующего шага. (б) двухфазная схема дообучения."),
+    ("fig_seam.svg",
+     "Прямая экспериментальная проверка бесшовности стыка",
+     "Рис. 2. Стык региональной вставки. "
+     "(а) прогноз приземной температуры на +24 ч; размер ячейки соответствует "
+     "шагу сетки — 0,25° внутри вставки и 0,703° снаружи. "
+     "(б) среднеквадратическая ошибка по расстоянию до границы, 100 сроков."),
+]
 OUT = ROOT / "docs" / "paper" / "artifact.html"
 
 
@@ -57,18 +73,19 @@ def build():
 
     body = body.replace("<table>", '<div class="tw"><table>').replace("</table>", "</table></div>")
 
-    if FIG.exists():
-        svg = FIG.read_text()
+    for name, anchor, caption in reversed(FIGURES):
+        f = FIGDIR / name
+        if not f.exists():
+            print(f"   рисунка нет, пропускаю: {name}")
+            continue
+        if anchor not in body:
+            print(f"   не нашёл место для {name} — опорная фраза изменилась?")
+            continue
+        svg = f.read_text()
         svg = svg[svg.index("<svg"):]
-        anchor = "Прямая экспериментальная проверка бесшовности стыка"
-        if anchor in body:
-            end = body.index("</p>", body.index(anchor)) + 4
-            body = (body[:end] + '\n<figure class="fig">' + svg +
-                    '<figcaption>Рис. 2. Стык региональной вставки. '
-                    '(а) прогноз приземной температуры на +24 ч; размер ячейки соответствует '
-                    'шагу сетки — 0,25° внутри вставки и 0,703° снаружи. '
-                    '(б) среднеквадратическая ошибка по расстоянию до границы, 100 сроков.'
-                    '</figcaption></figure>\n' + body[end:])
+        end = body.index("</p>", body.index(anchor)) + 4
+        body = (body[:end] + '\n<figure class="fig">' + svg +
+                f'<figcaption>{caption}</figcaption></figure>\n' + body[end:])
 
     words = len(re.findall(r"\w+", re.sub(r"<[^>]+>", " ", body)))
     gaps = body.count('class="gap"')
@@ -127,8 +144,11 @@ TEMPLATE = """<title>Графовый прогноз Красноярска</tit
          border-bottom:1px dashed var(--flag); padding:0 3px;
          font-family:var(--sans); font-size:.8em; }
   .gap::before { content:"заполнить: "; }
-  .fig { margin:1.4em 0; }
-  .fig svg { width:100%; height:auto; background:#fff; }
+  .fig { margin:1.1em 0; text-align:center; }
+  /* 82 % ширины полосы: при вёрстке журнала рисунки всё равно уменьшают, а две
+     полосные картинки съедали страницу сверх лимита в 20 полос. */
+  .fig svg { width:82%; height:auto; background:#fff; }
+  .fig figcaption { margin-top:.4em; }
   figcaption { font-size:.85em; color:var(--ink-2); margin-top:.5em; text-align:left; }
   /* Отступа 1,2em маркеру не хватает: он выносится влево за пределы печатной
      области и обрезается по краю страницы. У списка выводов от «1.» оставалась
