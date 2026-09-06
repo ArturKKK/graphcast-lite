@@ -66,11 +66,68 @@ def diff_ci(a: np.ndarray, b: np.ndarray, block: int, reps: int, seed: int = 0):
     return point, lo, hi
 
 
+# Каналы, не входящие в агрегат: статические поля и временной форсинг. Список
+# повторяет то, что делает predict.py (no_loss_ch), иначе агрегат отсюда не
+# совпал бы с публикуемым.
+STATIC_FORCING = {"z_surf", "lsm", "sin_hour", "cos_hour", "sin_doy", "cos_doy"}
+
+
+def dynamic_channels(variables) -> list:
+    return [i for i, v in enumerate(variables) if v not in STATIC_FORCING]
+
+
+def agg_terms(d: dict, scope: str, horizons: list) -> tuple:
+    """Посрочные вклады в агрегатную ошибку прогноза и эталона.
+
+    Агрегат считается в НОРМИРОВАННЫХ единицах по всем динамическим каналам и
+    горизонтам сразу — так же, как StreamingMetrics в predict.py. Возвращаем два
+    массива (N,): средний квадрат ошибки по каналам и горизонтам для каждого
+    срока, отдельно для прогноза и для инерционного эталона.
+    """
+    ch = dynamic_channels(d["variables"])
+    hs = [h - 1 for h in horizons]
+    pred = d[f"mse_pred_{scope}"][:, hs][:, :, ch].mean(axis=(1, 2))
+    base = d[f"mse_base_{scope}"][:, hs][:, :, ch].mean(axis=(1, 2))
+    return pred, base
+
+
+def skill(pred: np.ndarray, base: np.ndarray) -> float:
+    """Агрегатная успешность в процентах по формуле (3)."""
+    return (1.0 - np.sqrt(pred.mean()) / np.sqrt(base.mean())) * 100.0
+
+
+def skill_ci(pred, base, block, reps, seed=0):
+    rng = np.random.default_rng(seed)
+    n = pred.shape[0]
+    point = skill(pred, base)
+    vals = np.empty(reps)
+    for r in range(reps):
+        idx = block_indices(n, block, rng)
+        vals[r] = skill(pred[idx], base[idx])
+    lo, hi = np.percentile(vals, [2.5, 97.5])
+    return point, lo, hi
+
+
+def skill_diff_ci(pa, ba, pb, bb, block, reps, seed=0):
+    """Парный интервал для разности успешностей S(B) - S(A) на общих сроках."""
+    rng = np.random.default_rng(seed)
+    n = min(pa.shape[0], pb.shape[0])
+    pa, ba, pb, bb = pa[:n], ba[:n], pb[:n], bb[:n]
+    point = skill(pb, bb) - skill(pa, ba)
+    vals = np.empty(reps)
+    for r in range(reps):
+        idx = block_indices(n, block, rng)
+        vals[r] = skill(pb[idx], bb[idx]) - skill(pa[idx], ba[idx])
+    lo, hi = np.percentile(vals, [2.5, 97.5])
+    return point, lo, hi
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("npz")
     ap.add_argument("--vs", default=None, help="второй npz для парного сравнения")
-    ap.add_argument("--var", default="t2m")
+    ap.add_argument("--var", default="t2m",
+                    help="имя канала либо 'aggregate' — агрегатная успешность")
     ap.add_argument("--scope", default="region", choices=["region", "global"])
     ap.add_argument("--horizons", type=int, nargs="*", default=None,
                     help="номера шагов (1-based); по умолчанию все")
@@ -82,6 +139,34 @@ def main():
     key = f"mse_pred_{a.scope}"
     if key not in A:
         raise SystemExit(f"в {a.npz} нет {key} (прогон без --region?)")
+
+    if a.var == "aggregate":
+        H_all = A[key].shape[1]
+        hs = a.horizons or list(range(1, H_all + 1))
+        pa, ba = agg_terms(A, a.scope, hs)
+        print(f"# Бутстреп-ДИ (95%), блок {a.block} сроков "
+              f"({a.block*6/24:.0f} сут), {a.reps} реплик")
+        print(f"# файл: {Path(a.npz).name}"
+              + (f"  против {Path(a.vs).name}" if a.vs else ""))
+        print(f"# агрегатная успешность, область {a.scope}, "
+              f"каналов {len(dynamic_channels(A['variables']))}, "
+              f"горизонтов {len(hs)}, N={len(pa)} сроков\n")
+        if a.vs is None:
+            p, lo, hi = skill_ci(pa, ba, a.block, a.reps)
+            print("| величина | оценка | 95% ДИ |")
+            print("|---|---:|---|")
+            print(f"| S, % | {p:.2f} | [{lo:.2f}, {hi:.2f}] |")
+        else:
+            B = load(Path(a.vs))
+            pb, bb = agg_terms(B, a.scope, hs)
+            sa, sb = skill(pa, ba), skill(pb, bb)
+            p, lo, hi = skill_diff_ci(pa, ba, pb, bb, a.block, a.reps)
+            sign = "ДА" if (lo > 0) == (hi > 0) else "нет"
+            print("| A, % | B, % | разность B−A, п.п. | 95% ДИ | значимо |")
+            print("|---:|---:|---:|---|---|")
+            print(f"| {sa:.2f} | {sb:.2f} | {p:+.2f} | [{lo:+.2f}, {hi:+.2f}] | {sign} |")
+        return
+
     ch = A["variables"].index(a.var)
     std = A["std"]
     H = A[key].shape[1]

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//root/.claude/**)",
+      "Read(//root/**)",
+      "Bash(grep -iA6 -- \"--model\")",
+      "Bash(claude auto-mode *)",
+      "Bash(grep -o \"[^\\\\\"\\\\`]\\\\{0,60\\\\}alwaysThinkingEnabled[^\\\\\"\\\\`]\\\\{0,80\\\\}\" /root/.claude/projects/-root-projects-graphcast-lite/7f67f1b3-ed85-4892-8c4b-c314c34422f2/tool-results/bpmk9pg6r.txt)",
+      "Bash(grep -oi \"tab[^\\\\\"]\\\\{0,50\\\\}thinking[^\\\\\"]\\\\{0,50\\\\}\\\\|thinking[^\\\\\"]\\\\{0,40\\\\}tab[^\\\\\"]\\\\{0,40\\\\}\" /root/.claude/projects/-root-projects-graphcast-lite/7f67f1b3-ed85-4892-8c4b-c314c34422f2/tool-results/bpmk9pg6r.txt)"
+    ]
+  }
+}
