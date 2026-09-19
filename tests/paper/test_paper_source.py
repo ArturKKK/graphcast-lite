@@ -123,3 +123,50 @@ def test_list_indent_leaves_room_for_two_digit_markers():
     assert m, "не нашёл отступ списков в стилях"
     assert float(m.group(1)) >= 2.0, (
         f"отступ {m.group(1)}em мал для маркера «11.» — номера обрежутся")
+
+
+def test_standalone_page_declares_encoding():
+    """Страница для печати объявляет кодировку.
+
+    artifact.html — фрагмент без <head>, он писался под внешнюю обёртку.
+    wkhtmltopdf переживал это благодаря флагу --encoding utf-8, а weasyprint
+    такого флага не имеет: 19.09.2026 вся кириллица в PDF вышла мусором.
+    """
+    import subprocess
+    import tempfile
+    from pathlib import Path as _P
+    with tempfile.TemporaryDirectory() as d:
+        out = _P(d) / "s.html"
+        r = subprocess.run([sys.executable, str(ROOT / "scripts" / "paper_artifact.py"),
+                            str(out)], capture_output=True, text=True, cwd=ROOT)
+        assert r.returncode == 0, r.stdout + r.stderr
+        head = out.read_text()[:400]
+        assert "<!doctype html>" in head.lower()
+        assert 'charset="utf-8"' in head
+        assert "<head>" in head and "</head>" in out.read_text()
+
+
+def test_pdf_line_spacing_matches_the_journal():
+    """Шаг строки в готовом PDF — 18 pt, как требует журнал.
+
+    Кегль 12 при интервале 1,5 даёт ровно 18 pt и 40 строк на полосу. Прежний
+    движок (wkhtmltopdf) набирал с шагом 13,8 pt, втискивал 50 строк и занижал
+    объём рукописи на четверть: 23 полосы вместо 29. Ошибка тихая — PDF
+    выглядит нормально, и заметить её можно только измерением.
+    """
+    import re
+    import shutil
+    import statistics
+    import subprocess
+    pdf = ROOT / "docs" / "paper" / "article_gip.pdf"
+    if not pdf.exists() or not shutil.which("pdftotext"):
+        return
+    out = subprocess.run(["pdftotext", "-bbox", "-f", "4", "-l", "4", str(pdf), "-"],
+                         capture_output=True, text=True).stdout
+    ys = sorted({round(float(m.group(1)), 1) for m in re.finditer(r'yMin="([\d.]+)"', out)})
+    gaps = [b - a for a, b in zip(ys, ys[1:]) if 5 < b - a < 40]
+    if not gaps:
+        return
+    step = statistics.median(gaps)
+    assert abs(step - 18.0) < 0.6, (
+        f"шаг строки {step:.1f} pt вместо 18,0 — набор не по требованию журнала")

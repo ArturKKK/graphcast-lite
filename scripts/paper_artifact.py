@@ -46,7 +46,7 @@ FIGURES = [
 OUT = ROOT / "docs" / "paper" / "artifact.html"
 
 
-def build():
+def build(standalone=None):
     md = SRC.read_text()
     md, done = prepare(md)
     for marker in done["cut"]:
@@ -95,6 +95,20 @@ def build():
                     .replace("__WORDS__", f"{words:,}".replace(",", " "))
                     .replace("__GAPS__", str(gaps)))
     OUT.write_text(page)
+
+    # Отдельная полная страница для печати в PDF. Сам artifact.html — фрагмент
+    # без <head>, он писался под внешнюю обёртку; wkhtmltopdf это переживал
+    # благодаря флагу --encoding utf-8, а weasyprint такого флага не имеет и
+    # кодировку угадывает — кириллица разъезжается. Поэтому для печати
+    # объявляем её явно.
+    if standalone:
+        Path(standalone).write_text(
+            '<!doctype html>\n<html lang="ru">\n<head>\n'
+            '<meta charset="utf-8">\n'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+            + page.split("</style>", 1)[0] + "</style>\n</head>\n<body>\n"
+            + page.split("</style>", 1)[1] + "\n</body>\n</html>\n")
+        print(f"[вёрстка] отдельная страница для печати: {standalone}")
     print(f"[вёрстка] {OUT.name}: слов {words}, незаполненных мест {gaps}, "
           f"{OUT.stat().st_size // 1024} КБ")
 
@@ -187,4 +201,5 @@ __BODY__
 """
 
 if __name__ == "__main__":
-    build()
+    import sys
+    build(sys.argv[1] if len(sys.argv) > 1 else None)
