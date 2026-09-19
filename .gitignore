@@ -268,3 +268,7 @@ data/isd_lite_russia/
 .coverage
 .coverage.*
 htmlcov/
+
+# Растровые рисунки для подачи в журнал: собираются из SVG
+# командой scripts/paper_figures_export.py, в репозитории не хранятся.
+docs/paper/figures/submission/

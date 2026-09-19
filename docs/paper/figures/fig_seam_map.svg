@@ -2976,7 +2976,7 @@
 <text x="50" y="320.2" font-size="12" fill="#52514e" text-anchor="end">50°с.ш.</text>
 <text x="50" y="214.0" font-size="12" fill="#52514e" text-anchor="end">55°с.ш.</text>
 <text x="50" y="107.8" font-size="12" fill="#52514e" text-anchor="end">60°с.ш.</text>
-<text x="56" y="26" font-size="14" fill="#0b0b0b">(а) прогноз приземной температуры на +24 ч</text>
+<text x="56" y="26" font-size="14" fill="#0b0b0b">Прогноз приземной температуры на +24 ч</text>
 <rect x="56.0" y="410" width="17.2" height="10" fill="#cde2fb"/>
 <rect x="72.7" y="410" width="17.2" height="10" fill="#b7d3f6"/>
 <rect x="89.3" y="410" width="17.2" height="10" fill="#9ec5f4"/>
@@ -2990,41 +2990,9 @@
 <rect x="222.7" y="410" width="17.2" height="10" fill="#184f95"/>
 <rect x="239.3" y="410" width="17.2" height="10" fill="#104281"/>
 <rect x="56" y="410" width="200" height="10" fill="none" stroke="#52514e" stroke-width="0.8"/>
-<text x="56" y="434" font-size="11" fill="#52514e">-28 °C</text>
-<text x="256" y="434" font-size="11" fill="#52514e" text-anchor="end">-12 °C</text>
+<text x="56" y="434" font-size="11" fill="#52514e">−28 °C</text>
+<text x="256" y="434" font-size="11" fill="#52514e" text-anchor="end">−12 °C</text>
 <text x="272" y="419" font-size="11" fill="#52514e">штриховая линия — граница вставки 0,25°</text>
-<line x1="610" y1="346.0" x2="980" y2="346.0" stroke="#d8d8d4" stroke-width="1"/>
-<text x="604" y="350.0" font-size="12" fill="#52514e" text-anchor="end">1.8</text>
-<line x1="610" y1="278.0" x2="980" y2="278.0" stroke="#d8d8d4" stroke-width="1"/>
-<text x="604" y="282.0" font-size="12" fill="#52514e" text-anchor="end">1.9</text>
-<line x1="610" y1="210.0" x2="980" y2="210.0" stroke="#d8d8d4" stroke-width="1"/>
-<text x="604" y="214.0" font-size="12" fill="#52514e" text-anchor="end">2.0</text>
-<line x1="610" y1="142.0" x2="980" y2="142.0" stroke="#d8d8d4" stroke-width="1"/>
-<text x="604" y="146.0" font-size="12" fill="#52514e" text-anchor="end">2.1</text>
-<line x1="610" y1="74.0" x2="980" y2="74.0" stroke="#d8d8d4" stroke-width="1"/>
-<text x="604" y="78.0" font-size="12" fill="#52514e" text-anchor="end">2.2</text>
-<line x1="795.0" y1="40" x2="795.0" y2="380" stroke="#0b0b0b" stroke-width="1.4" stroke-dasharray="6 3"/>
-<text x="795.0" y="34" font-size="12" fill="#0b0b0b" text-anchor="middle">граница</text>
 <polyline points="786.6,298.4 761.4,244.0 685.7,176.0" fill="none" stroke="#eb6834" stroke-width="2"/>
-<rect x="782.6" y="294.4" width="8" height="8" fill="#eb6834" stroke="#ffffff" stroke-width="2"/>
-<rect x="757.4" y="240.0" width="8" height="8" fill="#eb6834" stroke="#ffffff" stroke-width="2"/>
-<rect x="681.7" y="172.0" width="8" height="8" fill="#eb6834" stroke="#ffffff" stroke-width="2"/>
 <polyline points="797.1,128.4 801.3,155.6 807.6,196.4 820.2,216.8 895.9,162.4" fill="none" stroke="#2a78d6" stroke-width="2"/>
-<circle cx="797.1" cy="128.4" r="4.5" fill="#2a78d6" stroke="#ffffff" stroke-width="2"/>
-<circle cx="801.3" cy="155.6" r="4.5" fill="#2a78d6" stroke="#ffffff" stroke-width="2"/>
-<circle cx="807.6" cy="196.4" r="4.5" fill="#2a78d6" stroke="#ffffff" stroke-width="2"/>
-<circle cx="820.2" cy="216.8" r="4.5" fill="#2a78d6" stroke="#ffffff" stroke-width="2"/>
-<circle cx="895.9" cy="162.4" r="4.5" fill="#2a78d6" stroke="#ffffff" stroke-width="2"/>
-<rect x="610" y="40" width="370" height="340" fill="none" stroke="#52514e" stroke-width="1"/>
-<text x="626.8" y="396" font-size="12" fill="#52514e" text-anchor="middle">-1000</text>
-<text x="710.9" y="396" font-size="12" fill="#52514e" text-anchor="middle">-500</text>
-<text x="795.0" y="396" font-size="12" fill="#52514e" text-anchor="middle">0</text>
-<text x="879.1" y="396" font-size="12" fill="#52514e" text-anchor="middle">500</text>
-<text x="963.2" y="396" font-size="12" fill="#52514e" text-anchor="middle">1000</text>
-<text x="795.0" y="414" font-size="12" fill="#52514e" text-anchor="middle">расстояние до границы, км</text>
-<text x="610" y="16" font-size="14" fill="#0b0b0b">(б) ошибка на +24 ч по расстоянию до границы, °C</text>
-<circle cx="624" cy="436" r="4.5" fill="#2a78d6"/>
-<text x="636" y="440" font-size="12" fill="#52514e">внутри вставки, 0,25°</text>
-<rect x="800" y="432" width="8" height="8" fill="#eb6834"/>
-<text x="814" y="440" font-size="12" fill="#52514e">глобальная сетка, 0,703°</text>
 </svg>

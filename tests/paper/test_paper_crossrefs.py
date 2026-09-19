@@ -56,3 +56,41 @@ def test_no_self_reference():
         if here and f"п. {here}" in chunk:
             bad.append(title)
     assert not bad, f"пункт ссылается на самого себя: {bad}"
+
+
+def references():
+    """(номера в русском списке, номера в References, номера, цитируемые в тексте)."""
+    text = ARTICLE.read_text()
+    ru_at, en_at = text.index("## Список литературы"), text.index("## References")
+    body = text[:ru_at]
+    cited = set()
+    for m in re.finditer(r"\[(\d+(?:\s*,\s*\d+)*)\]", body):
+        cited |= {int(x) for x in re.split(r"\s*,\s*", m.group(1))}
+    return numbers(text[ru_at:en_at]), numbers(text[en_at:]), cited
+
+
+def numbers(block):
+    return {int(m.group(1)) for m in re.finditer(r"^(\d+)\.\s", block, re.M)}
+
+
+def test_both_reference_lists_agree():
+    """Списка два, и они обязаны совпадать по номерам (правила, п. 12)."""
+    ru, en, _ = references()
+    assert ru == en, (f"расходятся: только в рус. {sorted(ru - en)}, "
+                      f"только в References {sorted(en - ru)}")
+
+
+def test_no_orphan_or_dangling_references():
+    """Ни записи без ссылки, ни ссылки без записи.
+
+    19.09.2026 удаление абзаца «Обсуждения» разом унесло три ссылки [8, 9, 13];
+    останься они единственными, записи повисли бы в списке без упоминания.
+    """
+    ru, _, cited = references()
+    assert not (ru - cited), f"в списке есть, но нигде не цитируются: {sorted(ru - cited)}"
+    assert not (cited - ru), f"цитируются, но записи нет: {sorted(cited - ru)}"
+
+
+def test_reference_numbers_are_contiguous():
+    ru, _, _ = references()
+    assert ru == set(range(1, len(ru) + 1)), f"дыра в нумерации: {sorted(ru)}"
