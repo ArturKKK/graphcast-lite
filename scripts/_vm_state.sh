@@ -19,7 +19,11 @@ for d in "$WD" "$DATA"; do
   [[ -d "$d" ]] || { echo "  $d — НЕТ"; continue; }
   # /workdir: квота 8 ГБ, выход за неё гасит виртуалку. /data: не учитывается,
   # но стирается при рестарте.
+  used=$(du -sm "$d" 2>/dev/null | cut -f1)
   echo "  $d: $(du -sh "$d" 2>/dev/null | cut -f1)"
+  # Квота /workdir — 8 ГБ; выход за неё гасит job без предупреждения.
+  [[ "$d" == "$WD" && -n "$used" && "$used" -ge 7000 ]] \
+    && echo "     !!! ВНИМАНИЕ: квота /workdir 8 ГБ, занято ${used} МБ — чистить немедленно"
 done
 [[ -d "$WD" ]] && { echo "  крупное в $WD:"; du -sh "$WD"/* 2>/dev/null | sort -rh | head -6 | sed 's/^/     /'; }
 
@@ -38,8 +42,15 @@ else
   echo "  каталога нет — /data стёрся"
 fi
 
-say "архивы для восстановления (ждём их из S3)"
-ls -la "$DATA"/*.tar.zst "$DATA"/*.tar.gz "$DATA"/*.tar 2>/dev/null | sed 's/^/  /' || echo "  архивов нет"
+say "архивы для восстановления"
+# Ищем И в /data, И в /data/datasets: 19.09.2026 проверка смотрела только в
+# /data и отчиталась «архивов нет», тогда как все три лежали уровнем ниже.
+find "$DATA" -maxdepth 2 \( -name '*.tar.zst' -o -name '*.tar.gz' -o -name '*.tar' \) \
+     -printf '  %10s Б  %p\n' 2>/dev/null | sort -k2 -rn || true
+for a in dataset_512x256.tar.zst paper_krsk_datasets.tar.zst paper_ckpts.tar.zst; do
+  f=$(find "$DATA" -maxdepth 2 -name "$a" 2>/dev/null | head -1)
+  [[ -n "$f" ]] && echo "     ЕСТЬ  $a" || echo "     НЕТ   $a — без него восстановление не пройдёт"
+done
 
 say "репозиторий"
 if [[ -d "$REPO/.git" ]]; then
