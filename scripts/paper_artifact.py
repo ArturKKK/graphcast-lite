@@ -35,15 +35,87 @@ FIGURES = [
      "Рис. 1. Устройство модели. (а) поток данных: значения расчётной сетки "
      "переносятся кодировщиком в вершины графа-мозаики, процессор выполняет 12 раундов "
      "обмена сообщениями, декодировщик возвращает приращения полей на сетку; выход "
-     "подаётся на вход следующего шага. (б) двухфазная схема дообучения."),
-    ("fig_seam.svg",
-     "Прямая экспериментальная проверка бесшовности стыка",
-     "Рис. 2. Стык региональной вставки. "
-     "(а) прогноз приземной температуры на +24 ч; размер ячейки соответствует "
-     "шагу сетки — 0,25° внутри вставки и 0,703° снаружи. "
-     "(б) среднеквадратическая ошибка по расстоянию до границы, 100 сроков."),
+     "подаётся на вход следующего шага. (б) двухфазная схема дообучения.",
+     "Fig. 1. Model layout. (a) data flow: the encoder carries grid values onto the "
+     "vertices of the mesh graph, the processor runs 12 rounds of message passing, "
+     "the decoder returns field increments to the grid, and the output is fed to the "
+     "next step. (b) the two-phase fine-tuning schedule."),
+    # Панель с ошибкой по расстоянию до границы убрана: те же результаты
+    # приведены в табл. 5, а правила журнала запрещают излагать одни и те же
+    # результаты одновременно таблицей и рисунком.
+    ("fig_seam_map.svg",
+     "Прямая проверка бесшовности приведена на рис. 2",
+     "Рис. 2. Прогноз приземной температуры на +24 ч в окрестности границы "
+     "региональной вставки. Размер ячейки соответствует шагу сетки — 0,25° "
+     "внутри вставки и 0,703° снаружи; штриховая линия — граница вставки.",
+     "Fig. 2. Forecast of 2 m temperature at +24 h near the boundary of the "
+     "regional insert. Cell size follows the grid spacing — 0.25° inside the "
+     "insert and 0.703° outside; the dashed line marks the insert boundary."),
 ]
+
+# Правило 5: подрисуночные подписи и названия таблиц — на русском и английском.
+# Ключ — точное начало русской подписи таблицы в тексте статьи.
+TABLES_EN = {
+    "Таблица 1.": "Table 1. RMSE of 2 m temperature (°C) by lead time and aggregate "
+                  "skill score S (%) according to (3). Test set of 1607 initial times; "
+                  "region — 2501 nodes, inner zone — 45 nodes.",
+    "Таблица 2.": "Table 2. Forecast error at +24 h at the nodes of the regional "
+                  "insert: persistence, interpolated global forecast and the "
+                  "multiscale model.",
+    "Таблица 3.": "Table 3. Effect of loss weighting. Region, 1607 initial times; "
+                  "t2m is averaged over four lead times and the last column is the "
+                  "error over the whole computational graph.",
+    "Таблица 4.": "Table 4. RMSE of 2 m temperature (°C) over the region and aggregate "
+                  "skill score for different ways of selecting the checkpoint.",
+    "Таблица 5.": "Table 5. RMSE of 2 m temperature (°C) by distance to the boundary "
+                  "of the insert. Positive distance is inside the insert (0.25° "
+                  "spacing), negative is outside, on the global part of the graph "
+                  "(0.703° spacing).",
+}
 OUT = ROOT / "docs" / "paper" / "artifact.html"
+
+
+def relocate(body):
+    """Таблицы и рисунки — на отдельные страницы после текста (правила, п. 13, 14).
+
+    «В текст рисунки не вставлять», таблицы «размещаются на отдельных страницах
+    после основного текста статьи». В исходнике docs/paper/article_gip.md они
+    стоят рядом с обсуждением — так рукопись читается; в печать они переезжают
+    в конец. Ссылки «табл. 1», «рис. 2» в тексте остаются на месте.
+    """
+    moved_t, moved_f = [], []
+
+    def take(open_tag, close_tag, sink, start=0):
+        """Вырезает блоки от open_tag до close_tag включительно."""
+        nonlocal body
+        while True:
+            i = body.find(open_tag, start)
+            if i < 0:
+                return
+            j = body.index(close_tag, i) + len(close_tag)
+            sink.append(body[i:j])
+            body = body[:i] + body[j:]
+
+    # Подпись таблицы — отдельный абзац перед самой таблицей; забираем пару целиком.
+    for num in sorted(TABLES_EN):
+        i = body.find(f"<strong>{num}</strong>")
+        if i < 0:
+            raise SystemExit(f"[вёрстка] в статье нет подписи «{num}»")
+        i = body.rindex("<p>", 0, i)
+        j = body.index("</table></div>", i) + len("</table></div>")
+        cap_en = html.escape(TABLES_EN[num])
+        block = body[i:j].replace("<p>", '<p class="capru">', 1)
+        moved_t.append(block + f'\n<p class="capen">{cap_en}</p>')
+        body = body[:i] + body[j:]
+
+    take('<figure class="fig">', "</figure>", moved_f)
+
+    if not moved_f:
+        raise SystemExit("[вёрстка] ни один рисунок не перенесён — вставка сорвалась?")
+
+    tail = "".join(f'\n<div class="sheet">{b}</div>\n' for b in moved_t + moved_f)
+    # «На отдельных страницах после основного текста» — хвост начинается с новой.
+    return body + '\n<div class="tail">' + tail + "</div>\n"
 
 
 def build(standalone=None):
@@ -73,19 +145,26 @@ def build(standalone=None):
 
     body = body.replace("<table>", '<div class="tw"><table>').replace("</table>", "</table></div>")
 
-    for name, anchor, caption in reversed(FIGURES):
+    for name, anchor, caption, caption_en in reversed(FIGURES):
         f = FIGDIR / name
         if not f.exists():
             print(f"   рисунка нет, пропускаю: {name}")
             continue
         if anchor not in body:
-            print(f"   не нашёл место для {name} — опорная фраза изменилась?")
-            continue
+            # Молча пропустить нельзя: рисунок исчезает из рукописи, а сборка
+            # завершается успешно. Так уже терялся рис. 2 после правки текста.
+            raise SystemExit(
+                f"[вёрстка] опорной фразы для {name} нет в тексте:\n"
+                f"    {anchor!r}\n"
+                f"    поправьте FIGURES в {Path(__file__).name} или верните фразу в статью")
         svg = f.read_text()
         svg = svg[svg.index("<svg"):]
         end = body.index("</p>", body.index(anchor)) + 4
         body = (body[:end] + '\n<figure class="fig">' + svg +
-                f'<figcaption>{caption}</figcaption></figure>\n' + body[end:])
+                f'<figcaption>{caption}</figcaption>'
+                f'<figcaption lang="en">{caption_en}</figcaption></figure>\n' + body[end:])
+
+    body = relocate(body)
 
     words = len(re.findall(r"\w+", re.sub(r"<[^>]+>", " ", body)))
     gaps = body.count('class="gap"')
@@ -111,6 +190,7 @@ def build(standalone=None):
         print(f"[вёрстка] отдельная страница для печати: {standalone}")
     print(f"[вёрстка] {OUT.name}: слов {words}, незаполненных мест {gaps}, "
           f"{OUT.stat().st_size // 1024} КБ")
+    return page
 
 
 TEMPLATE = """<title>Графовый прогноз Красноярска</title>
@@ -148,7 +228,7 @@ TEMPLATE = """<title>Графовый прогноз Красноярска</tit
   a { color:inherit; }
   /* Таблицы той же гарнитурой, что и текст: разнобой шрифтов в рукописи ни к чему */
   .tw { overflow-x:auto; margin:1em 0; }
-  table { border-collapse:collapse; width:100%; font-size:.9em;
+  table { border-collapse:collapse; width:100%; font-size:11pt;
           font-variant-numeric:tabular-nums; }
   th, td { padding:5px 9px; border-bottom:1px solid var(--rule); text-align:left; }
   thead th { border-top:1px solid var(--ink); border-bottom:1px solid var(--ink);
@@ -159,11 +239,22 @@ TEMPLATE = """<title>Графовый прогноз Красноярска</tit
          font-family:var(--sans); font-size:.8em; }
   .gap::before { content:"заполнить: "; }
   .fig { margin:1.1em 0; text-align:center; }
+  /* Перенесённые в конец таблицы и рисунки: каждый блок не рвётся по страницам. */
+  .tail { break-before:page; page-break-before:always; }
+  .sheet { margin:0 0 1.1em; }
+  /* Блок в целом ломать можно — иначе четыре полосы хвоста наполовину пустые.
+     Нельзя ломать связку «подпись — таблица — англ. подпись»: без этого
+     подпись табл. 3 оставалась внизу полосы, а сама таблица уезжала на
+     следующую. */
+  .capru { break-inside:avoid; break-after:avoid; page-break-after:avoid; }
+  .capen { font-size:11pt; color:var(--ink-2); margin:.35em 0 0; text-indent:0; }
   /* 82 % ширины полосы: при вёрстке журнала рисунки всё равно уменьшают, а две
-     полосные картинки съедали страницу сверх лимита в 20 полос. */
-  .fig svg { width:82%; height:auto; background:#fff; }
+     полосные картинки съедали страницу сверх лимита в 20 полос. Потолок по
+     высоте нужен рис. 2: карта почти квадратная, и по одной ширине она
+     разворачивалась на 118 мм — полстраницы под одну панель. */
+  .fig svg { width:82%; height:auto; max-height:72mm; background:#fff; }
   .fig figcaption { margin-top:.4em; }
-  figcaption { font-size:.85em; color:var(--ink-2); margin-top:.5em; text-align:left; }
+  figcaption { font-size:11pt; color:var(--ink-2); margin-top:.5em; text-align:left; }
   /* Отступа 1,2em маркеру не хватает: он выносится влево за пределы печатной
      области и обрезается по краю страницы. У списка выводов от «1.» оставалась
      одна точка, а в списке литературы обрезались бы и двузначные номера.
@@ -173,7 +264,8 @@ TEMPLATE = """<title>Графовый прогноз Красноярска</tit
   hr { border:0; border-top:1px solid var(--rule); margin:1.8em 0; }
 __MATHCSS__
   @media print {
-    @page { size:A4; margin:20mm; }
+    /* Поля по правилам журнала: низ, верх и левое 25 мм, правое 15 мм. */
+    @page { size:A4; margin:25mm 15mm 25mm 25mm; }
     .bar { display:none; }
     body { background:#fff; color:#000; font-size:12pt; line-height:1.5; }
     .wrap { max-width:none; padding:0; }
@@ -182,9 +274,14 @@ __MATHCSS__
     /* Журнальный набор: абзац задаётся отступом первой строки, а не пустой
        строкой между абзацами. Отбивка поверх полуторного интервала при полутора
        сотнях абзацев съедала около двух страниц. */
-    p { margin:0; text-indent:1.25em; text-align:justify; }
+    p { margin:0; text-indent:1cm; text-align:justify; }
+    /* Плотнее строка таблицы: на 30 строк пяти таблиц это целая полоса. */
+    th, td { padding:2px 8px; }
     h2 + p, h3 + p, table + p, figure + p, .mf + p, ul + p, ol + p { text-indent:0; }
     p + table, p + figure, p + .mf, p + ul, p + ol { margin-top:.7em; }
+    /* Список литературы набирается без отбивки между записями — при 32
+       записях она съедала полосу. */
+    li { margin-bottom:0; }
     table + p, figure + p, .mf + p, ul + p, ol + p { margin-top:.7em; }
     h2 { margin:1.2em 0 .4em; }
     h3 { margin:1em 0 .3em; }
