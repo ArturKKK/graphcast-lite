@@ -272,3 +272,7 @@ htmlcov/
 # Растровые рисунки для подачи в журнал: собираются из SVG
 # командой scripts/paper_figures_export.py, в репозитории не хранятся.
 docs/paper/figures/submission/
+
+# Корпус постобработки: 356 МБ, собирается 21 час на видеокарте
+# (scripts/postproc/_run_corpus_krsk.sh). Хранится вне репозитория.
+data/postproc/
