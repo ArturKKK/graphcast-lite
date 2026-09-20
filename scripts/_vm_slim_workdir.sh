@@ -11,9 +11,15 @@
 #
 # Запуск:  bash scripts/_vm_slim_workdir.sh          — только показать
 #          bash scripts/_vm_slim_workdir.sh --move   — перенести
+#
+# KEEP — что НЕ переносить, оставить в /workdir. По умолчанию это базовый
+# корпус постобработки: он весит 342 МБ, но собирался 21 час на видеокарте
+# (27.08.2026 14:33 -> 28.08 11:27), тогда как производные от него наборы
+# (окрестности, лаги, рельеф) пересчитываются из него за минуты.
 set -uo pipefail
 REPO=/workdir/graphcast-lite
-DEST=/data/workdir_offload
+DEST=${DEST:-/data/workdir_offload}
+KEEP=${KEEP:-corpus_krsk_2016_2020.parquet}
 # На виртуалке это $REPO; вне её работаем в текущем репозитории, чтобы скрипт
 # можно было прогнать вхолостую и посмотреть, что он посчитает кандидатами.
 [[ -d "$REPO" ]] && cd "$REPO"
@@ -28,6 +34,19 @@ candidates() {
       done | sed 's#/$##' | sort -u
 }
 
+# Внутрь каталога-кандидата спускаемся, если там лежит что-то из KEEP: иначе
+# перенос утащил бы вместе с дешёвыми производными и дорогой базовый корпус.
+expand() {
+  local p
+  while IFS= read -r p; do
+    if [[ -d "$p" && -n "$KEEP" ]] && find "$p" -maxdepth 1 -name "$KEEP" | grep -q .; then
+      find "$p" -maxdepth 1 -mindepth 1 ! -name "$KEEP"
+    else
+      printf '%s\n' "$p"
+    fi
+  done < <(candidates)
+}
+
 echo "занято в /workdir: $(du -sh /workdir 2>/dev/null | cut -f1) из 8 ГБ"
 echo
 echo "кандидаты на перенос (в data/, git их не отслеживает):"
@@ -39,7 +58,7 @@ while IFS= read -r p; do
   sz=$(du -sh "$p" 2>/dev/null | cut -f1)
   echo "    $sz  $p"
   found=1
-done < <(candidates)
+done < <(expand)
 [[ "$found" == 0 ]] && { echo "    нечего переносить"; exit 0; }
 
 if [[ "${1:-}" != "--move" ]]; then
@@ -55,7 +74,7 @@ while IFS= read -r p; do
   mkdir -p "$(dirname "$tgt")"
   echo "перенос: $p -> $tgt"
   mv "$p" "$tgt" && ln -s "$tgt" "$p"
-done < <(candidates)
+done < <(expand)
 echo
 echo "стало в /workdir: $(du -sh /workdir 2>/dev/null | cut -f1)"
 echo "ВНИМАНИЕ: /data стирается при рестарте — перенесённое придётся качать заново"
