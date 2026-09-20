@@ -94,3 +94,22 @@ def test_no_orphan_or_dangling_references():
 def test_reference_numbers_are_contiguous():
     ru, _, _ = references()
     assert ru == set(range(1, len(ru) + 1)), f"дыра в нумерации: {sorted(ru)}"
+
+
+def test_saved_run_metrics_are_actually_tracked():
+    """Посрочные метрики обязаны лежать в git, несмотря на *.npz в .gitignore.
+
+    20.09.2026 новые прогоны не доехали в репозиторий: scripts/_vm_save_runs.sh
+    делал `git add` без -f, gitignore отсекал их молча, и скрипт рапортовал
+    «нового нет». Проверяем, что и раньше сохранённое отслеживается, и что в
+    скрипте стоит -f.
+    """
+    import subprocess
+    tracked = subprocess.run(
+        ["git", "ls-files", "docs/paper/runs"], cwd=ROOT,
+        capture_output=True, text=True).stdout.splitlines()
+    npz = [f for f in tracked if f.endswith("_samples.npz")]
+    assert len(npz) > 100, f"посрочных метрик в git всего {len(npz)} — их вымыло gitignore"
+
+    saver = (ROOT / "scripts" / "_vm_save_runs.sh").read_text()
+    assert "git add -f" in saver, "без -f новые прогоны в репозиторий не попадут"
