@@ -276,3 +276,34 @@ def test_per_sample_acc_terms_without_weights():
     assert store["acc_num_global"][0, 0, 0] == pytest.approx(14.0)
     assert store["acc_ff_global"][0, 0, 0] == pytest.approx(20.0)
     assert store["acc_aa_global"][0, 0, 0] == pytest.approx(10.0)
+
+
+def test_per_sample_weighted_mse_aggregates_to_the_streaming_value():
+    """Взвешенный посрочный MSE обязан свернуться в ту же величину.
+
+    20.09.2026 прогоны шли с --lat-weight, но в npz клался невзвешенный
+    посрочный MSE: агрегат из файла давал 74,55 %, а лог того же прогона —
+    74,36 %. То есть в таблицу пошло бы одно число, а доверительный интервал
+    считался бы для другого, и заметить это можно было только сверкой руками.
+    """
+    _wmean, = _from_predict("_wmean")
+    rng = np.random.default_rng(20260921)
+    G, C, N, P = 7, 3, 4, 2
+    w = np.abs(rng.normal(size=G)) + 0.5
+    m = StreamingMetrics(C, node_weights=w)
+    acc = []
+    for _ in range(N):
+        y = rng.normal(size=(G, C * P))
+        p_ = y + rng.normal(size=(G, C * P)) * 0.4
+        m.update(y, p_)
+        for h in range(P):
+            sl = slice(h * C, (h + 1) * C)
+            d2 = (p_[:, sl] - y[:, sl]) ** 2
+            acc.append(_wmean(d2, w))
+    assert np.mean(acc) == pytest.approx(m.mse, rel=1e-9)
+
+
+def test_unweighted_wmean_is_a_plain_mean():
+    _wmean, = _from_predict("_wmean")
+    d2 = np.array([[1.0, 3.0], [3.0, 5.0]])
+    assert _wmean(d2, None) == pytest.approx([2.0, 4.0])

@@ -237,6 +237,14 @@ def _acc_terms(store, scope, i, p, y_true, y_pred, clim, w):
     store[f"acc_aa_{scope}"][i, p, :] = (ww * aa ** 2).sum(axis=0)
 
 
+def _wmean(d2, w):
+    """Средний квадрат ошибки по узлам: взвешенный, если веса заданы."""
+    if w is None:
+        return d2.mean(axis=0)
+    ww = np.asarray(w)[:, None]
+    return (ww * d2).sum(axis=0) / float(np.asarray(w).sum())
+
+
 def latitude_weights(lats: np.ndarray) -> np.ndarray:
     """Веса cos(широта), нормированные на единичное среднее.
 
@@ -694,6 +702,15 @@ def main():
                 for _k in ("num", "ff", "aa"):
                     sample_metrics[f"acc_{_k}_{_sc}"] = np.zeros(
                         (_n_samples, AR_STEPS, C), dtype=np.float64)
+        # Взвешенный вариант — отдельными массивами. Невзвешенный сохраняем
+        # всегда: по нему сопоставимы 1150 прогонов, уже лежащих в
+        # docs/paper/runs. А без взвешенного доверительный интервал считался бы
+        # для другой величины, чем публикуемая в таблице, — незаметно и неверно.
+        if w_glob is not None:
+            for _sc in (["global", "region"] if region_idxs is not None else ["global"]):
+                for _kind in ("pred", "base"):
+                    sample_metrics[f"wmse_{_kind}_{_sc}"] = np.zeros(
+                        (_n_samples, AR_STEPS, C), dtype=np.float64)
         print(f"[metrics] per-sample MSE будут сохранены в {args.save_sample_metrics}")
 
     # --- accumulate predictions (if --save) ---
@@ -943,14 +960,22 @@ def main():
             if sample_metrics is not None:
                 for p in range(effective_P):
                     sl = slice(p * C, (p + 1) * C)
-                    se_g = (out_cpu[:, sl] - y_cpu[:, sl]).pow(2).mean(dim=0)   # [C]
-                    sb_g = (bl_cpu[:, sl] - y_cpu[:, sl]).pow(2).mean(dim=0)
-                    sample_metrics["mse_pred_global"][i, p, :] = se_g.numpy()
-                    sample_metrics["mse_base_global"][i, p, :] = sb_g.numpy()
+                    d2p_g = np.asarray((out_cpu[:, sl] - y_cpu[:, sl]).pow(2))
+                    d2b_g = np.asarray((bl_cpu[:, sl] - y_cpu[:, sl]).pow(2))
+                    sample_metrics["mse_pred_global"][i, p, :] = _wmean(d2p_g, None)
+                    sample_metrics["mse_base_global"][i, p, :] = _wmean(d2b_g, None)
+                    if w_glob is not None:
+                        sample_metrics["wmse_pred_global"][i, p, :] = _wmean(d2p_g, w_glob)
+                        sample_metrics["wmse_base_global"][i, p, :] = _wmean(d2b_g, w_glob)
                     if region_idxs is not None:
                         yr, orr, br = y_cpu[region_idxs], out_cpu[region_idxs], bl_cpu[region_idxs]
-                        sample_metrics["mse_pred_region"][i, p, :] = (orr[:, sl] - yr[:, sl]).pow(2).mean(dim=0).numpy()
-                        sample_metrics["mse_base_region"][i, p, :] = (br[:, sl] - yr[:, sl]).pow(2).mean(dim=0).numpy()
+                        d2p_r = np.asarray((orr[:, sl] - yr[:, sl]).pow(2))
+                        d2b_r = np.asarray((br[:, sl] - yr[:, sl]).pow(2))
+                        sample_metrics["mse_pred_region"][i, p, :] = _wmean(d2p_r, None)
+                        sample_metrics["mse_base_region"][i, p, :] = _wmean(d2b_r, None)
+                        if w_reg is not None:
+                            sample_metrics["wmse_pred_region"][i, p, :] = _wmean(d2p_r, w_reg)
+                            sample_metrics["wmse_base_region"][i, p, :] = _wmean(d2b_r, w_reg)
                     if cl_all is not None:
                         _acc_terms(sample_metrics, "global", i, p,
                                    np.asarray(y_cpu[:, sl]), np.asarray(out_cpu[:, sl]),

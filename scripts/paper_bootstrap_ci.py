@@ -76,7 +76,26 @@ def dynamic_channels(variables) -> list:
     return [i for i, v in enumerate(variables) if v not in STATIC_FORCING]
 
 
-def agg_terms(d: dict, scope: str, horizons: list) -> tuple:
+def mse_key(d: dict, kind: str, scope: str, weighted) -> str:
+    """Имя массива посрочных MSE: взвешенный, если он в прогоне есть.
+
+    Прогон с --lat-weight кладёт и невзвешенный mse_* (по нему сопоставимы
+    старые прогоны), и взвешенный wmse_*. Публикуемая в таблице величина —
+    взвешенная, поэтому и интервал должен считаться по ней; иначе точка и
+    интервал окажутся о разных величинах.
+    """
+    w = f"wmse_{kind}_{scope}"
+    plain = f"mse_{kind}_{scope}"
+    if weighted is True:
+        if w not in d:
+            raise SystemExit(f"в прогоне нет {w}: он считался без --lat-weight")
+        return w
+    if weighted is False:
+        return plain
+    return w if w in d else plain
+
+
+def agg_terms(d: dict, scope: str, horizons: list, weighted=None) -> tuple:
     """Посрочные вклады в агрегатную ошибку прогноза и эталона.
 
     Агрегат считается в НОРМИРОВАННЫХ единицах по всем динамическим каналам и
@@ -86,8 +105,10 @@ def agg_terms(d: dict, scope: str, horizons: list) -> tuple:
     """
     ch = dynamic_channels(d["variables"])
     hs = [h - 1 for h in horizons]
-    pred = d[f"mse_pred_{scope}"][:, hs][:, :, ch].mean(axis=(1, 2))
-    base = d[f"mse_base_{scope}"][:, hs][:, :, ch].mean(axis=(1, 2))
+    kp = mse_key(d, "pred", scope, weighted)
+    kb = mse_key(d, "base", scope, weighted)
+    pred = d[kp][:, hs][:, :, ch].mean(axis=(1, 2))
+    base = d[kb][:, hs][:, :, ch].mean(axis=(1, 2))
     return pred, base
 
 
@@ -164,6 +185,9 @@ def main():
     ap.add_argument("--scope", default="region", choices=["region", "global"])
     ap.add_argument("--horizons", type=int, nargs="*", default=None,
                     help="номера шагов (1-based); по умолчанию все")
+    ap.add_argument("--unweighted", action="store_true",
+                    help="считать по невзвешенным посрочным MSE, даже если в "
+                         "прогоне есть взвешенные (для сравнения со старыми)")
     ap.add_argument("--acc", action="store_true",
                     help="считать ACC против климатологии вместо RMSE "
                          "(прогон должен быть сделан с --climatology)")
@@ -179,7 +203,8 @@ def main():
     if a.var == "aggregate":
         H_all = A[key].shape[1]
         hs = a.horizons or list(range(1, H_all + 1))
-        pa, ba = agg_terms(A, a.scope, hs)
+        wq = False if a.unweighted else None
+        pa, ba = agg_terms(A, a.scope, hs, wq)
         print(f"# Бутстреп-ДИ (95%), блок {a.block} сроков "
               f"({a.block*6/24:.0f} сут), {a.reps} реплик")
         print(f"# файл: {Path(a.npz).name}"
@@ -194,7 +219,7 @@ def main():
             print(f"| S, % | {p:.2f} | [{lo:.2f}, {hi:.2f}] |")
         else:
             B = load(Path(a.vs))
-            pb, bb = agg_terms(B, a.scope, hs)
+            pb, bb = agg_terms(B, a.scope, hs, wq)
             sa, sb = skill(pa, ba), skill(pb, bb)
             p, lo, hi = skill_diff_ci(pa, ba, pb, bb, a.block, a.reps)
             sign = "ДА" if (lo > 0) == (hi > 0) else "нет"
@@ -226,6 +251,11 @@ def main():
 
     B = load(Path(a.vs)) if a.vs else None
     unit = "°C" if a.var == "t2m" or a.var.startswith("t@") else ""
+    _w = False if a.unweighted else None
+    kA = mse_key(A, "pred", a.scope, _w)
+    kB = mse_key(B, "pred", a.scope, _w) if B else None
+    if kA.startswith("w"):
+        print("# метрика взвешена по cos(широта)")
 
     print(f"# Бутстреп-ДИ (95%), блок {a.block} сроков ({a.block*6/24:.0f} сут), {a.reps} реплик")
     print(f"# файл: {Path(a.npz).name}" + (f"  против {Path(a.vs).name}" if B else ""))
@@ -235,17 +265,16 @@ def main():
         print(f"| горизонт | RMSE, {unit or 'ед.'} | 95% ДИ |")
         print("|---|---:|---|")
         for h in horizons:
-            v = A[key][:, h - 1, ch] * std[ch] ** 2   # (N,) квадраты ошибок в физ. ед.
+            v = A[kA][:, h - 1, ch] * std[ch] ** 2   # (N,) квадраты ошибок в физ. ед.
             p, lo, hi = ci(v, a.block, a.reps)
             print(f"| +{h*6} ч | {p:.3f} | [{lo:.3f}, {hi:.3f}] |")
     else:
-        keyB = f"mse_pred_{a.scope}"
         chB = B["variables"].index(a.var)
         print(f"| горизонт | A | B | разность B−A | 95% ДИ разности | значимо |")
         print("|---|---:|---:|---:|---|---|")
         for h in horizons:
-            va = A[key][:, h - 1, ch] * std[ch] ** 2
-            vb = B[keyB][:, h - 1, chB] * B["std"][chB] ** 2
+            va = A[kA][:, h - 1, ch] * std[ch] ** 2
+            vb = B[kB][:, h - 1, chB] * B["std"][chB] ** 2
             pa = np.sqrt(va.mean()); pb = np.sqrt(vb.mean())
             p, lo, hi = diff_ci(va, vb, a.block, a.reps)
             sig = "да" if (lo > 0 or hi < 0) else "нет"
