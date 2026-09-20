@@ -222,6 +222,21 @@ class Climatology:
             [self.field(t_offset, p, node_idx) for p in range(n_horizons)], axis=1)
 
 
+def _acc_terms(store, scope, i, p, y_true, y_pred, clim, w):
+    """Слагаемые ACC за один срок и горизонт: числитель и оба знаменателя.
+
+    Складываются раздельно, потому что ACC — отношение сумм по срокам, а не
+    среднее корреляций. Для бутстрепа этого достаточно: реплика пересобирает
+    суммы по своим срокам и делит уже их.
+    """
+    fa = y_pred.astype(np.float64) - clim
+    aa = y_true.astype(np.float64) - clim
+    ww = 1.0 if w is None else np.asarray(w)[:, None]
+    store[f"acc_num_{scope}"][i, p, :] = (ww * fa * aa).sum(axis=0)
+    store[f"acc_ff_{scope}"][i, p, :] = (ww * fa ** 2).sum(axis=0)
+    store[f"acc_aa_{scope}"][i, p, :] = (ww * aa ** 2).sum(axis=0)
+
+
 def latitude_weights(lats: np.ndarray) -> np.ndarray:
     """Веса cos(широта), нормированные на единичное среднее.
 
@@ -669,6 +684,16 @@ def main():
         if region_idxs is not None:
             sample_metrics["mse_pred_region"] = np.zeros((_n_samples, AR_STEPS, C), dtype=np.float64)
             sample_metrics["mse_base_region"] = np.zeros((_n_samples, AR_STEPS, C), dtype=np.float64)
+        # Слагаемые ACC посрочно. ACC — отношение сумм, поэтому усреднить
+        # готовые корреляции нельзя: для доверительного интервала нужны именно
+        # числитель и оба знаменателя по каждому сроку. Не сохранив их здесь,
+        # интервал для ACC уже не получить иначе как повторным инференсом — на
+        # этом мы один раз обожглись с серией усвоения.
+        if clim is not None:
+            for _sc in (["global", "region"] if region_idxs is not None else ["global"]):
+                for _k in ("num", "ff", "aa"):
+                    sample_metrics[f"acc_{_k}_{_sc}"] = np.zeros(
+                        (_n_samples, AR_STEPS, C), dtype=np.float64)
         print(f"[metrics] per-sample MSE будут сохранены в {args.save_sample_metrics}")
 
     # --- accumulate predictions (if --save) ---
@@ -926,6 +951,15 @@ def main():
                         yr, orr, br = y_cpu[region_idxs], out_cpu[region_idxs], bl_cpu[region_idxs]
                         sample_metrics["mse_pred_region"][i, p, :] = (orr[:, sl] - yr[:, sl]).pow(2).mean(dim=0).numpy()
                         sample_metrics["mse_base_region"][i, p, :] = (br[:, sl] - yr[:, sl]).pow(2).mean(dim=0).numpy()
+                    if cl_all is not None:
+                        _acc_terms(sample_metrics, "global", i, p,
+                                   np.asarray(y_cpu[:, sl]), np.asarray(out_cpu[:, sl]),
+                                   cl_all[:, sl], w_glob)
+                        if region_idxs is not None:
+                            _acc_terms(sample_metrics, "region", i, p,
+                                       np.asarray(y_cpu[region_idxs][:, sl]),
+                                       np.asarray(out_cpu[region_idxs][:, sl]),
+                                       cl_reg[:, sl], w_reg)
                 if hasattr(test_ds, "_sample_indices") and i < len(test_ds._sample_indices):
                     sample_metrics["t_offset"][i] = test_ds._sample_indices[i][1]
 

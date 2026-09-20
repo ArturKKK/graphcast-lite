@@ -234,3 +234,45 @@ def test_climatology_rejects_too_few_channels(clim_file):
     f, _ = clim_file
     with pytest.raises(SystemExit, match="каналов"):
         Climatology(f, n_channels=5)
+
+
+# --------------------------------------------------------------------------
+# Посрочные слагаемые ACC (для доверительных интервалов)
+# --------------------------------------------------------------------------
+
+def test_per_sample_acc_terms_sum_to_the_streaming_value():
+    """Сумма посрочных слагаемых обязана дать ровно тот же ACC.
+
+    Иначе интервал считался бы по одной величине, а в таблицу шла бы другая —
+    расхождение, которое глазами не поймать.
+    """
+    _acc_terms, = _from_predict("_acc_terms")
+    rng = np.random.default_rng(20260920)
+    G, C, N = 6, 2, 5
+    w = np.abs(rng.normal(size=G)) + 0.1
+
+    store = {f"acc_{k}_region": np.zeros((N, 1, C)) for k in ("num", "ff", "aa")}
+    m = StreamingMetrics(C, node_weights=w)
+    for i in range(N):
+        y = rng.normal(size=(G, C))
+        p_ = y + rng.normal(size=(G, C)) * 0.3
+        c = rng.normal(size=(G, C)) * 0.5
+        m.update(y, p_, clim=c)
+        _acc_terms(store, "region", i, 0, y, p_, c, w)
+
+    num = store["acc_num_region"].sum(axis=(0, 1))
+    den = np.sqrt(store["acc_ff_region"].sum(axis=(0, 1)) * store["acc_aa_region"].sum(axis=(0, 1)))
+    assert (num / den) == pytest.approx(m.acc_per_channel, rel=1e-9)
+
+
+def test_per_sample_acc_terms_without_weights():
+    _acc_terms, = _from_predict("_acc_terms")
+    store = {f"acc_{k}_global": np.zeros((1, 1, 1)) for k in ("num", "ff", "aa")}
+    y = np.array([[2.0], [4.0]])
+    p_ = np.array([[3.0], [5.0]])
+    c = np.array([[1.0], [1.0]])
+    _acc_terms(store, "global", 0, 0, y, p_, c, None)
+    # fa = (2,4), aa = (1,3) → num = 2+12 = 14
+    assert store["acc_num_global"][0, 0, 0] == pytest.approx(14.0)
+    assert store["acc_ff_global"][0, 0, 0] == pytest.approx(20.0)
+    assert store["acc_aa_global"][0, 0, 0] == pytest.approx(10.0)

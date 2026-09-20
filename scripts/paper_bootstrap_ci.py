@@ -122,6 +122,39 @@ def skill_diff_ci(pa, ba, pb, bb, block, reps, seed=0):
     return point, lo, hi
 
 
+def acc_terms(d: dict, scope: str, horizons: list, ch: int) -> tuple:
+    """Посрочные слагаемые ACC одного канала: (числитель, ff, aa).
+
+    ACC — отношение сумм, а не среднее корреляций, поэтому реплика бутстрепа
+    обязана пересобрать суммы по своим срокам и поделить уже их.
+    """
+    need = [f"acc_{k}_{scope}" for k in ("num", "ff", "aa")]
+    missing = [k for k in need if k not in d]
+    if missing:
+        raise SystemExit(
+            f"в прогоне нет {missing}: он считался без --climatology, "
+            f"и ACC из него не восстановить")
+    hs = [h - 1 for h in horizons]
+    return tuple(d[k][:, hs, ch].sum(axis=1) for k in need)
+
+
+def acc(num, ff, aa) -> float:
+    den = np.sqrt(ff.sum() * aa.sum())
+    return float(num.sum() / den) if den > 0 else float("nan")
+
+
+def acc_ci(num, ff, aa, block, reps, seed=0):
+    rng = np.random.default_rng(seed)
+    n = num.shape[0]
+    point = acc(num, ff, aa)
+    vals = np.empty(reps)
+    for r in range(reps):
+        idx = block_indices(n, block, rng)
+        vals[r] = acc(num[idx], ff[idx], aa[idx])
+    lo, hi = np.percentile(vals, [2.5, 97.5])
+    return point, lo, hi
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("npz")
@@ -131,6 +164,9 @@ def main():
     ap.add_argument("--scope", default="region", choices=["region", "global"])
     ap.add_argument("--horizons", type=int, nargs="*", default=None,
                     help="номера шагов (1-based); по умолчанию все")
+    ap.add_argument("--acc", action="store_true",
+                    help="считать ACC против климатологии вместо RMSE "
+                         "(прогон должен быть сделан с --climatology)")
     ap.add_argument("--block", type=int, default=20, help="длина блока в сроках (20 = 5 суток)")
     ap.add_argument("--reps", type=int, default=2000)
     a = ap.parse_args()
@@ -169,6 +205,22 @@ def main():
 
     ch = A["variables"].index(a.var)
     std = A["std"]
+
+    if a.acc:
+        H_all = A[key].shape[1]
+        hs = a.horizons or list(range(1, H_all + 1))
+        print(f"# Бутстреп-ДИ (95%), блок {a.block} сроков, {a.reps} реплик")
+        print(f"# файл: {Path(a.npz).name}, канал {a.var}, область {a.scope}\n")
+        print("| горизонт | ACC | 95% ДИ |")
+        print("|---|---:|---|")
+        for h in hs:
+            n_, f_, aa_ = acc_terms(A, a.scope, [h], ch)
+            pnt, lo, hi = acc_ci(n_, f_, aa_, a.block, a.reps)
+            print(f"| +{h*6} ч | {pnt:.4f} | [{lo:.4f}, {hi:.4f}] |")
+        n_, f_, aa_ = acc_terms(A, a.scope, hs, ch)
+        pnt, lo, hi = acc_ci(n_, f_, aa_, a.block, a.reps)
+        print(f"| все | {pnt:.4f} | [{lo:.4f}, {hi:.4f}] |")
+        return
     H = A[key].shape[1]
     horizons = a.horizons or list(range(1, H + 1))
 
