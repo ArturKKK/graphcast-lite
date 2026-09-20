@@ -32,6 +32,18 @@ COEF=$HEAVY/clim_coef_krsk.npz   # около 180 МБ, поэтому не в /
 
 mkdir -p "$OUT" "$HEAVY"
 MASTER="$OUT/acc_master.log"
+
+# Замок на весь раннер. 20.09.2026 батч шёл в двух копиях: pkill снял только
+# python, а родительский скрипт выжил и поехал дальше, поверх него запустили
+# второй. Две копии делят одну карту — прогон растянулся с 40 минут до двух
+# часов, и обе писали в один npz.
+LOCK=$OUT/.acc_batch.lock
+exec 9>"$LOCK"
+if ! flock -n 9; then
+  echo "[$(date '+%d.%m %H:%M:%S')] батч уже идёт (замок $LOCK) — выхожу" >> "$MASTER"
+  exit 0
+fi
+trap 'flock -u 9' EXIT
 exec >>"$MASTER" 2>&1
 cd "$REPO" || exit 1
 source "$VENV/bin/activate"
