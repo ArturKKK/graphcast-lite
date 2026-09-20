@@ -7,6 +7,8 @@ import os
 import sys
 from pathlib import Path
 import torch
+from datetime import datetime, timedelta
+
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +20,7 @@ from src.config import ExperimentConfig
 from src.utils import load_from_json_file
 from src.data.dataloader import load_train_and_test_datasets
 from src.data.dataloader_chunked import load_chunked_datasets
+from paper_climatology import design_row  # noqa: E402
 from src.main import load_model_from_experiment_config
 
 # --- ИМПОРТЫ АЛГОРИТМОВ УСВОЕНИЯ ---
@@ -51,52 +54,106 @@ def read_coords(meta, data_dir: Path):
 
 # ====================== STREAMING METRICS ======================
 class StreamingMetrics:
-    """Накапливает MSE/MAE/ACC потоково — без хранения всех сэмплов в RAM."""
+    """Накапливает MSE/MAE/ACC потоково — без хранения всех сэмплов в RAM.
 
-    def __init__(self, num_channels: int, exclude_channels: list = None):
+    Считает на numpy, а не на torch. Метрике нужны только суммы по узлам, и
+    привязка к torch мешала её проверять: настоящего torch нет ни на ноутбуке,
+    ни в быстрой прогонке, а заглушка из tests/conftest.py не умеет ни .pow(),
+    ни .float(). Тензоры приходят уже с процессора, так что перевод — это view
+    без копирования.
+
+    Широтное взвешивание. Ячейка широтно-долготной сетки на 60° с.ш. вдвое
+    у́же экваториальной, и равные веса узлов завышают вклад высоких широт.
+    Протокол WeatherBench 2 требует веса cos(широта). Передаются в
+    node_weights; None — прежнее поведение с равными весами.
+
+    ACC. Без климатологии считается прежняя величина — корреляция после
+    вычитания СРЕДНЕГО ПО ОБЛАСТИ. Это не ACC: сезонный ход общий у прогноза
+    и у истины, и, не убрав его, получаешь завышенную оценку. Настоящая
+    аномальная корреляция требует поля климатологии на тот же срок:
+        ACC = sum w (f-c)(a-c) / sqrt( sum w (f-c)^2 * sum w (a-c)^2 ),
+    где f — прогноз, a — истина, c — климатология, w — широтный вес.
+    Числитель и знаменатели копятся раздельно: усреднять корреляции по срокам
+    неверно, протокол требует отношения сумм.
+    """
+
+    def __init__(self, num_channels: int, exclude_channels: list = None,
+                 node_weights=None):
         self.C = num_channels
         self.exclude_channels = set(exclude_channels or [])
         self.n = 0
-        self.total_elem = 0
+        self.total_elem = 0.0
         self.sum_se = 0.0
         self.sum_ae = 0.0
         self.sum_se_per_ch = np.zeros(num_channels, dtype=np.float64)
-        self.elem_per_ch = np.zeros(num_channels, dtype=np.int64)
+        self.elem_per_ch = np.zeros(num_channels, dtype=np.float64)
         self.sum_acc = np.zeros(num_channels, dtype=np.float64)
         self.acc_count = np.zeros(num_channels, dtype=np.int64)
+        self.acc_num = np.zeros(num_channels, dtype=np.float64)
+        self.acc_ff = np.zeros(num_channels, dtype=np.float64)
+        self.acc_aa = np.zeros(num_channels, dtype=np.float64)
+        self.w = None if node_weights is None else np.asarray(node_weights, dtype=np.float64)
 
-    def update(self, y_true: torch.Tensor, y_pred: torch.Tensor):
-        """y_true, y_pred: [G, C*P] or [G, C]"""
-        err = y_pred.float() - y_true.float()
+    @staticmethod
+    def _np(a):
+        return np.asarray(a, dtype=np.float64)
 
-        # per-channel SE & spatial ACC (накапливаем для ВСЕХ каналов)
-        CP = y_true.shape[1]
+    def update(self, y_true, y_pred, clim=None):
+        """y_true, y_pred, clim: [G, C*P] либо [G, C]."""
+        yt_all = self._np(y_true)
+        yp_all = self._np(y_pred)
+        cl_all = None if clim is None else self._np(clim)
+        G, CP = yt_all.shape
+
+        w = self.w
+        if w is not None and w.shape[0] != G:
+            raise ValueError(f"весов {w.shape[0]}, узлов {G} — маска узлов разошлась с весами")
+        wsum = float(w.sum()) if w is not None else float(G)
         eps = 1e-8
+
+        d2_all = (yp_all - yt_all) ** 2
         for c in range(CP):
-            yt = y_true[:, c].float()
-            yp = y_pred[:, c].float()
             ch = c % self.C
-            se_c = (yp - yt).pow(2).sum().item()
-            self.sum_se_per_ch[ch] += se_c
-            self.elem_per_ch[ch] += yt.numel()
-            yt_a = yt - yt.mean()
-            yp_a = yp - yp.mean()
-            corr = (yt_a * yp_a).sum() / (yt_a.norm() * yp_a.norm() + eps)
-            self.sum_acc[ch] += corr.item()
+            d2 = d2_all[:, c]
+            self.sum_se_per_ch[ch] += float(d2.sum() if w is None else (d2 * w).sum())
+            self.elem_per_ch[ch] += wsum
+
+            if cl_all is None:
+                yt, yp = yt_all[:, c], yp_all[:, c]
+                yt_a, yp_a = yt - yt.mean(), yp - yp.mean()
+                den = np.linalg.norm(yt_a) * np.linalg.norm(yp_a) + eps
+                self.sum_acc[ch] += float((yt_a * yp_a).sum() / den)
+            else:
+                cc = cl_all[:, c]
+                fa, aa = yp_all[:, c] - cc, yt_all[:, c] - cc
+                if w is None:
+                    self.acc_num[ch] += float((fa * aa).sum())
+                    self.acc_ff[ch] += float((fa ** 2).sum())
+                    self.acc_aa[ch] += float((aa ** 2).sum())
+                else:
+                    self.acc_num[ch] += float((w * fa * aa).sum())
+                    self.acc_ff[ch] += float((w * fa ** 2).sum())
+                    self.acc_aa[ch] += float((w * aa ** 2).sum())
             self.acc_count[ch] += 1
 
         # aggregate: только dynamic каналы (без excluded)
-        dyn_mask = [c for c in range(CP) if (c % self.C) not in self.exclude_channels]
-        if dyn_mask:
-            err_dyn = err[:, dyn_mask]
-            self.sum_se += err_dyn.pow(2).sum().item()
-            self.sum_ae += err_dyn.abs().sum().item()
-            self.total_elem += err_dyn.numel()
+        dyn = [c for c in range(CP) if (c % self.C) not in self.exclude_channels]
+        if dyn:
+            err = yp_all[:, dyn] - yt_all[:, dyn]
+            if w is None:
+                self.sum_se += float((err ** 2).sum())
+                self.sum_ae += float(np.abs(err).sum())
+                self.total_elem += float(err.size)
+            else:
+                ww = w[:, None]
+                self.sum_se += float((err ** 2 * ww).sum())
+                self.sum_ae += float((np.abs(err) * ww).sum())
+                self.total_elem += wsum * len(dyn)
         self.n += 1
 
     @property
     def mse(self):
-        return self.sum_se / max(self.total_elem, 1)
+        return self.sum_se / max(self.total_elem, 1e-12)
 
     @property
     def rmse(self):
@@ -104,16 +161,25 @@ class StreamingMetrics:
 
     @property
     def mae(self):
-        return self.sum_ae / max(self.total_elem, 1)
+        return self.sum_ae / max(self.total_elem, 1e-12)
+
+    @property
+    def acc_is_true(self) -> bool:
+        """Правда ли, что ACC посчитан против климатологии."""
+        return bool(self.acc_num.any())
 
     @property
     def acc_per_channel(self):
+        """ACC против климатологии, если она подавалась; иначе прежняя величина."""
+        if self.acc_is_true:
+            den = np.sqrt(self.acc_ff * self.acc_aa)
+            return np.divide(self.acc_num, den, out=np.zeros_like(den), where=den > 0)
         return self.sum_acc / np.maximum(self.acc_count, 1)
 
     @property
     def rmse_per_channel(self):
         """Normalized RMSE per channel."""
-        mse_pc = self.sum_se_per_ch / np.maximum(self.elem_per_ch, 1)
+        mse_pc = self.sum_se_per_ch / np.maximum(self.elem_per_ch, 1e-12)
         return np.sqrt(mse_pc)
 
     @property
@@ -121,6 +187,53 @@ class StreamingMetrics:
         apc = self.acc_per_channel
         dyn = [c for c in range(self.C) if c not in self.exclude_channels]
         return float(apc[dyn].mean()) if dyn else 0.0
+
+
+class Climatology:
+    """Поле климатологии на произвольный срок по сохранённым гармоникам.
+
+    Коэффициенты считает scripts/paper_climatology.py (ключ --out-coef): три
+    годовые гармоники плюс суточный ход, подогнанные СТРОГО по обучающей части
+    выборки. Здесь они только разворачиваются обратно в поле — чтобы ACC
+    считался относительно климатологии, а не относительно среднего по области.
+    """
+
+    def __init__(self, path, n_channels: int):
+        z = np.load(path, allow_pickle=True)
+        self.coef = z["coef"].astype(np.float32)          # (K, узлы, каналы)
+        self.t0 = datetime.fromisoformat(str(z["time_start"]))
+        self.obs_window = int(z["obs_window"])
+        self.C = n_channels
+        if self.coef.shape[2] < n_channels:
+            raise SystemExit(
+                f"[clim] в {path} каналов {self.coef.shape[2]}, а модели нужно {n_channels}")
+
+    def field(self, t_offset: int, horizon: int, node_idx=None):
+        """Климатология на срок, соответствующий шагу horizon (с нуля)."""
+        # Тот же отсчёт, что в paper_climatology.py: окно наблюдений плюс шаг.
+        fi = int(t_offset) + self.obs_window + int(horizon)
+        x = design_row(self.t0 + timedelta(hours=6 * fi)).astype(np.float32)
+        f = np.tensordot(x, self.coef, axes=(0, 0))[:, :self.C]
+        return f if node_idx is None else f[node_idx]
+
+    def stacked(self, t_offset: int, n_horizons: int, node_idx=None):
+        """[узлы, C*P] — в том же порядке, в каком идут цели у даталоадера."""
+        return np.concatenate(
+            [self.field(t_offset, p, node_idx) for p in range(n_horizons)], axis=1)
+
+
+def latitude_weights(lats: np.ndarray) -> np.ndarray:
+    """Веса cos(широта), нормированные на единичное среднее.
+
+    Нормировка не меняет отношения ошибок, но оставляет RMSE в прежнем
+    масштабе: иначе взвешенная ошибка молча уехала бы вниз просто оттого, что
+    средний вес меньше единицы, и её нельзя было бы сравнить со старыми
+    числами.
+    """
+    w = np.cos(np.deg2rad(np.asarray(lats, dtype=np.float64)))
+    w = np.clip(w, 1e-6, None)
+    return w / w.mean()
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -143,6 +256,13 @@ def main():
                          "самостоятельно, в метрики идёт СРЕДНЕЕ по участникам. "
                          "Архитектура у всех должна совпадать.")
     ap.add_argument("--per-channel", action="store_true")
+    ap.add_argument("--lat-weight", action="store_true",
+                    help="взвешивать узлы на cos(широта), как требует протокол "
+                         "WeatherBench 2; по умолчанию веса равные")
+    ap.add_argument("--climatology", default=None,
+                    help="npz с коэффициентами гармоник (paper_climatology.py "
+                         "--out-coef): включает настоящий ACC вместо корреляции "
+                         "по отклонению от среднего по области")
     ap.add_argument("--ar-steps", type=int, default=None,
                     help="Число AR-шагов для авторегрессионного инференса. "
                          "Если модель одношаговая (P=1), можно прогнать N шагов, "
@@ -447,6 +567,30 @@ def main():
         region_idxs = region_node_indices(*args.region, lats, lons)
         print(f"[Region] {len(region_idxs)} nodes")
 
+    # --- широтные веса и климатология (после region_idxs: нужна его маска) ---
+    w_glob = w_reg = None
+    if args.lat_weight:
+        lats_all, _ = read_coords(meta, data_dir)
+        lats_all = np.asarray(lats_all)
+        if lats_all.ndim == 1 and lats_all.shape[0] != G:
+            # Регулярная сетка: координаты заданы осями, разворачиваем в узлы
+            # тем же порядком (lat-major), что и даталоадер.
+            _, la = np.meshgrid(np.arange(meta.num_longitudes), lats_all, indexing="xy")
+            lats_all = la.ravel()
+        if lats_all.shape[0] != G:
+            raise SystemExit(f"[lat-weight] широт {lats_all.shape[0]}, узлов {G} — не сходится")
+        w_glob = latitude_weights(lats_all)
+        if region_idxs is not None:
+            w_reg = latitude_weights(lats_all[region_idxs])
+        print(f"[lat-weight] веса cos(широта): по сетке {w_glob.min():.3f}..{w_glob.max():.3f}"
+              + (f", по области {w_reg.min():.3f}..{w_reg.max():.3f}" if w_reg is not None else ""))
+
+    clim = None
+    if args.climatology:
+        clim = Climatology(args.climatology, C)
+        print(f"[clim] коэффициенты из {args.climatology}: ACC считается против "
+              f"климатологии, а не против среднего по области")
+
     # --- OI init (после region_idxs, чтобы знать ROI) ---
     if _oi_pending:
         lats, lons = read_coords(meta, data_dir)
@@ -495,21 +639,21 @@ def main():
 
     # --- streaming metrics (без хранения всех тензоров) ---
     no_loss_ch = sorted(set(static_ch) | set(forcing_ch))
-    sm_pred = StreamingMetrics(C, exclude_channels=no_loss_ch)
-    sm_base = StreamingMetrics(C, exclude_channels=no_loss_ch)
-    sm_pred_r = StreamingMetrics(C, exclude_channels=no_loss_ch) if region_idxs is not None else None
-    sm_base_r = StreamingMetrics(C, exclude_channels=no_loss_ch) if region_idxs is not None else None
+    sm_pred = StreamingMetrics(C, exclude_channels=no_loss_ch, node_weights=w_glob)
+    sm_base = StreamingMetrics(C, exclude_channels=no_loss_ch, node_weights=w_glob)
+    sm_pred_r = StreamingMetrics(C, exclude_channels=no_loss_ch, node_weights=w_reg) if region_idxs is not None else None
+    sm_base_r = StreamingMetrics(C, exclude_channels=no_loss_ch, node_weights=w_reg) if region_idxs is not None else None
 
     sm_pred_rh, sm_base_rh = [], []  # per-horizon region metrics
 
     sm_pred_h, sm_base_h = [], []
     if AR_STEPS > 1:
         for _ in range(AR_STEPS):
-            sm_pred_h.append(StreamingMetrics(C, exclude_channels=no_loss_ch))
-            sm_base_h.append(StreamingMetrics(C, exclude_channels=no_loss_ch))
+            sm_pred_h.append(StreamingMetrics(C, exclude_channels=no_loss_ch, node_weights=w_glob))
+            sm_base_h.append(StreamingMetrics(C, exclude_channels=no_loss_ch, node_weights=w_glob))
             if region_idxs is not None:
-                sm_pred_rh.append(StreamingMetrics(C, exclude_channels=no_loss_ch))
-                sm_base_rh.append(StreamingMetrics(C, exclude_channels=no_loss_ch))
+                sm_pred_rh.append(StreamingMetrics(C, exclude_channels=no_loss_ch, node_weights=w_reg))
+                sm_base_rh.append(StreamingMetrics(C, exclude_channels=no_loss_ch, node_weights=w_reg))
     if no_loss_ch:
         print(f"[metrics] Исключены из aggregate метрик: каналы {no_loss_ch} (static+forcing)")
 
@@ -739,23 +883,35 @@ def main():
             if bl_cpu.shape[-1] > y_cpu.shape[-1]:
                 bl_cpu = bl_cpu[:, :y_cpu.shape[-1]]
 
-            sm_pred.update(y_cpu, out_cpu)
-            sm_base.update(y_cpu, bl_cpu)
+            # Климатология на сроки этого прогноза: нужна для настоящего ACC.
+            cl_all = cl_reg = None
+            if clim is not None:
+                _toff = (test_ds._sample_indices[i][1]
+                         if hasattr(test_ds, "_sample_indices") and i < len(test_ds._sample_indices)
+                         else i)
+                cl_all = clim.stacked(_toff, effective_P)
+                if region_idxs is not None:
+                    cl_reg = cl_all[region_idxs]
+
+            sm_pred.update(y_cpu, out_cpu, clim=cl_all)
+            sm_base.update(y_cpu, bl_cpu, clim=cl_all)
 
             if effective_P > 1:
                 for p in range(effective_P):
                     sl = slice(p*C, (p+1)*C)
-                    sm_pred_h[p].update(y_cpu[:, sl], out_cpu[:, sl])
-                    sm_base_h[p].update(y_cpu[:, sl], bl_cpu[:, sl])
+                    _c = None if cl_all is None else cl_all[:, sl]
+                    sm_pred_h[p].update(y_cpu[:, sl], out_cpu[:, sl], clim=_c)
+                    sm_base_h[p].update(y_cpu[:, sl], bl_cpu[:, sl], clim=_c)
 
             if region_idxs is not None:
-                sm_pred_r.update(y_cpu[region_idxs], out_cpu[region_idxs])
-                sm_base_r.update(y_cpu[region_idxs], bl_cpu[region_idxs])
+                sm_pred_r.update(y_cpu[region_idxs], out_cpu[region_idxs], clim=cl_reg)
+                sm_base_r.update(y_cpu[region_idxs], bl_cpu[region_idxs], clim=cl_reg)
                 if effective_P > 1:
                     for p in range(effective_P):
                         sl = slice(p*C, (p+1)*C)
-                        sm_pred_rh[p].update(y_cpu[region_idxs][:, sl], out_cpu[region_idxs][:, sl])
-                        sm_base_rh[p].update(y_cpu[region_idxs][:, sl], bl_cpu[region_idxs][:, sl])
+                        _cr = None if cl_reg is None else cl_reg[:, sl]
+                        sm_pred_rh[p].update(y_cpu[region_idxs][:, sl], out_cpu[region_idxs][:, sl], clim=_cr)
+                        sm_base_rh[p].update(y_cpu[region_idxs][:, sl], bl_cpu[region_idxs][:, sl], clim=_cr)
 
             # --- per-sample метрики для бутстрепа доверительных интервалов ---
             # Компактно (~1 МБ на прогон) в отличие от --save (десятки ГБ полей).

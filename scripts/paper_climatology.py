@@ -98,6 +98,9 @@ def main():
     ap.add_argument("--samples", required=True,
                     help="npz от predict.py --save-sample-metrics: берём t_offset")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--out-coef", default=None,
+                    help="куда сохранить коэффициенты гармоник: без них ACC "
+                         "против климатологии не посчитать")
     ap.add_argument("--obs-window", type=int, default=2)
     ap.add_argument("--fit-day-stride", type=int, default=5,
                     help="каждые N суток обучающей части идут в подгонку ЦЕЛИКОМ, все "
@@ -186,6 +189,17 @@ def main():
         out["mse_clim_region"] = mse_r
     np.savez_compressed(args.out, **out)
     print(f"[clim] сохранено → {args.out}")
+
+    # Коэффициенты нужны отдельно: по ним predict.py восстанавливает поле
+    # климатологии на любой срок и считает настоящий ACC — аномалии
+    # относительно климатологии, а не относительно среднего по области.
+    # Отдельным файлом, потому что это (10, узлы, каналы) float32 — сотни
+    # мегабайт, и таскать их в каждом чтении сводных метрик незачем.
+    if args.out_coef:
+        np.savez(args.out_coef, coef=coef, time_start=info["time_start"],
+                 obs_window=args.obs_window, n_feat=n_feat)
+        mb = os.path.getsize(args.out_coef) // (1024 * 1024)
+        print(f"[clim] коэффициенты → {args.out_coef} ({mb} МБ, форма {coef.shape})")
 
     # --- сводка ---
     names = json.load(open(os.path.join(args.data_dir, "variables.json")))
