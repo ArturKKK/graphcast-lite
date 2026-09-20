@@ -1,0 +1,32 @@
+[20.09 13:43:34] === ЭТАП 1: широтный вес и ACC против климатологии (commit 32f6078) ===
+[20.09 13:43:34] состояние уже готово: /workdir/paper_results/krsk33f_last_epoch.pth
+[prep] multires_krsk_33f_chw: epoch=7 ar=4 -> /data/paper_heavy/krsk33f_chw_last.pth
+[20.09 13:43:35] START климатология (сроки из docs/paper/runs/graphcast-v4-1716805295/m33_last_roi_samples.npz)
+[20.09 13:51:00] DONE климатология: 168M
+[20.09 13:51:00] START w_m33_base_roi
+Terminated
+[20.09 14:39:42] DONE  w_m33_base_roi rc=143 |  | ACC=0.9664 | 
+[20.09 14:39:42] START w_m33_base_inner
+[20.09 14:40:04] === ЭТАП 1: широтный вес и ACC против климатологии (commit 26a133b) ===
+[20.09 14:40:04] состояние уже готово: /workdir/paper_results/krsk33f_last_epoch.pth
+[20.09 14:40:05] состояние уже готово: /data/paper_heavy/krsk33f_chw_last.pth
+[20.09 14:40:05] коэффициенты уже есть: /data/paper_heavy/clim_coef_krsk.npz
+[20.09 14:40:05] START w_m33_base_roi
+[20.09 16:43:38] DONE  w_m33_base_inner rc=0 | skill=76.27% | ACC=0.9476 |  t2m K 1.21°C 1.41°C 1.47°C 1.53°C
+[20.09 16:43:38] START w_m33_chw_roi
+[20.09 17:00:03] DONE  w_m33_base_roi rc=0 | skill=75.12% | ACC=0.9422 |  t2m K 1.33°C 1.55°C 1.61°C 1.68°C
+[20.09 17:00:03] SKIP w_m33_base_inner (уже посчитан)
+[20.09 17:00:03] START w_m33_chw_roi
+[20.09 19:05:56] DONE  w_m33_chw_roi rc=0 | skill=76.26% | ACC=0.9479 |  t2m K 1.19°C 1.38°C 1.41°C 1.47°C
+[20.09 19:05:56] START w_m33_chw_inner
+[20.09 19:22:38] DONE  w_m33_chw_roi rc=0 | skill=76.26% | ACC=0.9479 |  t2m K 1.19°C 1.38°C 1.41°C 1.47°C
+[20.09 19:22:38] START w_m33_chw_inner
+[20.09 19:43:52] === ЭТАП 1: широтный вес и ACC против климатологии (commit b031c19) ===
+[20.09 19:43:52] состояние уже готово: /workdir/paper_results/krsk33f_last_epoch.pth
+[20.09 19:43:52] состояние уже готово: /data/paper_heavy/krsk33f_chw_last.pth
+[20.09 19:43:52] коэффициенты уже есть: /data/paper_heavy/clim_coef_krsk.npz
+[20.09 19:43:52] SKIP w_m33_base_roi (уже посчитан)
+[20.09 19:43:52] START w_m33_base_inner
+[20.09 21:32:28] DONE  w_m33_base_inner rc=0 | skill=76.27% | ACC=0.9476 |  t2m K 1.21°C 1.41°C 1.47°C 1.53°C
+[20.09 21:32:28] SKIP w_m33_chw_roi (уже посчитан)
+[20.09 21:32:28] START w_m33_chw_inner
