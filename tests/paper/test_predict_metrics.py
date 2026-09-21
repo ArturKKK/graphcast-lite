@@ -343,7 +343,8 @@ def test_table_climatology_is_standardised(table_file):
     """Таблица в физических единицах, поля модели нормированы."""
     Climatology, = _from_predict("Climatology")
     f, raw = table_file
-    mean = np.array([100.0, 0.0, 7.0]); std = np.array([2.0, 1.0, 5.0])
+    mean = np.array([100.0, 0.0, 7.0])
+    std = np.array([2.0, 1.0, 5.0])
     c = Climatology(f, n_channels=3, var_names=["t2m", "10u", "msl"],
                     mean=mean, std=std)
     got = c.field(t_offset=0, horizon=0)
@@ -369,7 +370,9 @@ def test_metrics_keep_old_measure_where_climatology_missing():
     G, C = 5, 2
     y = rng.normal(size=(G, C))
     p_ = y + rng.normal(size=(G, C)) * 0.2
-    cl = np.empty((G, C)); cl[:, 0] = 0.0; cl[:, 1] = np.nan
+    cl = np.empty((G, C))
+    cl[:, 0] = 0.0
+    cl[:, 1] = np.nan
     m = StreamingMetrics(C)
     m.update(y, p_, clim=cl)
     acc = m.acc_per_channel
