@@ -1,0 +1,27 @@
+[11:47:21] === FROZEN ABLATION START ===
+[11:47:21] нет venv — запускаю подготовку (venv + глобальный + Krsk + merge)
+[12:00:53] подготовка завершена rc=0
+[12:00:53] собираю 33f-датасет
+[12:22:01] сборка rc=0 размер 56G
+[12:22:01] коммит: d03d200
+[12:22:01] ВНИМАНИЕ: есть незакоммиченные изменения — модель будет невоспроизводима
+?? experiments/wb2_512x256_33f_ar_v3/config.json.bak
+[12:22:01] START обучения multires_krsk_33f_frozen (процессор заморожен все 32 эпохи)
+Terminated
+[12:21:06] DONE обучение rc=143
+[12:21:06] START frozen_best_roi
+Terminated
+[19:10:36] DONE  frozen_best_roi |  | 
+Traceback (most recent call last):
+  File "<stdin>", line 5, in <module>
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/serialization.py", line 628, in save
+    with _open_zipfile_writer(f) as opened_zipfile:
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/serialization.py", line 502, in _open_zipfile_writer
+    return container(name_or_buffer)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/serialization.py", line 473, in __init__
+    super().__init__(torch._C.PyTorchFileWriter(self.name))
+RuntimeError: Parent directory /data/paper_heavy does not exist.
+[19:10:37] START frozen_last_roi
+[19:10:41] DONE  frozen_last_roi |  | 
+[19:10:41] === ALL DONE ===
+[19:10:41] сравнивать с multires_krsk_33f: t2m 1.32/1.53/1.59/1.66 °C, успешность 75.31 %
