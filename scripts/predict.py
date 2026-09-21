@@ -177,12 +177,23 @@ class StreamingMetrics:
         return bool(self.acc_num.any())
 
     @property
+    def acc_true_mask(self):
+        """Поканально: где ACC посчитан против климатологии."""
+        return np.sqrt(self.acc_ff * self.acc_aa) > 0
+
+    @property
     def acc_per_channel(self):
-        """ACC против климатологии, если она подавалась; иначе прежняя величина."""
-        if self.acc_is_true:
-            den = np.sqrt(self.acc_ff * self.acc_aa)
-            return np.divide(self.acc_num, den, out=np.zeros_like(den), where=den > 0)
-        return self.sum_acc / np.maximum(self.acc_count, 1)
+        """ACC против климатологии там, где она есть; иначе прежняя величина.
+
+        Проверка обязана быть ПОКАНАЛЬНОЙ. Когда она была одна на все каналы,
+        таблица WB2 покрывала 6 каналов из 27, и остальные получали не прежнюю
+        величину, а ноль: среднее выходило 6 × 0,966 / 27 = 0,215 вместо ~0,95.
+        Число выглядело как «модель плоха», а не как «метрика сломана».
+        """
+        old = self.sum_acc / np.maximum(self.acc_count, 1)
+        den = np.sqrt(self.acc_ff * self.acc_aa)
+        true = np.divide(self.acc_num, den, out=np.zeros_like(den), where=den > 0)
+        return np.where(den > 0, true, old)
 
     @property
     def rmse_per_channel(self):

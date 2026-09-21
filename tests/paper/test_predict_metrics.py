@@ -379,6 +379,25 @@ def test_metrics_keep_old_measure_where_climatology_missing():
     assert np.isfinite(acc).all(), "NaN просочился в ACC"
     assert m.acc_num[0] != 0 and m.acc_num[1] == 0
     assert m.sum_acc[0] == 0 and m.sum_acc[1] != 0
+    # Канал без климатологии обязан отдать ИМЕННО прежнюю величину, а не ноль.
+    # Ноль тоже конечен, и прежняя проверка на конечность его пропускала: на
+    # настоящем прогоне это дало ACC 0,21 вместо 0,95.
+    assert acc[1] == pytest.approx(m.sum_acc[1] / m.acc_count[1], rel=1e-12)
+    assert acc[1] != 0
+    assert list(m.acc_true_mask) == [True, False]
+
+
+def test_aggregate_acc_is_not_diluted_by_channels_without_climatology():
+    """Среднее не должно падать оттого, что климатология покрывает не всё."""
+    rng = np.random.default_rng(7)
+    G, C = 6, 9
+    y = rng.normal(size=(G, C))
+    p_ = y + rng.normal(size=(G, C)) * 0.05      # почти точный прогноз
+    cl = np.full((G, C), np.nan)
+    cl[:, :2] = 0.0                              # климатология лишь у двух каналов
+    m = StreamingMetrics(C)
+    m.update(y, p_, clim=cl)
+    assert m.acc > 0.8, f"агрегат просел до {m.acc:.3f} — каналы без климатологии обнулены"
 
 
 def test_table_climatology_selects_a_subset_of_nodes(table_file):
