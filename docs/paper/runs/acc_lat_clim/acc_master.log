@@ -30,3 +30,26 @@ Terminated
 [20.09 21:32:28] DONE  w_m33_base_inner rc=0 | skill=76.27% | ACC=0.9476 |  t2m K 1.21°C 1.41°C 1.47°C 1.53°C
 [20.09 21:32:28] SKIP w_m33_chw_roi (уже посчитан)
 [20.09 21:32:28] START w_m33_chw_inner
+[20.09 21:57:27] === ЭТАП 1: широтный вес и ACC против климатологии (commit 37995b2) ===
+[20.09 21:57:27] состояние уже готово: /workdir/paper_results/krsk33f_last_epoch.pth
+[20.09 21:57:27] состояние уже готово: /data/paper_heavy/krsk33f_chw_last.pth
+[20.09 21:57:27] коэффициенты уже есть: /data/paper_heavy/clim_coef_krsk.npz
+[20.09 21:57:27] START w_m33_base_roi
+[20.09 23:45:16] DONE  w_m33_base_roi rc=0 | skill=75.12% | ACC=0.9422 |  t2m K 1.33°C 1.55°C 1.61°C 1.68°C
+[20.09 23:45:16] START w_m33_base_inner
+[21.09 01:32:42] DONE  w_m33_base_inner rc=0 | skill=76.27% | ACC=0.9476 |  t2m K 1.21°C 1.41°C 1.47°C 1.53°C
+[21.09 01:32:42] START w_m33_chw_roi
+[21.09 03:21:44] DONE  w_m33_chw_roi rc=0 | skill=76.26% | ACC=0.9479 |  t2m K 1.19°C 1.38°C 1.41°C 1.47°C
+[21.09 03:21:44] START w_m33_chw_inner
+[21.09 05:09:24] DONE  w_m33_chw_inner rc=0 | skill=77.08% | ACC=0.9508 |  t2m K 1.06°C 1.23°C 1.26°C 1.31°C
+[21.09 05:09:24] START w_m19_roi
+[21.09 06:16:35] DONE  w_m19_roi rc=0 | skill=70.02% | ACC=0.8355 |  t2m K 1.41°C 1.67°C 1.75°C 1.85°C
+[21.09 06:16:35] === ВСЁ ===
+[20.09 19:05:56] DONE  w_m33_chw_roi rc=0 | skill=76.26% | ACC=0.9479 |  t2m K 1.19°C 1.38°C 1.41°C 1.47°C
+[20.09 19:22:38] DONE  w_m33_chw_roi rc=0 | skill=76.26% | ACC=0.9479 |  t2m K 1.19°C 1.38°C 1.41°C 1.47°C
+[20.09 21:32:28] DONE  w_m33_base_inner rc=0 | skill=76.27% | ACC=0.9476 |  t2m K 1.21°C 1.41°C 1.47°C 1.53°C
+[20.09 23:45:16] DONE  w_m33_base_roi rc=0 | skill=75.12% | ACC=0.9422 |  t2m K 1.33°C 1.55°C 1.61°C 1.68°C
+[21.09 01:32:42] DONE  w_m33_base_inner rc=0 | skill=76.27% | ACC=0.9476 |  t2m K 1.21°C 1.41°C 1.47°C 1.53°C
+[21.09 03:21:44] DONE  w_m33_chw_roi rc=0 | skill=76.26% | ACC=0.9479 |  t2m K 1.19°C 1.38°C 1.41°C 1.47°C
+[21.09 05:09:24] DONE  w_m33_chw_inner rc=0 | skill=77.08% | ACC=0.9508 |  t2m K 1.06°C 1.23°C 1.26°C 1.31°C
+[21.09 06:16:35] DONE  w_m19_roi rc=0 | skill=70.02% | ACC=0.8355 |  t2m K 1.41°C 1.67°C 1.75°C 1.85°C
