@@ -27,6 +27,7 @@
 """
 import argparse
 import os
+import re
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -52,6 +53,12 @@ PRESETS = {
                  "10m_v_component_of_wind", "mean_sea_level_pressure"],
         plev={}, latname="lat", lonname="lon",
         outer=("time", "prediction_timedelta"),
+    ),
+    "era5": dict(
+        url=f"{BASE}/era5/1959-2022-6h-1440x721.zarr",
+        surface=["2m_temperature", "10m_u_component_of_wind",
+                 "10m_v_component_of_wind", "mean_sea_level_pressure"],
+        plev={}, latname="latitude", lonname="longitude", outer=("time",),
     ),
     "hres": dict(
         url=f"{BASE}/hres/2016-2022-12h-6h-0p25deg-chunk-1.zarr",
@@ -80,6 +87,26 @@ def window(g, latname, lonname):
     return iy, ix, lat[iy], lon[ix]
 
 
+def decode_time(arr):
+    """Разворачивает ось времени из «часов с такой-то даты» в datetime64.
+
+    zarr отдаёт сырые числа: расшифровка единиц — дело xarray, которого мы
+    здесь не тянем ради одной оси. Без этого срезы по датам молча сравнивали бы
+    целые числа с датами и падали.
+    """
+    import numpy as np
+    raw = np.asarray(arr)
+    units = dict(arr.attrs).get("units", "")
+    m = re.match(r"\s*(\w+)\s+since\s+(.+?)\s*$", units)
+    if not m:
+        return raw
+    step, origin = m.group(1), m.group(2).strip()
+    code = {"hours": "h", "minutes": "m", "seconds": "s", "days": "D"}.get(step)
+    if code is None:
+        return raw
+    return np.datetime64(origin.replace(" ", "T")) + raw.astype("int64") * np.timedelta64(1, code)
+
+
 def chunk_groups(wanted, chunk):
     """Индексы, сгруппированные по номеру чанка: {чанк: [индексы]}."""
     by = defaultdict(list)
@@ -88,14 +115,21 @@ def chunk_groups(wanted, chunk):
     return by
 
 
-def fetch(arr, want_a, want_b, iy, ix, workers, label, level_idx=None):
+def fetch(arr, wants, iy, ix, workers, label, level_idx=None):
     """Тянет массив по границам чанков и режет окно.
 
-    Возвращает (len(want_a), len(want_b), 41, 61). Каждый чанк скачивается ровно
-    один раз: индексы сгруппированы, внутри группы берётся непрерывный срез.
+    wants — одна или две последовательности внешних индексов: у климатологии это
+    (часы, дни), у прогнозов (сроки, горизонты), у реанализа только (сроки).
+    Каждый чанк скачивается ровно один раз: индексы сгруппированы по чанкам,
+    внутри группы берётся непрерывный срез.
     """
-    ca, cb = arr.chunks[0], arr.chunks[1]
-    ga, gb = chunk_groups(want_a, ca), chunk_groups(want_b, cb)
+    two = len(wants) == 2
+    want_a = list(wants[0])
+    want_b = list(wants[1]) if two else [0]
+    ca = arr.chunks[0]
+    cb = arr.chunks[1] if two else 1
+    ga = chunk_groups(want_a, ca)
+    gb = chunk_groups(want_b, cb) if two else {0: [0]}
     pos_a = {v: k for k, v in enumerate(want_a)}
     pos_b = {v: k for k, v in enumerate(want_b)}
     out = np.empty((len(want_a), len(want_b), len(iy), len(ix)), dtype=np.float32)
@@ -110,8 +144,13 @@ def fetch(arr, want_a, want_b, iy, ix, workers, label, level_idx=None):
         ia, ib = ga[A], gb[B]
         sa = slice(ia[0], ia[-1] + 1)
         sb = slice(ib[0], ib[-1] + 1)
-        sel = (sa, sb) if level_idx is None else (sa, sb, level_idx)
+        if two:
+            sel = (sa, sb) if level_idx is None else (sa, sb, level_idx)
+        else:
+            sel = (sa,) if level_idx is None else (sa, level_idx)
         block = np.asarray(arr[sel + (sy, sx)], dtype=np.float32)
+        if not two:
+            block = block[:, None]
         for u, i in enumerate(range(sa.start, sa.stop)):
             if i not in pos_a:
                 continue
@@ -140,6 +179,10 @@ def main():
     ap.add_argument("--time-stride", type=int, default=1,
                     help="каждый N-й срок инициализации: трафик делится на N")
     ap.add_argument("--only", nargs="*", default=None)
+    ap.add_argument("--start", default="2019-11-25",
+                    help="для preset era5: начало окна верификации")
+    ap.add_argument("--end", default="2020-12-31",
+                    help="для preset era5: конец окна верификации")
     ap.add_argument("--dry-run", action="store_true",
                     help="посчитать трафик и выйти, ничего не качая")
     a = ap.parse_args()
@@ -152,14 +195,24 @@ def main():
           f"долготы {lons[0]}…{lons[-1]}")
 
     res = {"lat": lats, "lon": lons, "source": cfg["url"]}
-    na, nb = cfg["outer"]
+    outer = cfg["outer"]
+    na = outer[0]
+    nb = outer[1] if len(outer) > 1 else None
 
     if a.preset == "clim":
         hour, doy = np.asarray(g["hour"]), np.asarray(g["dayofyear"])
         want_a, want_b = list(range(len(hour))), list(range(len(doy)))
         res["hour"], res["dayofyear"] = hour, doy
+    elif nb is None:
+        # Реанализ: единственная внешняя ось — время. Берём наше тестовое окно.
+        t = decode_time(g[na])
+        t0 = np.datetime64(a.start); t1 = np.datetime64(a.end)
+        want_a = [int(i) for i in np.where((t >= t0) & (t <= t1))[0]]
+        want_b = None
+        res["time"] = t[want_a]
+        print(f"[wb2] сроков {len(want_a)}: {t[want_a][0]} … {t[want_a][-1]}")
     else:
-        t, td = np.asarray(g[na]), np.asarray(g[nb])
+        t, td = decode_time(g[na]), np.asarray(g[nb])
         td_h = ((td / np.timedelta64(1, "h")).astype(int)
                 if td.dtype.kind == "m" else td.astype(int))
         want_b = [int(i) for i in np.where(td_h <= a.max_lead_h)[0]]
@@ -168,6 +221,7 @@ def main():
         print(f"[wb2] сроков {len(want_a)} (шаг {a.time_stride}), "
               f"горизонты {td_h[want_b]} ч")
 
+    wants = (want_a,) if want_b is None else (want_a, want_b)
     names = [n for n in cfg["surface"] if not a.only or n in a.only]
     jobs = [(n, None, n) for n in names]
     for name, levels in cfg["plev"].items():
@@ -179,7 +233,9 @@ def main():
 
     # Прикидка трафика: чанков на переменную × вес чанка.
     a0 = g[names[0]]
-    per = len(chunk_groups(want_a, a0.chunks[0])) * len(chunk_groups(want_b, a0.chunks[1]))
+    per = len(chunk_groups(want_a, a0.chunks[0]))
+    if want_b is not None:
+        per *= len(chunk_groups(want_b, a0.chunks[1]))
     mb = 20 if a.preset == "clim" else 2.3
     print(f"[wb2] переменных {len(jobs)}, чанков на каждую {per}, "
           f"трафик около {len(jobs) * per * mb / 1024:.1f} ГБ")
@@ -191,7 +247,7 @@ def main():
         if name not in g:
             print(f"  нет переменной {name} — пропускаю"); continue
         print(f"  {key}")
-        res[key], n = fetch(g[name], want_a, want_b, iy, ix, a.workers, key, li)
+        res[key], n = fetch(g[name], wants, iy, ix, a.workers, key, li)
         total_chunks += n
 
     np.savez_compressed(a.out, **res)
