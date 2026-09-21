@@ -1088,15 +1088,19 @@ def main():
                         if w_reg is not None:
                             sample_metrics["wmse_pred_region"][i, p, :] = _wmean(d2p_r, w_reg)
                             sample_metrics["wmse_base_region"][i, p, :] = _wmean(d2b_r, w_reg)
+                    # Условия раздельные. Табличная климатология задана только
+                    # на узлах области, и cl_all там None; общее условие
+                    # оставляло посрочные слагаемые нулями, а ошибка всплывала
+                    # лишь при попытке посчитать интервал — после часа счёта.
                     if cl_all is not None:
                         _acc_terms(sample_metrics, "global", i, p,
                                    np.asarray(y_cpu[:, sl]), np.asarray(out_cpu[:, sl]),
                                    cl_all[:, sl], w_glob)
-                        if region_idxs is not None:
-                            _acc_terms(sample_metrics, "region", i, p,
-                                       np.asarray(y_cpu[region_idxs][:, sl]),
-                                       np.asarray(out_cpu[region_idxs][:, sl]),
-                                       cl_reg[:, sl], w_reg)
+                    if cl_reg is not None and region_idxs is not None:
+                        _acc_terms(sample_metrics, "region", i, p,
+                                   np.asarray(y_cpu[region_idxs][:, sl]),
+                                   np.asarray(out_cpu[region_idxs][:, sl]),
+                                   cl_reg[:, sl], w_reg)
                 if hasattr(test_ds, "_sample_indices") and i < len(test_ds._sample_indices):
                     sample_metrics["t_offset"][i] = test_ds._sample_indices[i][1]
 

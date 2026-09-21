@@ -420,3 +420,19 @@ def test_table_climatology_rejects_foreign_nodes(table_file):
                     mean=np.zeros(1), std=np.ones(1))
     with pytest.raises(SystemExit, match="разные наборы точек"):
         c.select(np.array([10, 999]))
+
+
+def test_region_acc_terms_are_stored_without_global_climatology():
+    """Табличная климатология задана только на области, и это не повод молчать.
+
+    21.09.2026 посрочные слагаемые писались под общим условием «есть
+    глобальная климатология». У таблицы WB2 её нет, слагаемые остались нулями,
+    и выяснилось это лишь при попытке посчитать интервал — после полутора часов
+    счёта. Проверяем на самом тексте predict.py, что условия раздельные.
+    """
+    src = (ROOT / "scripts" / "predict.py").read_text()
+    i = src.index('_acc_terms(sample_metrics, "region"')
+    head = src[:i]
+    # Ближайшее условие перед региональной веткой не должно требовать cl_all.
+    guard = head[head.rindex("if "):]
+    assert "cl_reg" in guard, f"региональная ветка под чужим условием: {guard[:80]!r}"
