@@ -43,6 +43,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dpi", type=int, default=600)
     ap.add_argument("--jpeg", action="store_true", help="вместо .tif")
+    ap.add_argument("--png", action="store_true",
+                    help="вместо .tif: нужен для вставки в docx, Word не берёт SVG")
     ap.add_argument("--width-mm", type=float, default=160.0,
                     help="ширина рисунка в журнале, мм")
     a = ap.parse_args()
@@ -67,13 +69,18 @@ def main():
             stem = OUT / f"fig{i}"
             # Без сжатия .tif 600 dpi весит десятки мегабайт — рукопись подаётся
             # по электронной почте, поэтому LZW (без потерь) обязателен.
-            fmt = (["-jpeg", "-jpegopt", "quality=95"] if a.jpeg
-                   else ["-tiff", "-tiffcompression", "lzw"])
+            if a.png:
+                fmt = ["-png"]
+            elif a.jpeg:
+                fmt = ["-jpeg", "-jpegopt", "quality=95"]
+            else:
+                fmt = ["-tiff", "-tiffcompression", "lzw"]
             subprocess.run(["pdftoppm", *fmt, "-r", str(a.dpi), "-singlefile",
                             str(pdf), str(stem)], check=True)
         # Именно ожидаемое имя, а не glob: рядом лежит файл прошлого прогона в
         # другом формате, и glob отчитывался чужим файлом.
-        got = OUT / f"fig{i}.{'jpg' if a.jpeg else 'tif'}"
+        ext = "png" if a.png else ("jpg" if a.jpeg else "tif")
+        got = OUT / f"fig{i}.{ext}"
         if not got.exists():
             raise SystemExit(f"pdftoppm не создал {got}")
         made.append(got)
