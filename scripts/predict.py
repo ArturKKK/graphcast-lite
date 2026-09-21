@@ -258,6 +258,17 @@ class Climatology:
         print(f"[clim] таблица: {len(got)} каналов из {n_channels} — {got}")
         print("[clim] приведена к нормированным единицам набора")
 
+    def select(self, region_idxs):
+        """Оставить строки таблицы под узлы конкретного прогона."""
+        pos = {int(n): i for i, n in enumerate(self.node_index)}
+        missing = [int(n) for n in region_idxs if int(n) not in pos]
+        if missing:
+            raise SystemExit(
+                f"[clim] в таблице нет {len(missing)} узлов прогона "
+                f"(например {missing[:3]}): это разные наборы точек")
+        self.rows = np.array([pos[int(n)] for n in region_idxs], dtype=np.int64)
+        print(f"[clim] узлов прогона {len(self.rows)} из {len(self.node_index)} в таблице")
+
     def _when(self, t_offset: int, horizon: int):
         """Срок, которому отвечает шаг horizon (с нуля)."""
         return self.t0 + timedelta(hours=6 * (int(t_offset) + self.obs_window + int(horizon)))
@@ -271,10 +282,13 @@ class Climatology:
 
         hi = self.hour_pos[when.hour]
         di = self.doy_pos[when.timetuple().tm_yday]
-        out = np.full((len(self.node_index), self.C), np.nan, dtype=np.float32)
+        rows = getattr(self, "rows", None)
+        n = len(self.node_index) if rows is None else len(rows)
+        out = np.full((n, self.C), np.nan, dtype=np.float32)
         for c in range(self.C):
             if self.slot[c] >= 0:
-                out[:, c] = self.data[self.slot[c], hi, di]
+                col = self.data[self.slot[c], hi, di]
+                out[:, c] = col if rows is None else col[rows]
         return out
 
     def stacked(self, t_offset: int, n_horizons: int, node_idx=None):
@@ -687,13 +701,14 @@ def main():
         clim = Climatology(args.climatology, C, var_names=_names, mean=_m, std=_sd)
         print(f"[clim] {args.climatology}: ACC считается против климатологии, "
               f"а не против среднего по области")
-        if clim.node_index is not None and region_idxs is not None:
-            # Таблица покрывает только узлы области. Сверяем состав: молчаливое
-            # несовпадение дало бы ACC по чужим точкам.
-            if not np.array_equal(np.sort(clim.node_index), np.sort(region_idxs)):
-                raise SystemExit(
-                    f"[clim] таблица покрывает {len(clim.node_index)} узлов, "
-                    f"а область прогона — {len(region_idxs)}; это разные наборы точек")
+        if clim.node_index is not None:
+            if region_idxs is None:
+                raise SystemExit("[clim] табличная климатология задана только на "
+                                 "узлах области — прогон нужен с --region")
+            # Внутренняя зона — подмножество области, поэтому требуем вложения,
+            # а не совпадения. Несовпадение состава означало бы ACC по чужим
+            # точкам, и молча этого допускать нельзя.
+            clim.select(region_idxs)
 
     # --- OI init (после region_idxs, чтобы знать ROI) ---
     if _oi_pending:

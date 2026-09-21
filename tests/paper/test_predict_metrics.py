@@ -379,3 +379,25 @@ def test_metrics_keep_old_measure_where_climatology_missing():
     assert np.isfinite(acc).all(), "NaN просочился в ACC"
     assert m.acc_num[0] != 0 and m.acc_num[1] == 0
     assert m.sum_acc[0] == 0 and m.sum_acc[1] != 0
+
+
+def test_table_climatology_selects_a_subset_of_nodes(table_file):
+    """Внутренняя зона — подмножество области, и таблица обязана это уметь."""
+    Climatology, = _from_predict("Climatology")
+    f, _ = table_file
+    c = Climatology(f, n_channels=1, var_names=["t2m"],
+                    mean=np.zeros(1), std=np.ones(1))
+    full = c.field(0, 0)
+    c.select(np.array([11]))            # второй узел таблицы
+    one = c.field(0, 0)
+    assert one.shape == (1, 1)
+    assert one[0, 0] == pytest.approx(full[1, 0], rel=1e-6)
+
+
+def test_table_climatology_rejects_foreign_nodes(table_file):
+    Climatology, = _from_predict("Climatology")
+    f, _ = table_file
+    c = Climatology(f, n_channels=1, var_names=["t2m"],
+                    mean=np.zeros(1), std=np.ones(1))
+    with pytest.raises(SystemExit, match="разные наборы точек"):
+        c.select(np.array([10, 999]))
