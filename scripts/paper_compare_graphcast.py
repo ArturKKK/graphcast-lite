@@ -69,9 +69,19 @@ def main():
     ap.add_argument("--ours", default=None)
     a = ap.parse_args()
 
-    gc = np.load(a.gc, allow_pickle=True)
-    e5 = np.load(a.era5, allow_pickle=True)
-    cl = np.load(a.clim, allow_pickle=True) if a.clim else None
+    def load(path):
+        """Читает npz ЦЕЛИКОМ в память.
+
+        np.load отдаёт ленивый объект: каждое обращение к ключу заново
+        распаковывает весь массив. В цикле по 800 срокам это распаковка
+        35-мегабайтного поля тысячи раз, и счёт вставал намертво.
+        """
+        with np.load(path, allow_pickle=True) as z:
+            return {k: z[k] for k in z.files}
+
+    gc = load(a.gc)
+    e5 = load(a.era5)
+    cl = load(a.clim) if a.clim else None
 
     # Сетки обоих наборов должны совпадать узел в узел, иначе сравнение
     # превращается в сравнение интерполяций.
@@ -101,20 +111,26 @@ def main():
     if not ok:
         raise SystemExit("пересечения по времени нет — проверьте окна")
 
-    def field(src, name, idx, lead_i=None):
+    def field(src, name, idx, lead_i=None, is_gc=False):
         x = src[name][idx] if lead_i is None else src[name][idx, lead_i]
-        if flip and src is gc:
+        # У наборов с одной внешней осью (реанализ) выгружалка оставляет
+        # пустышку длины 1 на месте второй оси. Без её снятия массивы
+        # разъезжаются по форме и numpy пытается развернуть (803, 803, 41, 61).
+        if x.ndim == 3 and x.shape[0] == 1:
+            x = x[0]
+        if flip and is_gc:
             x = x[::-1]
         return x.astype(np.float64)
 
+    hour_pos = {int(h): i for i, h in enumerate(cl["hour"])} if cl else {}
+    doy_pos = {int(d): i for i, d in enumerate(cl["dayofyear"])} if cl else {}
+
     def clim_at(name, valid):
         """Климатология на конкретный срок: таблица час × день года."""
-        h = int(valid.astype("datetime64[h]").astype(int) % 24)
-        hi = int(np.where(cl["hour"] == h)[0][0])
+        h = int(valid.astype("datetime64[h]").astype("int64") % 24)
         doy = int((valid.astype("datetime64[D]") -
-                   valid.astype("datetime64[Y]")).astype(int)) + 1
-        di = int(np.where(cl["dayofyear"] == doy)[0][0])
-        return cl[name][hi, di].astype(np.float64)
+                   valid.astype("datetime64[Y]")).astype("int64")) + 1
+        return cl[name][hour_pos[h], doy_pos[doy]].astype(np.float64)
 
     rows = []
     for our, (wb, unit) in VARS.items():
@@ -125,7 +141,7 @@ def main():
             P, T, C, B = [], [], [], []
             for i in ok:
                 v = t_gc[i] + np.timedelta64(L, "h")
-                P.append(field(gc, wb, i, li) * k)
+                P.append(field(gc, wb, i, li, is_gc=True) * k)
                 T.append(field(e5, wb, e5_pos[v]) * k)
                 B.append(field(e5, wb, e5_pos[t_gc[i]]) * k)   # инерция: поле на t0
                 if cl is not None and wb in cl:
@@ -142,14 +158,31 @@ def main():
                   f"инерция {r_pe:7.3f} | ACC {acc}")
 
     print("\n--- проверка сопоставления ---")
-    print("Инерционный прогноз по приземной температуре, посчитанный здесь:")
+    print("Инерционный прогноз по приземной температуре из данных WB2:")
     pe = [f"{r[4]:.2f}" for r in rows if r[0] == "t2m"]
     print(f"   {' / '.join(pe)} °C")
-    print("В статье (наша выборка, равные веса): 4,99 / 6,88 / 5,88 / 4,42 °C")
-    print("Близость подтверждает, что узлы, сроки и единицы совпали.")
 
     if a.ours:
         o = np.load(a.ours, allow_pickle=True)
+        # Тот же эталон, посчитанный нашим кодом на наших полях. Сверять надо
+        # именно с подвыборкой 00/12 UTC: у GraphCast других инициализаций нет,
+        # а суточный ход делает инерцию на +6 и +18 ч совсем разной. С полной
+        # выборкой числа расходятся вдвое, и это не ошибка, а другой набор
+        # сроков.
+        _b = "wmse_base_region" if "wmse_base_region" in o else "mse_base_region"
+        _n = [str(v) for v in o["variables"]]
+        _t0 = (DATASET_START + (o["t_offset"].astype("int64") + OBS_WINDOW - 1)
+               * np.timedelta64(6, "h")).astype("datetime64[h]")
+        _m = np.isin(_t0.astype("int64") % 24, [0, 12])
+        _c = _n.index("t2m")
+        ours_pe = [np.sqrt(o[_b][_m, h, _c].mean()) * o["std"][_c] for h in range(len(leads))]
+        print("Он же, посчитанный нашим кодом на инициализациях 00/12 UTC:")
+        print("   " + " / ".join(f"{x:.2f}" for x in ours_pe) + " °C")
+        diff = max(abs(float(r[4]) - x) for r, x in
+                   zip([r for r in rows if r[0] == "t2m"], ours_pe))
+        print(f"Наибольшее расхождение {diff:.3f} °C — "
+              + ("узлы, сроки и единицы совпали." if diff < 0.05
+                 else "РАСХОЖДЕНИЕ: сопоставление неверно."))
         key = "wmse_pred_region" if "wmse_pred_region" in o else "mse_pred_region"
         names = [str(v) for v in o["variables"]]
         t0s = DATASET_START + (o["t_offset"].astype("int64") + OBS_WINDOW - 1) * np.timedelta64(6, "h")
@@ -164,7 +197,10 @@ def main():
                     continue
                 ch = names.index(our); std = o["std"][ch]
                 k = SCALE.get(our, 1.0)
-                vals = [np.sqrt(o[key][sel, li, ch].mean()) * std * k for li in range(len(leads))]
+                # SCALE относится только к наборам WB2 (там Па); наши каналы
+                # уже приведены к единицам статьи, и второе деление дало бы
+                # 0,006 гПа вместо 1,0.
+                vals = [np.sqrt(o[key][sel, li, ch].mean()) * std for li in range(len(leads))]
                 print(f"  {our:4s}: " + " | ".join(f"+{L} ч {v:.3f}" for L, v in zip(leads, vals)))
 
 
