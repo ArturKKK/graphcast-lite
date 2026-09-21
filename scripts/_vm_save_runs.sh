@@ -18,8 +18,20 @@ DST=${DST:-docs/paper/runs/acc_lat_clim}
 [[ -d "$REPO" ]] && cd "$REPO"
 mkdir -p "$DST"
 
+# Префиксы прогонов. w_ — этап 1 (широтный вес и ACC), f_ — табл. 4
+# (заморозка). 21.09.2026 скрипт знал только про w_, и результаты заморозки
+# молча не доехали: «скопировано 12», «нового нет».
+PREFIXES=${PREFIXES:-"w_ f_"}
+list_files() {
+  local pre
+  for pre in $PREFIXES; do
+    ls -1 "$SRC/${pre}"*_samples.npz "$SRC/${pre}"*.log 2>/dev/null
+  done
+  ls -1 "$SRC"/*_master.log "$SRC"/acc_clim.log 2>/dev/null
+}
+
 n=0
-for f in "$SRC"/w_*_samples.npz "$SRC"/w_*.log "$SRC"/acc_master.log "$SRC"/acc_clim.log; do
+while IFS= read -r f; do
   [[ -f "$f" ]] || continue
   # Файл, который прямо сейчас дописывается, берём только когда он закрыт:
   # незавершённый npz — это обрезанный zip, и читаться он не будет.
@@ -29,7 +41,7 @@ for f in "$SRC"/w_*_samples.npz "$SRC"/w_*.log "$SRC"/acc_master.log "$SRC"/acc_
     continue
   fi
   cp -p "$f" "$DST"/ && n=$((n + 1))
-done
+done < <(list_files | sort -u)
 echo "скопировано файлов: $n"
 du -sh "$DST"
 

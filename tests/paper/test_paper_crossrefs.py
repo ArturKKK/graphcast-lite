@@ -113,3 +113,25 @@ def test_saved_run_metrics_are_actually_tracked():
 
     saver = (ROOT / "scripts" / "_vm_save_runs.sh").read_text()
     assert "git add -f" in saver, "без -f новые прогоны в репозиторий не попадут"
+
+
+def test_run_saver_covers_every_batch_prefix():
+    """Сохранялка должна знать про все батчи, а не только про первый.
+
+    21.09.2026 scripts/_vm_save_runs.sh копировал только файлы с префиксом w_,
+    и результаты батча заморозки (f_) молча не доехали: скрипт отчитался
+    «скопировано 12, нового нет».
+    """
+    import re
+    saver = (ROOT / "scripts" / "_vm_save_runs.sh").read_text()
+    m = re.search(r'PREFIXES=\$\{PREFIXES:-"([^"]+)"\}', saver)
+    assert m, "в сохранялке нет списка префиксов"
+    known = set(m.group(1).split())
+
+    # Каждый батч кладёт npz с собственным префиксом — собираем их из раннеров.
+    used = set()
+    for sh in (ROOT / "scripts").glob("_vm_batch_*.sh"):
+        for tag in re.findall(r"^\s*run\s+([a-z0-9]+)_", sh.read_text(), re.M):
+            used.add(tag + "_")
+    assert used, "не нашёл ни одного раннера с прогонами"
+    assert used <= known, f"сохранялка не знает про префиксы {sorted(used - known)}"
