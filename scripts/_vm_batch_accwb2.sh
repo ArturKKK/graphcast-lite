@@ -51,7 +51,19 @@ CK=$HEAVY/krsk33f_chw_last.pth
 run() {
   local tag="$1" reg="$2"
   local lf="$OUT/${tag}.log" npz="$OUT/${tag}_samples.npz"
-  [[ -f "$npz" ]] && { log "SKIP $tag"; return 0; }
+  # Пропускаем только ГОДНЫЙ файл. Наличия мало: 21.09.2026 прогоны оставили
+  # npz с пустыми слагаемыми ACC, и повторный запуск счёл их посчитанными.
+  if [[ -f "$npz" ]]; then
+    if python - "$npz" <<'PY'
+import sys, numpy as np
+with np.load(sys.argv[1], allow_pickle=True) as z:
+    ok = "acc_ff_region" in z.files and float(np.abs(z["acc_ff_region"]).sum()) > 0
+sys.exit(0 if ok else 1)
+PY
+    then log "SKIP $tag (посчитан, слагаемые ACC на месте)"; return 0
+    else log "$tag: файл есть, но слагаемых ACC в нём нет — считаю заново"; rm -f "$npz"
+    fi
+  fi
   log "START $tag"
   python -u scripts/predict.py experiments/multires_krsk_33f_chw --data-dir "$D33" \
       --split test_only --ar-steps 4 --max-samples 2000 --per-channel --no-save \
