@@ -78,7 +78,10 @@ def test_broken_anchor_is_fatal(monkeypatch):
 
 def test_missing_table_caption_is_fatal(monkeypatch):
     """Подпись таблицы, которой нет в статье, тоже обязана ронять сборку."""
-    monkeypatch.setattr(paper_artifact, "TABLES_EN", {"Таблица 99.": "Table 99."})
+    # Именно ДОБАВЛЯЕМ: подмена всего словаря сработала бы на другой проверке —
+    # на той, что ловит таблицу без английской подписи.
+    monkeypatch.setattr(paper_artifact, "TABLES_EN",
+                        {**paper_artifact.TABLES_EN, "Таблица 99.": "Table 99."})
     with pytest.raises(SystemExit) as e:
         paper_artifact.build()
     assert "Таблица 99." in str(e.value)

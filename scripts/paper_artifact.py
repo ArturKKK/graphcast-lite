@@ -30,47 +30,37 @@ FIGDIR = ROOT / "docs" / "paper" / "figures"
 # Рисунки вставляются после абзаца, содержащего опорную фразу. Порядок в списке
 # задаёт нумерацию; вставка идёт с конца, чтобы смещения не поехали.
 FIGURES = [
-    ("fig_arch.svg",
-     "Используется схема «кодировщик — процессор — декодировщик»",
-     "Рис. 1. Устройство модели. (а) поток данных: значения расчётной сетки "
-     "переносятся кодировщиком в вершины графа-мозаики, процессор выполняет 12 раундов "
-     "обмена сообщениями, декодировщик возвращает приращения полей на сетку; выход "
-     "подаётся на вход следующего шага. (б) двухфазная схема дообучения.",
-     "Fig. 1. Model layout. (a) data flow: the encoder carries grid values onto the "
-     "vertices of the mesh graph, the processor runs 12 rounds of message passing, "
-     "the decoder returns field increments to the grid, and the output is fed to the "
-     "next step. (b) the two-phase fine-tuning schedule."),
     # Панель с ошибкой по расстоянию до границы убрана: те же результаты
     # приведены в табл. 5, а правила журнала запрещают излагать одни и те же
     # результаты одновременно таблицей и рисунком.
     ("fig_seam_map.svg",
-     "Прямая проверка бесшовности приведена на рис. 2",
-     "Рис. 2. Прогноз приземной температуры на +24 ч в окрестности границы "
+     "Прямая проверка бесшовности приведена на рис. 1",
+     "Рис. 1. Прогноз приземной температуры на +24 ч в окрестности границы "
      "региональной вставки. Размер ячейки соответствует шагу сетки — 0,25° "
      "внутри вставки и 0,703° снаружи; штриховая линия — граница вставки.",
-     "Fig. 2. Forecast of 2 m temperature at +24 h near the boundary of the "
-     "regional insert. Cell size follows the grid spacing — 0.25° inside the "
-     "insert and 0.703° outside; the dashed line marks the insert boundary."),
+     "Fig. 1. 2 m temperature forecast at +24 h near the insert boundary. Cell "
+     "size follows the grid spacing, 0.25° inside and 0.703° outside; dashed "
+     "line — the boundary."),
 ]
 
 # Правило 5: подрисуночные подписи и названия таблиц — на русском и английском.
 # Ключ — точное начало русской подписи таблицы в тексте статьи.
 TABLES_EN = {
-    "Таблица 1.": "Table 1. RMSE of 2 m temperature (°C) by lead time and aggregate "
-                  "skill score S (%) according to (3). Test set of 1607 initial times; "
-                  "region — 2501 nodes, inner zone — 45 nodes.",
-    "Таблица 2.": "Table 2. Forecast error at +24 h at the nodes of the regional "
-                  "insert: persistence, interpolated global forecast and the "
-                  "multiscale model.",
-    "Таблица 3.": "Table 3. Effect of loss weighting. Region, 1607 initial times; "
-                  "t2m is averaged over four lead times and the last column is the "
-                  "error over the whole computational graph.",
-    "Таблица 4.": "Table 4. RMSE of 2 m temperature (°C) over the region and aggregate "
-                  "skill score for different ways of selecting the checkpoint.",
-    "Таблица 5.": "Table 5. RMSE of 2 m temperature (°C) by distance to the boundary "
-                  "of the insert. Positive distance is inside the insert (0.25° "
-                  "spacing), negative is outside, on the global part of the graph "
-                  "(0.703° spacing).",
+    "Таблица 1.": "Table 1. RMSE of 2 m temperature (°C) by lead time and aggregate skill "
+                  "score S (%) per (3). 1607 initial times; region 2501 nodes, inner "
+                  "zone 45 nodes.",
+    "Таблица 2.": "Table 2. Error at +24 h at the insert nodes: persistence, interpolated "
+                  "global forecast, multiscale model.",
+    "Таблица 3.": "Table 3. Effect of loss weighting. Region, 1607 initial times; t2m "
+                  "averaged over four lead times, last column — error over the whole "
+                  "graph.",
+    "Таблица 4.": "Table 4. RMSE of 2 m temperature (°C) and aggregate skill score for "
+                  "different ways of selecting the checkpoint.",
+    "Таблица 6.": "Table 6. Comparison with GraphCast on shared nodes and times: 803 "
+                  "initialisations, 2501 nodes, latitude weights. RMSE averaged over "
+                  "+6…+24 h; ACC against the WeatherBench 2 1990–2019 climatology.",
+    "Таблица 5.": "Table 5. RMSE of 2 m temperature (°C) by distance to the insert "
+                  "boundary. Positive — inside (0.25°), negative — outside (0.703°).",
 }
 OUT = ROOT / "docs" / "paper" / "artifact.html"
 
@@ -97,6 +87,14 @@ def relocate(body):
             body = body[:i] + body[j:]
 
     # Подпись таблицы — отдельный абзац перед самой таблицей; забираем пару целиком.
+    import re as _re
+    seen = _re.findall(r"<strong>(Таблица \d+\.)</strong>", body)
+    uncovered = [n for n in seen if n not in TABLES_EN]
+    if uncovered:
+        # Иначе таблица молча осталась бы в тексте без английской подписи —
+        # прямое нарушение п. 5 и 13 правил, заметное только в готовом файле.
+        raise SystemExit(f"[вёрстка] нет английской подписи для {uncovered}: "
+                         f"допишите TABLES_EN в {Path(__file__).name}")
     for num in sorted(TABLES_EN):
         i = body.find(f"<strong>{num}</strong>")
         if i < 0:
@@ -241,7 +239,7 @@ TEMPLATE = """<title>Графовый прогноз Красноярска</tit
   .fig { margin:1.1em 0; text-align:center; }
   /* Перенесённые в конец таблицы и рисунки: каждый блок не рвётся по страницам. */
   .tail { break-before:page; page-break-before:always; }
-  .sheet { margin:0 0 1.1em; }
+  .sheet { margin:0 0 .8em; }
   /* Блок в целом ломать можно — иначе четыре полосы хвоста наполовину пустые.
      Нельзя ломать связку «подпись — таблица — англ. подпись»: без этого
      подпись табл. 3 оставалась внизу полосы, а сама таблица уезжала на
@@ -252,7 +250,7 @@ TEMPLATE = """<title>Графовый прогноз Красноярска</tit
      полосные картинки съедали страницу сверх лимита в 20 полос. Потолок по
      высоте нужен рис. 2: карта почти квадратная, и по одной ширине она
      разворачивалась на 118 мм — полстраницы под одну панель. */
-  .fig svg { width:82%; height:auto; max-height:72mm; background:#fff; }
+  .fig svg { width:82%; height:auto; max-height:62mm; background:#fff; }
   .fig figcaption { margin-top:.4em; }
   figcaption { font-size:11pt; color:var(--ink-2); margin-top:.5em; text-align:left; }
   /* Отступа 1,2em маркеру не хватает: он выносится влево за пределы печатной
