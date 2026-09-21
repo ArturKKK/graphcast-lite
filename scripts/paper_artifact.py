@@ -260,7 +260,10 @@ TEMPLATE = """<title>Графовый прогноз Красноярска</tit
      одна точка, а в списке литературы обрезались бы и двузначные номера.
      2,4em хватает на «11.» с запасом. */
   ul, ol { padding-left:2.4em; margin-left:0; }
-  li { margin-bottom:.25em; padding-left:.15em; }
+  /* Переносы в списках. Список литературы — 32 записи с длинными
+     англоязычными заглавиями; без переносов строки рвутся рано и список
+     занимает на полосу больше. Содержания это не трогает. */
+  li { margin-bottom:.25em; padding-left:.15em; hyphens:auto; }
   hr { border:0; border-top:1px solid var(--rule); margin:1.8em 0; }
 __MATHCSS__
   @media print {
@@ -283,8 +286,11 @@ __MATHCSS__
        записях она съедала полосу. */
     li { margin-bottom:0; }
     table + p, figure + p, .mf + p, ul + p, ol + p { margin-top:.7em; }
-    h2 { margin:1.2em 0 .4em; }
-    h3 { margin:1em 0 .3em; }
+    /* Отбивка заголовков: при двух десятках подпунктов четверть em на каждом
+       складывается в полосу. Меньше делать нельзя — заголовок сольётся с
+       предыдущим абзацем. */
+    h2 { margin:.9em 0 .3em; }
+    h3 { margin:.8em 0 .25em; }
   }
 </style>
 <div class="bar">
