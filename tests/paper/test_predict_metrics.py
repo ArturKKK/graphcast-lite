@@ -307,3 +307,72 @@ def test_unweighted_wmean_is_a_plain_mean():
     _wmean, = _from_predict("_wmean")
     d2 = np.array([[1.0, 3.0], [3.0, 5.0]])
     assert _wmean(d2, None) == pytest.approx([2.0, 4.0])
+
+
+# --------------------------------------------------------------------------
+# Климатология таблицей (WeatherBench 2)
+# --------------------------------------------------------------------------
+
+@pytest.fixture
+def table_file(tmp_path):
+    """Таблица на два узла и два канала из трёх модельных."""
+    rng = np.random.default_rng(20260921)
+    data = rng.normal(size=(2, 4, 366, 2)).astype(np.float32)   # каналы, час, день, узлы
+    f = tmp_path / "tab.npz"
+    np.savez(f, clim=data, channels=np.array(["t2m", "msl"]),
+             hour=np.array([0, 6, 12, 18]), dayofyear=np.arange(1, 367),
+             node_index=np.array([10, 11]), time_start="2010-01-01T00:00:00",
+             obs_window=2)
+    return f, data
+
+
+def test_table_climatology_marks_channels_without_data(table_file):
+    """Канал без климатологии должен отдавать NaN, а не тихо нули."""
+    Climatology, = _from_predict("Climatology")
+    f, _ = table_file
+    c = Climatology(f, n_channels=3, var_names=["t2m", "10u", "msl"],
+                    mean=np.zeros(3), std=np.ones(3))
+    got = c.field(t_offset=0, horizon=0)
+    assert got.shape == (2, 3)
+    assert np.isfinite(got[:, 0]).all(), "t2m должен быть"
+    assert np.isnan(got[:, 1]).all(), "у 10u климатологии нет — ожидается NaN"
+    assert np.isfinite(got[:, 2]).all(), "msl должен быть"
+
+
+def test_table_climatology_is_standardised(table_file):
+    """Таблица в физических единицах, поля модели нормированы."""
+    Climatology, = _from_predict("Climatology")
+    f, raw = table_file
+    mean = np.array([100.0, 0.0, 7.0]); std = np.array([2.0, 1.0, 5.0])
+    c = Climatology(f, n_channels=3, var_names=["t2m", "10u", "msl"],
+                    mean=mean, std=std)
+    got = c.field(t_offset=0, horizon=0)
+    # шаг 0 при t_offset=0 отвечает 12 UTC 01.01.2010 (окно наблюдений 2)
+    want_t2m = (raw[0, 2, 0] - mean[0]) / std[0]
+    assert got[:, 0] == pytest.approx(want_t2m, rel=1e-5)
+
+
+def test_table_climatology_needs_scalers(table_file):
+    f, _ = table_file
+    Climatology, = _from_predict("Climatology")
+    with pytest.raises(SystemExit, match="scalers"):
+        Climatology(f, n_channels=3, var_names=["t2m", "10u", "msl"])
+
+
+def test_metrics_keep_old_measure_where_climatology_missing():
+    """Смешивать две меры ACC в одной колонке нельзя.
+
+    Канал без климатологии обязан считаться по-старому (отклонение от среднего
+    по области), а не давать NaN и не портить остальные каналы.
+    """
+    rng = np.random.default_rng(1)
+    G, C = 5, 2
+    y = rng.normal(size=(G, C))
+    p_ = y + rng.normal(size=(G, C)) * 0.2
+    cl = np.empty((G, C)); cl[:, 0] = 0.0; cl[:, 1] = np.nan
+    m = StreamingMetrics(C)
+    m.update(y, p_, clim=cl)
+    acc = m.acc_per_channel
+    assert np.isfinite(acc).all(), "NaN просочился в ACC"
+    assert m.acc_num[0] != 0 and m.acc_num[1] == 0
+    assert m.sum_acc[0] == 0 and m.sum_acc[1] != 0

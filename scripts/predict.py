@@ -123,6 +123,14 @@ class StreamingMetrics:
                 yt_a, yp_a = yt - yt.mean(), yp - yp.mean()
                 den = np.linalg.norm(yt_a) * np.linalg.norm(yp_a) + eps
                 self.sum_acc[ch] += float((yt_a * yp_a).sum() / den)
+            elif not np.isfinite(cl_all[0, c]):
+                # Климатологии по этому каналу нет (таблица покрывает не все).
+                # Считаем прежнюю величину и помечаем её как прежнюю, чтобы
+                # две разные меры не смешались в одной колонке.
+                yt, yp = yt_all[:, c], yp_all[:, c]
+                yt_a, yp_a = yt - yt.mean(), yp - yp.mean()
+                den = np.linalg.norm(yt_a) * np.linalg.norm(yp_a) + eps
+                self.sum_acc[ch] += float((yt_a * yp_a).sum() / den)
             else:
                 cc = cl_all[:, c]
                 fa, aa = yp_all[:, c] - cc, yt_all[:, c] - cc
@@ -190,31 +198,84 @@ class StreamingMetrics:
 
 
 class Climatology:
-    """Поле климатологии на произвольный срок по сохранённым гармоникам.
+    """Поле климатологии на произвольный срок. Два источника.
 
-    Коэффициенты считает scripts/paper_climatology.py (ключ --out-coef): три
-    годовые гармоники плюс суточный ход, подогнанные СТРОГО по обучающей части
-    выборки. Здесь они только разворачиваются обратно в поле — чтобы ACC
-    считался относительно климатологии, а не относительно среднего по области.
+    Гармоники (scripts/paper_climatology.py --out-coef): три годовые плюс
+    суточный ход, подогнанные СТРОГО по обучающей части нашей выборки. Покрывают
+    все узлы и все каналы.
+
+    Таблица WeatherBench 2 (scripts/wb2_clim_to_nodes.py): готовая климатология
+    ERA5 за 1990–2019, час × день года. Тридцать лет против девяти, и — главное
+    — та же, против которой считают ACC для GraphCast и HRES, так что числа
+    становятся сопоставимы. Покрывает только узлы области и только те каналы,
+    что выгружены; для остальных возвращается NaN, и ACC по ним остаётся
+    прежней величиной (корреляцией по отклонению от среднего). Смешения не
+    происходит: StreamingMetrics помечает, где какая.
+
+    Значения отдаются в ФИЗИЧЕСКИХ единицах. Стандартизация — дело вызывающего:
+    поля модели нормированы, и вычитать климатологию надо в тех же единицах.
     """
 
-    def __init__(self, path, n_channels: int):
+    def __init__(self, path, n_channels: int, var_names=None, mean=None, std=None):
         z = np.load(path, allow_pickle=True)
-        self.coef = z["coef"].astype(np.float32)          # (K, узлы, каналы)
-        self.t0 = datetime.fromisoformat(str(z["time_start"]))
-        self.obs_window = int(z["obs_window"])
         self.C = n_channels
-        if self.coef.shape[2] < n_channels:
-            raise SystemExit(
-                f"[clim] в {path} каналов {self.coef.shape[2]}, а модели нужно {n_channels}")
+        self.table = "clim" in z.files
+        if not self.table:
+            self.coef = z["coef"].astype(np.float32)      # (K, узлы, каналы)
+            self.t0 = datetime.fromisoformat(str(z["time_start"]))
+            self.obs_window = int(z["obs_window"])
+            if self.coef.shape[2] < n_channels:
+                raise SystemExit(f"[clim] в {path} каналов {self.coef.shape[2]}, "
+                                 f"а модели нужно {n_channels}")
+            self.node_index = None
+            return
+
+        if var_names is None:
+            raise SystemExit("[clim] табличной климатологии нужны имена каналов модели")
+        self.data = z["clim"].astype(np.float32)          # (каналы, час, день, узлы)
+        self.names = [str(v) for v in z["channels"]]
+        self.node_index = z["node_index"].astype(np.int64)
+        self.hour_pos = {int(h): i for i, h in enumerate(z["hour"])}
+        self.doy_pos = {int(d): i for i, d in enumerate(z["dayofyear"])}
+        self.t0 = datetime.fromisoformat(str(z["time_start"])) if "time_start" in z.files \
+            else datetime(2010, 1, 1)
+        self.obs_window = int(z["obs_window"]) if "obs_window" in z.files else 2
+        # Куда лёг каждый наш канал в таблице; -1 значит климатологии нет.
+        self.slot = np.full(n_channels, -1, dtype=np.int64)
+        for i, nm in enumerate(var_names[:n_channels]):
+            if nm in self.names:
+                self.slot[i] = self.names.index(nm)
+        # Таблица в физических единицах, а поля модели нормированы. Переводим
+        # один раз здесь: иначе вычитание climatology из стандартизованного
+        # поля дало бы бессмыслицу, причём правдоподобную на вид.
+        if mean is None or std is None:
+            raise SystemExit("[clim] для таблицы нужны scalers.npz набора")
+        for i in range(n_channels):
+            k = self.slot[i]
+            if k >= 0:
+                self.data[k] = (self.data[k] - mean[i]) / std[i]
+        got = [var_names[i] for i in range(n_channels) if self.slot[i] >= 0]
+        print(f"[clim] таблица: {len(got)} каналов из {n_channels} — {got}")
+        print("[clim] приведена к нормированным единицам набора")
+
+    def _when(self, t_offset: int, horizon: int):
+        """Срок, которому отвечает шаг horizon (с нуля)."""
+        return self.t0 + timedelta(hours=6 * (int(t_offset) + self.obs_window + int(horizon)))
 
     def field(self, t_offset: int, horizon: int, node_idx=None):
-        """Климатология на срок, соответствующий шагу horizon (с нуля)."""
-        # Тот же отсчёт, что в paper_climatology.py: окно наблюдений плюс шаг.
-        fi = int(t_offset) + self.obs_window + int(horizon)
-        x = design_row(self.t0 + timedelta(hours=6 * fi)).astype(np.float32)
-        f = np.tensordot(x, self.coef, axes=(0, 0))[:, :self.C]
-        return f if node_idx is None else f[node_idx]
+        when = self._when(t_offset, horizon)
+        if not self.table:
+            x = design_row(when).astype(np.float32)
+            f = np.tensordot(x, self.coef, axes=(0, 0))[:, :self.C]
+            return f if node_idx is None else f[node_idx]
+
+        hi = self.hour_pos[when.hour]
+        di = self.doy_pos[when.timetuple().tm_yday]
+        out = np.full((len(self.node_index), self.C), np.nan, dtype=np.float32)
+        for c in range(self.C):
+            if self.slot[c] >= 0:
+                out[:, c] = self.data[self.slot[c], hi, di]
+        return out
 
     def stacked(self, t_offset: int, n_horizons: int, node_idx=None):
         """[узлы, C*P] — в том же порядке, в каком идут цели у даталоадера."""
@@ -229,12 +290,16 @@ def _acc_terms(store, scope, i, p, y_true, y_pred, clim, w):
     среднее корреляций. Для бутстрепа этого достаточно: реплика пересобирает
     суммы по своим срокам и делит уже их.
     """
+    clim = np.asarray(clim, dtype=np.float64)
     fa = y_pred.astype(np.float64) - clim
     aa = y_true.astype(np.float64) - clim
     ww = 1.0 if w is None else np.asarray(w)[:, None]
-    store[f"acc_num_{scope}"][i, p, :] = (ww * fa * aa).sum(axis=0)
-    store[f"acc_ff_{scope}"][i, p, :] = (ww * fa ** 2).sum(axis=0)
-    store[f"acc_aa_{scope}"][i, p, :] = (ww * aa ** 2).sum(axis=0)
+    # Каналы без климатологии оставляем нулями: бутстреп по ним потом честно
+    # скажет, что слагаемых нет, вместо того чтобы вернуть NaN.
+    ok = np.isfinite(clim[0])
+    for name, val in (("num", ww * fa * aa), ("ff", ww * fa ** 2), ("aa", ww * aa ** 2)):
+        acc = np.where(ok, np.nan_to_num(val).sum(axis=0), 0.0)
+        store[f"acc_{name}_{scope}"][i, p, :] = acc
 
 
 def _wmean(d2, w):
@@ -610,9 +675,25 @@ def main():
 
     clim = None
     if args.climatology:
-        clim = Climatology(args.climatology, C)
-        print(f"[clim] коэффициенты из {args.climatology}: ACC считается против "
-              f"климатологии, а не против среднего по области")
+        _scl = Path(data_dir) / "scalers.npz"
+        _m = _sd = None
+        if _scl.exists():
+            _z = np.load(_scl)
+            _m, _sd = _z["mean"].astype(np.float64), _z["std"].astype(np.float64)
+        _names = None
+        _vj = Path(data_dir) / "variables.json"
+        if _vj.exists():
+            _names = json.load(open(_vj))
+        clim = Climatology(args.climatology, C, var_names=_names, mean=_m, std=_sd)
+        print(f"[clim] {args.climatology}: ACC считается против климатологии, "
+              f"а не против среднего по области")
+        if clim.node_index is not None and region_idxs is not None:
+            # Таблица покрывает только узлы области. Сверяем состав: молчаливое
+            # несовпадение дало бы ACC по чужим точкам.
+            if not np.array_equal(np.sort(clim.node_index), np.sort(region_idxs)):
+                raise SystemExit(
+                    f"[clim] таблица покрывает {len(clim.node_index)} узлов, "
+                    f"а область прогона — {len(region_idxs)}; это разные наборы точек")
 
     # --- OI init (после region_idxs, чтобы знать ROI) ---
     if _oi_pending:
@@ -931,9 +1012,14 @@ def main():
                 _toff = (test_ds._sample_indices[i][1]
                          if hasattr(test_ds, "_sample_indices") and i < len(test_ds._sample_indices)
                          else i)
-                cl_all = clim.stacked(_toff, effective_P)
-                if region_idxs is not None:
-                    cl_reg = cl_all[region_idxs]
+                if clim.node_index is None:
+                    cl_all = clim.stacked(_toff, effective_P)
+                    if region_idxs is not None:
+                        cl_reg = cl_all[region_idxs]
+                else:
+                    # Табличная климатология задана только на узлах области:
+                    # по всей сетке ACC остаётся прежней величиной.
+                    cl_reg = clim.stacked(_toff, effective_P)
 
             sm_pred.update(y_cpu, out_cpu, clim=cl_all)
             sm_base.update(y_cpu, bl_cpu, clim=cl_all)
