@@ -20,9 +20,11 @@ from datetime import datetime
 
 # --- ЧЕКПОИНТИНГ (для возобновления обучения) ---
 def save_checkpoint(path, model, optimiser, epoch, ar_steps, best_val_loss,
-                    patience_counter, train_losses, val_losses):
+                    patience_counter, train_losses, val_losses, ema=None):
     """Сохраняет полное состояние обучения для возобновления."""
+    extra = {} if ema is None else {'ema_state_dict': ema.state_dict()}
     torch.save({
+        **extra,
         'epoch': epoch,
         'ar_steps': ar_steps,
         'best_val_loss': best_val_loss,
@@ -216,6 +218,48 @@ def carry_forward_channels(out, prev_frame, target_frame,
     return out
 
 
+class WeightEMA:
+    """Экспоненциальное среднее параметров модели.
+
+    Хранится в float32 на том же устройстве. Буферы (если есть) копируются как
+    есть. swap() меняет местами сырые и усреднённые веса — для валидации и
+    сохранения; повторный swap() возвращает сырые.
+    """
+
+    def __init__(self, model, decay: float):
+        self.decay = float(decay)
+        self.shadow = {k: v.detach().clone().float()
+                       for k, v in model.state_dict().items()}
+        self._backup = None
+
+    @torch.no_grad()
+    def update(self, model):
+        d = self.decay
+        for k, v in model.state_dict().items():
+            if v.dtype.is_floating_point:
+                self.shadow[k].mul_(d).add_(v.detach().float(), alpha=1.0 - d)
+            else:
+                self.shadow[k].copy_(v)
+
+    def state_dict(self):
+        return self.shadow
+
+    def load_state_dict(self, sd):
+        for k in self.shadow:
+            if k in sd:
+                self.shadow[k].copy_(sd[k].to(self.shadow[k].device).float())
+
+    @torch.no_grad()
+    def swap(self, model):
+        if self._backup is None:
+            self._backup = {k: v.detach().clone() for k, v in model.state_dict().items()}
+            model.load_state_dict({k: self.shadow[k].to(v.dtype)
+                                   for k, v in model.state_dict().items()})
+        else:
+            model.load_state_dict(self._backup)
+            self._backup = None
+
+
 def train_epoch(
     model: WeatherPrediction,
     train_dataloader: DataLoader,
@@ -241,19 +285,26 @@ def train_epoch(
     # Нужно для развёрток длиннее четырёх шагов: иначе не хватает памяти.
     detach_ar=False,
     scheduler=None,
+    grad_clip_norm=0.0,
+    grad_accum_steps=1,
+    ema=None,
 ):
     """Один проход обучения. ТЕПЕРЬ С АВТОРЕГРЕССИЕЙ."""
     model.train()  
     total_loss = 0  
     # print(threshold) # Можно раскомментировать для отладки
 
+    accum = max(1, int(grad_accum_steps))
+    n_batches = len(train_dataloader)
     for i, batch in enumerate(train_dataloader):  
         X, y = batch  
         # Удаляем лишние размерности (если батч 1)
         y = y.squeeze(0) if len(y.shape) == 4 else y 
         X, y = X.to(device), y.to(device)  
-        
-        optimiser.zero_grad()  
+        # Обнуляем в НАЧАЛЕ цикла накопления, а не после шага: при accum=1 это
+        # ровно прежнее поведение (градиент последнего батча остаётся виден).
+        if i % accum == 0:
+            optimiser.zero_grad()
 
         # --- НАЧАЛО НОВОЙ ЛОГИКИ (AR) ---
         
@@ -348,7 +399,7 @@ def train_epoch(
 
           # backward держим ВНЕ autocast — так предписывает документация torch.
           if step_backward:
-            (step_loss / steps_to_run).backward()
+            (step_loss / (steps_to_run * accum)).backward()
             loss_batch += float(step_loss.detach())
             # Отцепляем состояние: следующий шаг стартует с числа, а не с графа.
             curr_state = curr_state.detach()
@@ -359,12 +410,19 @@ def train_epoch(
         # сделан внутри цикла, здесь остаётся только усреднить для отчёта.
         loss_batch = loss_batch / steps_to_run
         if not step_backward:
-            loss_batch.backward()
-        optimiser.step()
-        # Шаг планировщика — ПОШАГОВЫЙ, а не поэпохный: разогрев меряется в
-        # шагах (у GraphCast 1000), а эпоха у нас это около 12 800 шагов.
-        if scheduler is not None:
-            scheduler.step()
+            (loss_batch / accum).backward()
+        # Шаг оптимизатора раз в accum примеров (и на хвосте эпохи). Градиент
+        # копится, лосс каждого примера уже поделен на accum — среднее, не сумма.
+        if (i + 1) % accum == 0 or (i + 1) == n_batches:
+            if grad_clip_norm and grad_clip_norm > 0:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip_norm)
+            optimiser.step()
+            if ema is not None:
+                ema.update(model)
+            # Шаг планировщика — ПОШАГОВЫЙ, а не поэпохный: разогрев меряется в
+            # шагах оптимизатора (у GraphCast 1000).
+            if scheduler is not None:
+                scheduler.step()
 
         total_loss += (loss_batch if step_backward else loss_batch.detach().item())
         # --- КОНЕЦ НОВОЙ ЛОГИКИ ---
@@ -775,7 +833,8 @@ def train(
         import math
         warmup = int(getattr(config, 'lr_warmup_steps', 1000))
         min_factor = float(getattr(config, 'lr_min_factor', 0.0))
-        steps_per_epoch = max(1, len(train_dataloader))
+        _acc = max(1, int(getattr(config, 'grad_accum_steps', 1)))
+        steps_per_epoch = max(1, -(-len(train_dataloader) // _acc))   # шаги ОПТИМИЗАТОРА
         total_steps = max(1, num_epochs * steps_per_epoch)
 
         def _lr_lambda(step: int) -> float:
@@ -803,6 +862,20 @@ def train(
              + (f", возобновление с шага {done_steps}" if done_steps else ""))
     elif lr_schedule != 'constant':
         _log(f"# ВНИМАНИЕ: неизвестный lr_schedule={lr_schedule!r}, темп остаётся постоянным")
+
+    grad_clip_norm = float(getattr(config, 'grad_clip_norm', 0.0) or 0.0)
+    grad_accum_steps = max(1, int(getattr(config, 'grad_accum_steps', 1)))
+    ema_decay = float(getattr(config, 'ema_decay', 0.0) or 0.0)
+    ema = WeightEMA(model, ema_decay) if ema_decay > 0 else None
+    if ema is not None and resume_checkpoint and os.path.exists(resume_checkpoint):
+        _ck = torch.load(resume_checkpoint, map_location=device)
+        if 'ema_state_dict' in _ck:
+            ema.load_state_dict(_ck['ema_state_dict'])
+            _log("# EMA восстановлено из чекпойнта")
+        del _ck
+    if grad_clip_norm > 0 or grad_accum_steps > 1 or ema is not None:
+        _log(f"# обрезка градиента {grad_clip_norm:g}, накопление {grad_accum_steps}, "
+             f"EMA {ema_decay:g}")
 
     # --- Fine-tuning: freeze/unfreeze processor ---
     freeze_proc_epochs = getattr(config, 'freeze_processor_epochs', 0)
@@ -856,7 +929,14 @@ def train(
             noise_apply_from_ar_step=noise_apply_from,
             detach_ar=detach_ar,
             scheduler=scheduler,
+            grad_clip_norm=grad_clip_norm,
+            grad_accum_steps=grad_accum_steps,
+            ema=ema,
         )
+
+        # Валидация и «лучшая модель» — по усреднённым весам, если EMA включено.
+        if ema is not None:
+            ema.swap(model)
 
         # Валидация: по умолчанию одношаговая, как было всегда. Если в конфиге
         # задан val_ar_steps > 1 — меряем на нескольких горизонтах и отбираем
@@ -902,6 +982,11 @@ def train(
         if per_h:
             _log('#   по горизонтам: ' + '  '.join(f'+{6*(i+1)}ч {v:.5f}' for i, v in enumerate(per_h)))
 
+        # Усреднённые веса последней эпохи — отдельным файлом, для оценки.
+        if ema is not None:
+            torch.save(model.state_dict(), os.path.join(results_save_dir, "ema_last.pth"))
+            ema.swap(model)   # назад к сырым весам: продолжать обучение надо ими
+
         # --- Сохраняем чекпоинт для возможного возобновления ---
         save_checkpoint(
             path=os.path.join(results_save_dir, FileNames.CHECKPOINT),
@@ -909,6 +994,7 @@ def train(
             ar_steps=ar_steps, best_val_loss=best_val_loss,
             patience_counter=patience_counter,
             train_losses=train_losses, val_losses=val_losses,
+            ema=ema,
         )
 
         if patience_counter >= config.early_stopping_patience:  

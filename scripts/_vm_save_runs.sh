@@ -21,11 +21,11 @@ mkdir -p "$DST"
 # Префиксы прогонов. w_ — этап 1 (широтный вес и ACC), f_ — табл. 4
 # (заморозка). 21.09.2026 скрипт знал только про w_, и результаты заморозки
 # молча не доехали: «скопировано 12», «нового нет».
-PREFIXES=${PREFIXES:-"w_ f_ g_"}
+PREFIXES=${PREFIXES:-"w_ f_ g_ t_ d_"}
 list_files() {
   local pre
   for pre in $PREFIXES; do
-    ls -1 "$SRC/${pre}"*_samples.npz "$SRC/${pre}"*.log 2>/dev/null
+    ls -1 "$SRC/${pre}"*_samples.npz "$SRC/${pre}"*_errors.npz "$SRC/${pre}"*.log 2>/dev/null
   done
   ls -1 "$SRC"/*_master.log "$SRC"/acc_clim.log 2>/dev/null
 }

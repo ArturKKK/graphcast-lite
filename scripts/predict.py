@@ -406,6 +406,12 @@ def main():
     ap.add_argument("--oi-corr-len", type=float, default=10000.0)
     ap.add_argument("--oi-first-k", type=int, default=None,
                     help="Применять ОИ только на первых K AR-шагах (default: на всех)")
+    ap.add_argument("--save-region-errors", type=str, default=None,
+                    help="npz с полями ошибки (прогноз − истина) по узлам области "
+                         "для инициализаций 00 и 12 UTC: диагностика масштабов "
+                         "ошибки против GraphCast (у него только эти сроки)")
+    ap.add_argument("--region-error-channels", nargs="*",
+                    default=["t2m", "10u", "10v", "msl"])
     ap.add_argument("--save-sample-metrics", type=str, default=None,
                     help="Путь к .npz для per-sample MSE (для бутстреп-ДИ). Компактно (~1 МБ), "
                          "в отличие от --save, который пишет полные поля (десятки ГБ)")
@@ -787,6 +793,20 @@ def main():
     if no_loss_ch:
         print(f"[metrics] Исключены из aggregate метрик: каналы {no_loss_ch} (static+forcing)")
 
+    # --- поля ошибки по области (диагностика масштабов) ---
+    region_err = region_err_t0 = None
+    if args.save_region_errors:
+        if region_idxs is None:
+            raise SystemExit("--save-region-errors требует --region")
+        _vars = json.loads((Path(data_dir) / "variables.json").read_text())
+        _err_ch = [_vars.index(n) for n in args.region_error_channels]
+        _err_std = np.load(Path(data_dir) / "scalers.npz")["std"].astype(np.float64)
+        _info = json.loads((Path(data_dir) / "dataset_info.json").read_text())
+        _ds_start = np.datetime64(str(_info["time_start"])[:10] + "T00", "h")
+        obs_w_err = int(OBS)
+        region_err, region_err_t0 = [], []
+        print(f"[region-errors] каналы {args.region_error_channels}, старт набора {_ds_start}")
+
     # --- per-sample метрики (для бутстреп-ДИ): компактные MSE по сэмплам ---
     sample_metrics = None
     if args.save_sample_metrics:
@@ -1067,6 +1087,25 @@ def main():
                         sm_pred_rh[p].update(y_cpu[region_idxs][:, sl], out_cpu[region_idxs][:, sl], clim=_cr)
                         sm_base_rh[p].update(y_cpu[region_idxs][:, sl], bl_cpu[region_idxs][:, sl], clim=_cr)
 
+            # --- поля ошибки по области для диагностики масштабов ---
+            # Только 00/12 UTC: с GraphCast сравнивать можно лишь на них. В
+            # физических единицах, float16 — иначе файл не пролезает в git.
+            if region_err is not None and region_idxs is not None:
+                _to = (test_ds._sample_indices[i][1]
+                       if hasattr(test_ds, "_sample_indices") and i < len(test_ds._sample_indices)
+                       else i)
+                _t0 = _ds_start + np.timedelta64(6 * (int(_to) + obs_w_err - 1), "h")
+                if int(_t0.astype("datetime64[h]").astype("int64") % 24) in (0, 12):
+                    _yr = np.asarray(y_cpu[region_idxs], dtype=np.float32)
+                    _or = np.asarray(out_cpu[region_idxs], dtype=np.float32)
+                    _e = np.empty((effective_P, len(region_idxs), len(_err_ch)), np.float16)
+                    for _p in range(effective_P):
+                        for _k, _c in enumerate(_err_ch):
+                            _j = _p * C + _c
+                            _e[_p, :, _k] = (_or[:, _j] - _yr[:, _j]) * _err_std[_c]
+                    region_err.append(_e)
+                    region_err_t0.append(_t0)
+
             # --- per-sample метрики для бутстрепа доверительных интервалов ---
             # Компактно (~1 МБ на прогон) в отличие от --save (десятки ГБ полей).
             if sample_metrics is not None:
@@ -1135,6 +1174,18 @@ def main():
         }
         torch.save(save_dict, save_path)
         print(f"\n[Save] predictions → {save_path} (pred={preds_tensor.shape}, gt={gt_tensor.shape})")
+
+    if region_err is not None:
+        _co = np.load(coords_npz) if coords_npz.exists() else None
+        np.savez_compressed(
+            args.save_region_errors,
+            err=np.stack(region_err) if region_err else np.zeros((0,)),
+            t0=np.array(region_err_t0, dtype="datetime64[h]"),
+            channels=np.array(args.region_error_channels),
+            lat=(_co["latitude"][region_idxs] if _co is not None else np.array([])),
+            lon=(_co["longitude"][region_idxs] if _co is not None else np.array([])),
+            lead_h=np.arange(1, AR_STEPS + 1) * 6)
+        print(f"[Save] поля ошибки → {args.save_region_errors} ({len(region_err)} сроков 00/12 UTC)")
 
     # --- persist per-sample metrics (bootstrap CI) ---
     if sample_metrics is not None:
