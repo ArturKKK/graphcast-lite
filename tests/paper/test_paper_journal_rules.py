@@ -25,9 +25,12 @@ def body():
 
 def abstracts():
     lines = ARTICLE.read_text().splitlines()
-    ru = next(x for x in lines if x.startswith("Представлена "))
-    en = next(x for x in lines if x.startswith("A regional "))
-    return ru, en
+    # Аннотация стоит абзацем прямо перед ключевыми словами (через пустую
+    # строку); первое слово у неё может меняться при правке стиля.
+    def before(head):
+        i = next(k for k, x in enumerate(lines) if x.startswith(head))
+        return next(x for x in reversed(lines[:i]) if x.strip())
+    return before("Ключевые слова:"), before("Keywords:")
 
 
 @pytest.mark.parametrize("lang,text", list(zip(("рус.", "англ."), abstracts())))
