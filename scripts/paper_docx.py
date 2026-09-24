@@ -12,6 +12,17 @@ PDF, который мы собираем weasyprint, нужен нам для �
 Editor» (п. 15). pandoc переводит $…$ в OMML — это и есть родной формат
 Equation Editor, то есть формулы приходят редактируемыми, а не картинками.
 
+Номера формул. pandoc при переводе в OMML молча выбрасывает \\tag: до
+24.09.2026 в docx не было номеров (1)–(7), хотя текст на них ссылается.
+Номера снимаются из разметки до pandoc, а после него каждая выключная формула
+ставится в таблицу без рамок: формула по центру, номер у правого поля. Так
+номера оформляют в Word, и формула остаётся редактируемой.
+
+Формат .doc (--doc). Яндекс Документы при загрузке docx теряют формулы OMML.
+В .doc LibreOffice сохраняет их объектами Microsoft Equation 3.0, у каждого
+есть готовое изображение. Это запасной путь для совместной правки, в редакцию
+идёт docx.
+
 Таблицы и рисунки, как и в PDF, уезжают на отдельные страницы после текста
 (п. 13, 14). Правило разметки то же самое, что в paper_artifact.py, но
 выполняется прямо над разметкой: docx собирается pandoc-ом, а не из HTML.
@@ -19,6 +30,7 @@ Equation Editor, то есть формулы приходят редактир�
 Запуск:
     python3 scripts/paper_docx.py
     python3 scripts/paper_docx.py --out /tmp/статья.docx
+    python3 scripts/paper_docx.py --doc      # ещё и article_gip.doc рядом
 """
 import argparse
 import re
@@ -127,10 +139,84 @@ def relocate(md: str) -> str:
     return md + "\n\n\\newpage\n\n" + tail + "\n"
 
 
+TAG = re.compile(r"\\tag\{([^}]*)\}")
+TEXT_W = PG["w"] - MAR["left"] - MAR["right"]    # ширина полосы набора, твипы
+NUM_W = 850                                        # колонка номера, 1,5 см
+
+
+def strip_tags(md: str):
+    """Снимает \\tag{n} с выключных формул; возвращает разметку и номера по порядку."""
+    tags = []
+
+    def one(m):
+        body = m.group(1)
+        t = TAG.search(body)
+        tags.append(t.group(1) if t else None)
+        # в одну строку: после снятия \\tag остаётся пустая строка, и pandoc
+        # перестаёт считать формулу выключной
+        return "$$" + " ".join(TAG.sub("", body).split()) + "$$"
+
+    return re.sub(r"\$\$(.+?)\$\$", one, md, flags=re.S), tags
+
+
+def number_equations(docx: Path, tags: list) -> int:
+    """Каждый абзац с выключной формулой → таблица «формула | (n)» без рамок."""
+    with zipfile.ZipFile(docx) as z:
+        parts = {n: z.read(n) for n in z.namelist()}
+    doc = parts["word/document.xml"].decode("utf-8")
+    paras = list(re.finditer(r"<w:p>(?:(?!</w:p>).)*?<m:oMathPara>.*?</m:oMathPara>.*?</w:p>",
+                             doc, flags=re.S))
+    if len(paras) != len(tags):
+        raise SystemExit(f"[docx] выключных формул в docx {len(paras)}, в разметке {len(tags)}")
+    none = ('<w:tblBorders>' + "".join(f'<w:{s} w:val="nil"/>' for s in
+            ("top", "left", "bottom", "right", "insideH", "insideV")) + '</w:tblBorders>')
+    no_indent = '<w:pPr><w:ind w:firstLine="0"/><w:jc w:val="{}"/></w:pPr>'
+    out, pos, n = [], 0, 0
+    for m, tag in zip(paras, tags):
+        out.append(doc[pos:m.start()])
+        pos = m.end()
+        if tag is None:
+            out.append(m.group(0))
+            continue
+        para = re.sub(r"^<w:p>(<w:pPr>.*?</w:pPr>)?", "<w:p>" + no_indent.format("center"),
+                      m.group(0), count=1, flags=re.S)
+        cell = ('<w:tc><w:tcPr><w:tcW w:w="{w}" w:type="dxa"/><w:vAlign w:val="center"/>'
+                '</w:tcPr>{body}</w:tc>')
+        num = (f'<w:p>{no_indent.format("right")}<w:r><w:t>({tag})</w:t></w:r></w:p>')
+        out.append(
+            f'<w:tbl><w:tblPr><w:tblW w:w="{TEXT_W}" w:type="dxa"/>{none}'
+            '<w:tblLayout w:type="fixed"/></w:tblPr>'
+            f'<w:tblGrid><w:gridCol w:w="{TEXT_W - NUM_W}"/><w:gridCol w:w="{NUM_W}"/></w:tblGrid>'
+            '<w:tr>' + cell.format(w=TEXT_W - NUM_W, body=para)
+            + cell.format(w=NUM_W, body=num) + '</w:tr></w:tbl>')
+        n += 1
+    out.append(doc[pos:])
+    parts["word/document.xml"] = "".join(out).encode("utf-8")
+    with zipfile.ZipFile(docx, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, data in parts.items():
+            z.writestr(name, data)
+    return n
+
+
+def to_doc(docx: Path) -> Path:
+    """docx → doc через LibreOffice: формулы уходят объектами Equation 3.0."""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        raise SystemExit("нет LibreOffice: apt-get install -y libreoffice-writer libreoffice-math")
+    r = subprocess.run([soffice, "--headless", "--convert-to", "doc", "--outdir",
+                        str(docx.parent), str(docx)], capture_output=True, text=True)
+    dst = docx.with_suffix(".doc")
+    if r.returncode != 0 or not dst.exists():
+        raise SystemExit(f"[doc] LibreOffice не справился:\n{r.stderr[-1500:]}")
+    return dst
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(OUT))
     ap.add_argument("--src", default=str(SRC))
+    ap.add_argument("--doc", action="store_true",
+                    help="ещё и .doc: для Яндекс Документов, которые теряют формулы docx")
     a = ap.parse_args()
 
     if not shutil.which("pandoc"):
@@ -140,6 +226,7 @@ def main():
     for marker in cut:
         print(f"   отрезан служебный раздел: {marker}")
     md = relocate(md)
+    md, tags = strip_tags(md)
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
@@ -156,6 +243,10 @@ def main():
         if r.returncode != 0:
             raise SystemExit(f"[docx] pandoc не справился:\n{r.stderr[-2000:]}")
 
+    n = number_equations(Path(a.out), tags)
+    print(f"   номера формул проставлены: {n}")
+    if a.doc:
+        print(f"   .doc: {to_doc(Path(a.out))}")
     size = Path(a.out).stat().st_size // 1024
     print(f"готово: {a.out} ({size} КБ)")
     print("проверьте в Word: TNR 12, полуторный интервал, поля 25/25/25/15 мм,")

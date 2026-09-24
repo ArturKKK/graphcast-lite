@@ -46,6 +46,12 @@ def docx(tmp_path_factory):
     }
 
 
+def data_tables(doc):
+    """Таблицы с данными; таблицы-обёртки выключных формул (формула | номер) не в счёт."""
+    return [m for m in re.finditer(r"<w:tbl>.*?</w:tbl>", doc, flags=re.S)
+            if "<m:oMathPara>" not in m.group(0)]
+
+
 def attrs(xml, tag):
     """Значения атрибутов тега — порядок в них pandoc не сохраняет."""
     m = re.search(rf"<{tag}\b([^>]*)/?>", xml)
@@ -79,7 +85,7 @@ def test_formulas_are_editable_not_pictures(docx):
 
 def test_all_tables_present(docx):
     from paper_artifact import TABLES_EN
-    assert docx["doc"].count("<w:tbl>") == len(TABLES_EN)
+    assert len(data_tables(docx["doc"])) == len(TABLES_EN)
 
 
 def test_figures_embedded(docx):
@@ -91,7 +97,7 @@ def test_tables_and_figures_come_after_the_text(docx):
     """П. 13, 14: и те, и другие — после основного текста."""
     text = re.sub(r"<[^>]+>", " ", docx["doc"])
     refs = text.index("Список литературы")
-    first_tbl = docx["doc"].index("<w:tbl>")
+    first_tbl = data_tables(docx["doc"])[0].start()
     text_before_tbl = len(re.sub(r"<[^>]+>", " ", docx["doc"][:first_tbl]).split())
     assert refs > 0, "в документе нет списка литературы"
     # Первая таблица должна стоять дальше основного текста: слов до неё
@@ -112,3 +118,23 @@ def test_superscript_affiliations(docx):
     text = re.sub(r"<[^>]+>", " ", docx["doc"])
     assert "^1" not in text and "^2^" not in text, "крышки остались в тексте"
     assert "superscript" in docx["doc"], "надстрочных знаков нет вовсе"
+
+
+def test_display_formulas_numbered(docx):
+    """Номера (1)–(n) стоят у каждой выключной формулы и идут по порядку.
+
+    pandoc молча выбрасывает \\tag при переводе в OMML: до 24.09.2026 в docx
+    не было ни одного номера, хотя текст ссылается на «(1)», «согласно (3)».
+    """
+    md = (ROOT / "docs" / "paper" / "article_gip.md").read_text()
+    want = re.findall(r"\\tag\{([^}]*)\}", md)
+    assert want, "в рукописи нет ни одной пронумерованной формулы"
+    doc = docx["doc"]
+    assert doc.count("<m:oMathPara>") == len(want), "выключная формула стала строчной"
+    got = []
+    for tbl in re.findall(r"<w:tbl>.*?</w:tbl>", doc, flags=re.S):
+        if "<m:oMathPara>" in tbl:
+            m = re.search(r"<w:t>\((\d+)\)</w:t>", tbl)
+            assert m, "у формулы нет номера"
+            got.append(m.group(1))
+    assert got == want
