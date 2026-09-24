@@ -1,0 +1,83 @@
+[12:43:46] === M1+M5 START (commit d62475f) ===
+[12:43:46] START m1_noda_ar28
+[13:03:24] DONE  m1_noda_ar28 rc=0 | skill=18.86% |  t2m K 1.44°C 1.83°C 1.99°C 2.11°C 2.29°C 2.42°C 2.49°C 2.59°C
+[13:03:24] START m1_oi10_ar28
+[13:36:29] DONE  m1_oi10_ar28 rc=0 | skill=78.31% |  t2m K 0.84°C 1.02°C 1.08°C 1.12°C 1.21°C 1.26°C 1.29°C 1.31°C
+[13:36:30] START m1_oi10_first4_ar28
+[13:58:00] DONE  m1_oi10_first4_ar28 rc=0 | skill=18.69% |  t2m K 0.84°C 1.02°C 1.08°C 1.12°C 1.70°C 2.02°C 2.20°C 2.36°C
+[13:58:00] START m1_oi1_ar28
+[14:20:13] DONE  m1_oi1_ar28 rc=0 | skill=68.88% |  t2m K 1.22°C 1.53°C 1.65°C 1.74°C 1.87°C 1.96°C 2.01°C 2.05°C
+[14:20:14] START m1_dipl_noda_ar28
+[14:39:42] DONE  m1_dipl_noda_ar28 rc=0 | skill=-90.51% |  t2m K 1.40°C 1.77°C 1.97°C 2.12°C 2.35°C 2.49°C 2.67°C 2.83°C
+[14:39:43] START m1_dipl_oi10_ar28
+[15:13:04] DONE  m1_dipl_oi10_ar28 rc=0 | skill=-60.44% |  t2m K 0.84°C 1.02°C 1.09°C 1.15°C 1.22°C 1.27°C 1.29°C 1.32°C
+[15:13:04] START m5_val_oi_L50000_s0.3
+[15:18:06] DONE  m5_val_oi_L50000_s0.3 rc=0 | skill=86.13% |  t2m K 0.89°C 1.06°C 1.10°C 1.13°C
+[15:18:06] START m5_val_oi_L50000_s0.5
+[15:23:08] DONE  m5_val_oi_L50000_s0.5 rc=0 | skill=85.76% |  t2m K 0.93°C 1.09°C 1.13°C 1.17°C
+[15:23:08] START m5_val_oi_L50000_s1.0
+[15:28:12] DONE  m5_val_oi_L50000_s1.0 rc=0 | skill=83.83% |  t2m K 1.07°C 1.25°C 1.28°C 1.32°C
+[15:28:12] START m5_val_oi_L100000_s0.3
+[15:33:16] DONE  m5_val_oi_L100000_s0.3 rc=0 | skill=86.12% |  t2m K 0.87°C 1.03°C 1.07°C 1.11°C
+[15:33:16] START m5_val_oi_L100000_s0.5
+[15:38:19] DONE  m5_val_oi_L100000_s0.5 rc=0 | skill=86.55% |  t2m K 0.87°C 1.02°C 1.05°C 1.08°C
+[15:38:19] START m5_val_oi_L100000_s1.0
+[15:43:18] DONE  m5_val_oi_L100000_s1.0 rc=0 | skill=85.98% |  t2m K 0.94°C 1.08°C 1.11°C 1.14°C
+[15:43:19] START m5_val_oi_L150000_s0.3
+[15:48:18] DONE  m5_val_oi_L150000_s0.3 rc=0 | skill=85.86% |  t2m K 0.92°C 1.08°C 1.11°C 1.14°C
+[15:48:18] START m5_val_oi_L150000_s0.5
+[15:53:17] DONE  m5_val_oi_L150000_s0.5 rc=0 | skill=86.06% |  t2m K 0.92°C 1.07°C 1.10°C 1.13°C
+[15:53:17] START m5_val_oi_L150000_s1.0
+[15:58:20] DONE  m5_val_oi_L150000_s1.0 rc=0 | skill=85.70% |  t2m K 0.95°C 1.11°C 1.14°C 1.16°C
+[15:58:20] START m5_val_oi_L200000_s0.3
+[16:03:24] DONE  m5_val_oi_L200000_s0.3 rc=0 | skill=85.45% |  t2m K 0.95°C 1.12°C 1.15°C 1.18°C
+[16:03:24] START m5_val_oi_L200000_s0.5
+[16:08:27] DONE  m5_val_oi_L200000_s0.5 rc=0 | skill=85.53% |  t2m K 0.96°C 1.12°C 1.15°C 1.18°C
+[16:08:27] START m5_val_oi_L200000_s1.0
+[16:13:31] DONE  m5_val_oi_L200000_s1.0 rc=0 | skill=85.19% |  t2m K 0.99°C 1.15°C 1.19°C 1.22°C
+[16:13:31] === M5 VAL SWEEP DONE — лучшие (L,sigma) выбираются из логов выше ===
+[16:13:31] START m5_test_baseline
+[16:37:16] DONE  m5_test_baseline rc=0 | skill=70.26% |  t2m K 1.39°C 1.66°C 1.74°C 1.84°C
+[16:37:16] START m5_test_nudge_a0.5
+[17:01:51] DONE  m5_test_nudge_a0.5 rc=0 | skill=71.79% |  t2m K 1.34°C 1.59°C 1.66°C 1.75°C
+[17:01:51] START m5_test_nudge_a0.7
+[17:26:11] DONE  m5_test_nudge_a0.7 rc=0 | skill=72.10% |  t2m K 1.33°C 1.58°C 1.65°C 1.74°C
+[17:26:11] START m5_test_nudge_a0.9
+[17:50:30] DONE  m5_test_nudge_a0.9 rc=0 | skill=72.29% |  t2m K 1.32°C 1.57°C 1.64°C 1.73°C
+[17:50:30] START m5_test_oi1
+[18:17:01] DONE  m5_test_oi1 rc=0 | skill=77.24% |  t2m K 1.16°C 1.36°C 1.39°C 1.42°C
+[18:17:01] START m5_test_oi10_seed42
+[18:55:53] DONE  m5_test_oi10_seed42 rc=0 | skill=84.65% |  t2m K 0.82°C 0.93°C 0.93°C 0.94°C
+[18:55:53] START m5_test_oi10_seed43
+[19:34:43] DONE  m5_test_oi10_seed43 rc=0 | skill=84.89% |  t2m K 0.82°C 0.94°C 0.93°C 0.94°C
+[19:34:44] START m5_test_oi10_seed44
+[20:13:50] DONE  m5_test_oi10_seed44 rc=0 | skill=85.08% |  t2m K 0.81°C 0.93°C 0.92°C 0.93°C
+[20:13:50] === ALL DONE ===
+[13:03:24] DONE  m1_noda_ar28 rc=0 | skill=18.86% |  t2m K 1.44°C 1.83°C 1.99°C 2.11°C 2.29°C 2.42°C 2.49°C 2.59°C
+[13:36:29] DONE  m1_oi10_ar28 rc=0 | skill=78.31% |  t2m K 0.84°C 1.02°C 1.08°C 1.12°C 1.21°C 1.26°C 1.29°C 1.31°C
+[13:58:00] DONE  m1_oi10_first4_ar28 rc=0 | skill=18.69% |  t2m K 0.84°C 1.02°C 1.08°C 1.12°C 1.70°C 2.02°C 2.20°C 2.36°C
+[14:20:13] DONE  m1_oi1_ar28 rc=0 | skill=68.88% |  t2m K 1.22°C 1.53°C 1.65°C 1.74°C 1.87°C 1.96°C 2.01°C 2.05°C
+[14:39:42] DONE  m1_dipl_noda_ar28 rc=0 | skill=-90.51% |  t2m K 1.40°C 1.77°C 1.97°C 2.12°C 2.35°C 2.49°C 2.67°C 2.83°C
+[15:13:04] DONE  m1_dipl_oi10_ar28 rc=0 | skill=-60.44% |  t2m K 0.84°C 1.02°C 1.09°C 1.15°C 1.22°C 1.27°C 1.29°C 1.32°C
+[15:18:06] DONE  m5_val_oi_L50000_s0.3 rc=0 | skill=86.13% |  t2m K 0.89°C 1.06°C 1.10°C 1.13°C
+[15:23:08] DONE  m5_val_oi_L50000_s0.5 rc=0 | skill=85.76% |  t2m K 0.93°C 1.09°C 1.13°C 1.17°C
+[15:28:12] DONE  m5_val_oi_L50000_s1.0 rc=0 | skill=83.83% |  t2m K 1.07°C 1.25°C 1.28°C 1.32°C
+[15:33:16] DONE  m5_val_oi_L100000_s0.3 rc=0 | skill=86.12% |  t2m K 0.87°C 1.03°C 1.07°C 1.11°C
+[15:38:19] DONE  m5_val_oi_L100000_s0.5 rc=0 | skill=86.55% |  t2m K 0.87°C 1.02°C 1.05°C 1.08°C
+[15:43:18] DONE  m5_val_oi_L100000_s1.0 rc=0 | skill=85.98% |  t2m K 0.94°C 1.08°C 1.11°C 1.14°C
+[15:48:18] DONE  m5_val_oi_L150000_s0.3 rc=0 | skill=85.86% |  t2m K 0.92°C 1.08°C 1.11°C 1.14°C
+[15:53:17] DONE  m5_val_oi_L150000_s0.5 rc=0 | skill=86.06% |  t2m K 0.92°C 1.07°C 1.10°C 1.13°C
+[15:58:20] DONE  m5_val_oi_L150000_s1.0 rc=0 | skill=85.70% |  t2m K 0.95°C 1.11°C 1.14°C 1.16°C
+[16:03:24] DONE  m5_val_oi_L200000_s0.3 rc=0 | skill=85.45% |  t2m K 0.95°C 1.12°C 1.15°C 1.18°C
+[16:08:27] DONE  m5_val_oi_L200000_s0.5 rc=0 | skill=85.53% |  t2m K 0.96°C 1.12°C 1.15°C 1.18°C
+[16:13:31] DONE  m5_val_oi_L200000_s1.0 rc=0 | skill=85.19% |  t2m K 0.99°C 1.15°C 1.19°C 1.22°C
+[16:13:31] === M5 VAL SWEEP DONE — лучшие (L,sigma) выбираются из логов выше ===
+[16:37:16] DONE  m5_test_baseline rc=0 | skill=70.26% |  t2m K 1.39°C 1.66°C 1.74°C 1.84°C
+[17:01:51] DONE  m5_test_nudge_a0.5 rc=0 | skill=71.79% |  t2m K 1.34°C 1.59°C 1.66°C 1.75°C
+[17:26:11] DONE  m5_test_nudge_a0.7 rc=0 | skill=72.10% |  t2m K 1.33°C 1.58°C 1.65°C 1.74°C
+[17:50:30] DONE  m5_test_nudge_a0.9 rc=0 | skill=72.29% |  t2m K 1.32°C 1.57°C 1.64°C 1.73°C
+[18:17:01] DONE  m5_test_oi1 rc=0 | skill=77.24% |  t2m K 1.16°C 1.36°C 1.39°C 1.42°C
+[18:55:53] DONE  m5_test_oi10_seed42 rc=0 | skill=84.65% |  t2m K 0.82°C 0.93°C 0.93°C 0.94°C
+[19:34:43] DONE  m5_test_oi10_seed43 rc=0 | skill=84.89% |  t2m K 0.82°C 0.94°C 0.93°C 0.94°C
+[20:13:50] DONE  m5_test_oi10_seed44 rc=0 | skill=85.08% |  t2m K 0.81°C 0.93°C 0.92°C 0.93°C
+[20:13:50] === ALL DONE ===

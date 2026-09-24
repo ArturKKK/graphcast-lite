@@ -1,0 +1,9 @@
+[23.09 20:10:21] === УЛУЧШЕНИЕ: ema (c425c27) ===
+[23.09 20:10:21] нет окружения или датасета — восстанавливаю (~40 мин), лог /workdir/paper_logs/restore33f.log
+[23.09 20:49:05] восстановление rc=0
+[prep] multires_krsk_33f: эпоха 28 -> /data/paper_heavy/krsk33f_last_epoch.pth
+[prep] multires_krsk_33f_chw: эпоха 7 -> /data/paper_heavy/krsk33f_chw_last.pth
+[23.09 20:49:08] START d_chw_diag
+[23.09 22:48:36] DONE  d_chw_diag rc=0 |  t2m K 1.19°C 1.38°C 1.41°C 1.47°C
+[prep] experiments/multires_krsk_33f_chw_ema/config.json: эпох 8, EMA 0.999, обрезка 1.0, темп 7.5e-05 cosine
+[23.09 22:48:36] START обучение multires_krsk_33f_chw_ema 

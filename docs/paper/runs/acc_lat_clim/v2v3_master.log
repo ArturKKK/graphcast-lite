@@ -1,0 +1,24 @@
+[14:50:53] === v2 vs v3 START (commit 290ea46) ===
+[14:50:53] disk: 118G
+[14:50:53] venv/torch отсутствует — ставлю
+[14:54:20] torch=2.2.2+cu121 True
+[14:54:20] ckpt 1a841c3c9420f94be69a23d0dcecc090  experiments/wb2_512x256_19f_ar_v2/best_model.pth
+[14:54:20] ckpt 22397f67ef83a01a50f83e035179656a  experiments/wb2_512x256_33f_ar_v3/best_model.pth
+[14:54:20] распаковываю глобальный 19f
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+[14:57:27] глобальный распакован (82G), архив удалён; disk=125G
+[14:57:27] собираю 33f глобальный датасет (~64 ГБ, часы) → /workdir/paper_results/v3_build.log
+[14:59:17] 33f готов (60G); disk=185G
+[14:59:17] START v2_global
+[15:02:26] DONE  v2_global rc=0 |  |  t2m K 19.14°C 50.81°C 89.89°C 133.83°C
+[15:02:26] START v3_global
+[15:02:38] DONE  v3_global rc=1 |  | 
+[15:02:38] === ALL DONE ===
+[15:02:26] DONE  v2_global rc=0 |  |  t2m K 19.14°C 50.81°C 89.89°C 133.83°C
+[15:02:38] DONE  v3_global rc=1 |  | 
+[15:02:38] === ALL DONE ===
