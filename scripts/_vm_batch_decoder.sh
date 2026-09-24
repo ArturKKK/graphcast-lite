@@ -14,9 +14,15 @@
 # ~26 ч обучения (слой дороже GCN примерно на 20 %) + ~2 ч оценки.
 #
 # Запуск:  bash scripts/_vm_batch_decoder.sh
+#          bash scripts/_vm_batch_decoder.sh ema   — встать в очередь: дождаться,
+#          пока на этой машине закончится батч ema (обучение и его оценка), и
+#          сразу стартовать. Чтобы не вставать ночью ради запуска.
 # Лог:     /workdir/paper_results/improve_dec_master.log
 set -uo pipefail
 V=dec
+AFTER=${1:-}
+[[ -z "$AFTER" || "$AFTER" == "ema" || "$AFTER" == "long" ]] \
+  || { echo "ждать можно только ema или long, а не «$AFTER»"; exit 1; }
 
 if [[ "${DAEMONIZED:-}" != "1" ]]; then
   mkdir -p /workdir/paper_results
@@ -43,6 +49,18 @@ exec >>"$MASTER" 2>&1
 cd "$REPO" || exit 1
 log() { echo "[$(date '+%d.%m %H:%M:%S')] $*"; }
 log "=== УЛУЧШЕНИЕ: $V ($(git rev-parse --short HEAD)) ==="
+
+# Очередь. Батч improve держит свою блокировку до самого конца, и её
+# наследуют его python-процессы, так что блокировка освобождается, только
+# когда закончены и обучение, и оценка.
+if [[ -n "$AFTER" ]]; then
+  log "жду окончания батча $AFTER (блокировка $OUT/.improve_${AFTER}.lock)"
+  exec 8>>"$OUT/.improve_${AFTER}.lock"
+  flock 8
+  exec 8>&-
+  log "батч $AFTER закончился — начинаю"
+  sleep 60     # дать карте освободить память
+fi
 
 BUSY=$(pgrep -af "^python.*(src\.main|scripts/predict\.py)" | head -1)
 [[ -n "$BUSY" ]] && { log "карта занята: $BUSY — стоп"; exit 1; }
