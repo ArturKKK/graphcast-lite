@@ -312,6 +312,43 @@ def create_processing_graph(
 
 
 
+def compute_decoding_edge_features(
+    grid_node_lats: np.ndarray,
+    grid_node_lons: np.ndarray,
+    mesh_node_lats: np.ndarray,
+    mesh_node_lons: np.ndarray,
+    edge_index: torch.Tensor,
+    num_grid_nodes: int,
+) -> torch.Tensor:
+    """Признаки рёбер Mesh→Grid для декодировщика: [длина, смещение xyz].
+
+    Смещение вершины меша относительно узла сетки считается в локальной системе
+    координат узла-получателя, как в GraphCast, и делится на максимальную длину
+    ребра в графе. Именно этого не хватало GCN-декодировщику: без признаков он
+    не знает, где узел лежит внутри треугольника.
+
+    grid_node_lats/lons — координаты КАЖДОГО узла сетки в порядке индексов
+    графа (для регулярной сетки — развёрнутые по строкам широт).
+    """
+    from src.utils import (get_bipartite_relative_position_in_receiver_local_coordinates,
+                           lat_lon_deg_to_spherical)
+
+    ei = edge_index.cpu().numpy() if isinstance(edge_index, torch.Tensor) else edge_index
+    senders = ei[0] - num_grid_nodes          # индексы вершин меша
+    receivers = ei[1]                          # индексы узлов сетки
+    s_phi, s_theta = lat_lon_deg_to_spherical(mesh_node_lats, mesh_node_lons)
+    r_phi, r_theta = lat_lon_deg_to_spherical(grid_node_lats, grid_node_lons)
+    rel = get_bipartite_relative_position_in_receiver_local_coordinates(
+        senders_node_phi=s_phi, senders_node_theta=s_theta, senders=senders,
+        receivers_node_phi=r_phi, receivers_node_theta=r_theta, receivers=receivers,
+        latitude_local_coordinates=True, longitude_local_coordinates=True,
+    )
+    dist = np.linalg.norm(rel, axis=-1, keepdims=True)
+    scale = dist.max() if len(dist) and dist.max() > 0 else 1.0
+    feats = np.concatenate([dist / scale, rel / scale], axis=-1)
+    return torch.tensor(feats, dtype=torch.float32)
+
+
 def create_decoding_graph(
     cordinates: Tuple[np.array, np.array],  # NOTE: орфография параметра сохранена как в исходнике
     mesh: TriangularMesh,

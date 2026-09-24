@@ -38,6 +38,11 @@ class GraphLayerType(str, Enum):
     # InteractionNetwork а-ля GraphCast: обновляет И рёбра, И узлы,
     # с residual connections на каждом шаге message passing.
     InteractionNet = "interaction_net"
+    # Декодировщик Mesh→Grid как в GraphCast: сообщение от вершины треугольника
+    # к узлу сетки зависит от их взаимного положения (признаки рёбер). Введён
+    # 24.09.2026 вместо GCNConv: у GCN все три вершины входят с одним весом, и
+    # в прогнозе отпечатываются треугольники меша (docs/results/error_scales_2026-09-24.md).
+    InteractionNetDecoder = "interaction_net_decoder"
 
 class ProductGraphType(str, Enum):
     """The different types of product graph."""
