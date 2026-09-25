@@ -17,12 +17,23 @@
 #          bash scripts/_vm_batch_decoder.sh ema   — встать в очередь: дождаться,
 #          пока на этой машине закончится батч ema (обучение и его оценка), и
 #          сразу стартовать. Чтобы не вставать ночью ради запуска.
+#          bash scripts/_vm_batch_decoder.sh +long — то же, но поверх модели
+#          long (16 эпох) вместо chw: декодировщик на лучшей базе. Опыт
+#          dec_long, лог improve_dec_long_master.log. Аргументы сочетаются:
+#          «ema +long» — ждать ema и потом стартовать от long.
 # Лог:     /workdir/paper_results/improve_dec_master.log
 set -uo pipefail
 V=dec
-AFTER=${1:-}
-[[ -z "$AFTER" || "$AFTER" == "ema" || "$AFTER" == "long" ]] \
-  || { echo "ждать можно только ema или long, а не «$AFTER»"; exit 1; }
+AFTER=""
+BASE=chw
+for a in "$@"; do
+  case "$a" in
+    ema|long) AFTER=$a ;;
+    +long)    BASE=long ;;
+    *) echo "непонятный аргумент «$a»: ждать — ema или long, база — +long"; exit 1 ;;
+  esac
+done
+[[ "$BASE" == "long" ]] && V=dec_long
 
 if [[ "${DAEMONIZED:-}" != "1" ]]; then
   mkdir -p /workdir/paper_results
@@ -39,6 +50,7 @@ D33=/data/datasets/multires_krsk_33f
 ROI="50 60 83 98"
 CLIM=$REPO/docs/paper/runs/clim_wb2_nodes.npz
 SRC=multires_krsk_33f_chw
+[[ "$BASE" == "long" ]] && SRC=multires_krsk_33f_chw_long
 EXP=multires_krsk_33f_chw_${V}
 
 mkdir -p "$OUT" "$HEAVY"
@@ -88,10 +100,11 @@ torch.save(ck.get("model_state_dict", ck), dst)
 print(f"[prep] {src.parent.name}: эпоха {ck.get('epoch','?')} -> {dst}")
 PY
 }
-CHW=$HEAVY/krsk33f_chw_last.pth
-[[ -f "$CHW" ]] || extract "experiments/$SRC/checkpoint.pth" "$CHW" \
-  || { log "нет состояния chw — стоп"; exit 1; }
-START=$CHW
+BASE_ST=$HEAVY/krsk33f_${BASE}_base.pth
+[[ "$BASE" == "chw" ]] && BASE_ST=$HEAVY/krsk33f_chw_last.pth
+[[ -f "$BASE_ST" ]] || extract "experiments/$SRC/checkpoint.pth" "$BASE_ST" \
+  || { log "нет состояния $SRC — стоп"; exit 1; }
+START=$BASE_ST
 
 # ---------- оценка ----------
 run() {   # run <тег> <опыт> <чекпойнт> [доп. ключи]
@@ -119,6 +132,7 @@ c["pipeline"]["decoder"]["gcn"] = {
     "layer_type": "interaction_net_decoder", "hidden_dims": [128],
     "output_dim": c["pipeline"]["decoder"]["gcn"]["output_dim"],
     "activation": "swish", "edge_feature_dim": 4, "use_layer_norm": True}
+c["num_epochs"] = 8                     # у long в конфиге 16; дообучение всегда 8
 c["freeze_processor_epochs"] = 1        # первую эпоху учится новый слой, процессор не трогаем
 c["finetune_processor_lr_factor"] = 1.0
 c["early_stopping_patience"] = 100      # косинус до нуля: останавливаться рано незачем
