@@ -51,6 +51,7 @@ from src.config import (
 )
 from src.create_graphs import (
     compute_decoding_edge_features,
+    compute_encoding_edge_features,
     create_decoding_graph,
     create_processing_graph,
     create_encoding_graph,
@@ -309,6 +310,44 @@ class InteractionNetDecoderLayer(nn.Module):
         return self.out(h)
 
 
+class InteractionNetEncoderLayer(nn.Module):
+    """Кодировщик Grid→Mesh как в GraphCast: одно сообщение по двудольному графу.
+
+    Для ребра (узел сетки g → вершина v):
+        e   = MLP_e(признаки ребра)
+        m   = MLP_m([h_g, h_v, e])
+    Каждый узел (и вершины, и узлы сетки — у последних входящих рёбер нет):
+        h   = LN(h + MLP_n([h, Σ m]))
+
+    GCNConv, который стоял здесь раньше, усреднял узлы сетки в окрестности
+    вершины с весами 1/sqrt(степеней), не зная их положения. Здесь вклад узла
+    зависит от его смещения относительно вершины. Размерность не меняется:
+    выход идёт в процессор (вершины) и в декодировщик (узлы сетки).
+    """
+
+    def __init__(self, node_dim: int, raw_edge_dim: int, hidden_dim: int,
+                 activation: str = "swish", use_layer_norm: bool = True):
+        super().__init__()
+
+        def mlp(i, o):
+            return nn.Sequential(nn.Linear(i, hidden_dim), _get_activation(activation),
+                                 nn.Linear(hidden_dim, o))
+
+        self.edge_embed = mlp(raw_edge_dim, hidden_dim)
+        self.message = mlp(2 * node_dim + hidden_dim, hidden_dim)
+        self.node_update = mlp(node_dim + hidden_dim, node_dim)
+        self.norm = nn.LayerNorm(node_dim) if use_layer_norm else nn.Identity()
+
+    def forward(self, x: torch.Tensor, edge_index: torch.Tensor,
+                edge_attr_raw: torch.Tensor) -> torch.Tensor:
+        from torch_geometric.utils import scatter
+        s, r = edge_index[0], edge_index[1]
+        e = self.edge_embed(edge_attr_raw)
+        m = self.message(torch.cat([x[s], x[r], e], dim=-1))
+        agg = scatter(m, r, dim=0, dim_size=x.size(0), reduce="sum")
+        return self.norm(x + self.node_update(torch.cat([x, agg], dim=-1)))
+
+
 class InteractionNetProcessor(nn.Module):
     """Processor из N шагов InteractionNetwork с UNSHARED weights (как GraphCast).
 
@@ -475,6 +514,19 @@ class GraphLayer(nn.Module):
             )
             print(f"[processor] InteractionNet: {num_steps} шагов, агрегация {aggregation!r}")
 
+        elif graph_config.layer_type == GraphLayerType.InteractionNetEncoder:
+            assert graph_config.output_dim in (None, input_dim), (
+                f"InteractionNetEncoder сохраняет размерность: output_dim должен быть {input_dim}")
+            self.output_dim = input_dim
+            hidden = (graph_config.hidden_dims or [input_dim])[0]
+            use_ln = graph_config.use_layer_norm if graph_config.use_layer_norm is not None else True
+            self.layers = InteractionNetEncoderLayer(
+                node_dim=input_dim, raw_edge_dim=graph_config.edge_feature_dim or 4,
+                hidden_dim=hidden, activation=graph_config.activation or "swish",
+                use_layer_norm=use_ln,
+            )
+            print(f"[encoder] InteractionNet с признаками рёбер, скрытый размер {hidden}")
+
         elif graph_config.layer_type == GraphLayerType.InteractionNetDecoder:
             self.output_dim = graph_config.output_dim
             hidden = (graph_config.hidden_dims or [input_dim])[0]
@@ -529,10 +581,11 @@ class GraphLayer(nn.Module):
             if edge_attr is None:
                 raise ValueError("InteractionNet requires edge_attr (edge features)")
             return self.layers(x=X, edge_index=edge_index, edge_attr_raw=edge_attr)
-        elif self.layer_type == GraphLayerType.InteractionNetDecoder:
+        elif self.layer_type in (GraphLayerType.InteractionNetDecoder,
+                                 GraphLayerType.InteractionNetEncoder):
             edge_attr = kwargs.get("edge_attr", None)
             if edge_attr is None:
-                raise ValueError("InteractionNetDecoder требует edge_attr (признаки рёбер Mesh→Grid)")
+                raise ValueError(f"{self.layer_type} требует edge_attr (признаки рёбер двудольного графа)")
             return self.layers(x=X, edge_index=edge_index, edge_attr_raw=edge_attr)
         return X
 
@@ -676,13 +729,26 @@ class WeatherPrediction(nn.Module):
         # Признаки рёбер декодировщика — только для декодировщика с сообщениями.
         # Буфер не сохраняется в state_dict: это геометрия, её пересчитывает
         # конструктор, а старые чекпойнты грузятся без лишних ключей.
+        if self.flat_grid:
+            g_lat, g_lon = self._grid_lat, self._grid_lon
+        else:
+            g_lat = np.repeat(self._grid_lat, len(self._grid_lon))
+            g_lon = np.tile(self._grid_lon, len(self._grid_lat))
+        self.register_buffer("_encoding_edge_features", None, persistent=False)
+        if pipeline_config.encoder.gcn.layer_type == GraphLayerType.InteractionNetEncoder:
+            self.register_buffer(
+                "_encoding_edge_features",
+                compute_encoding_edge_features(
+                    grid_node_lats=g_lat, grid_node_lons=g_lon,
+                    mesh_node_lats=self._mesh_nodes_lat,
+                    mesh_node_lons=self._mesh_nodes_lon,
+                    edge_index=self.encoding_graph,
+                    num_grid_nodes=self._num_grid_nodes,
+                ).to(device),
+                persistent=False,
+            )
         self.register_buffer("_decoding_edge_features", None, persistent=False)
         if pipeline_config.decoder.gcn.layer_type == GraphLayerType.InteractionNetDecoder:
-            if self.flat_grid:
-                g_lat, g_lon = self._grid_lat, self._grid_lon
-            else:
-                g_lat = np.repeat(self._grid_lat, len(self._grid_lon))
-                g_lon = np.tile(self._grid_lon, len(self._grid_lat))
             self.register_buffer(
                 "_decoding_edge_features",
                 compute_decoding_edge_features(
@@ -741,15 +807,22 @@ class WeatherPrediction(nn.Module):
             print()
 
         print("Encoder summary: ")
-        print(
-            summary(
-                self.encoder,
-                torch.randn(
-                    self._num_grid_nodes + self._num_mesh_nodes, encoder_input_dim
-                ).to(device),
-                self.encoding_graph,
+        try:
+            enc_kwargs = {}
+            if self._encoding_edge_features is not None:
+                enc_kwargs["edge_attr"] = self._encoding_edge_features
+            print(
+                summary(
+                    self.encoder,
+                    torch.randn(
+                        self._num_grid_nodes + self._num_mesh_nodes, encoder_input_dim
+                    ).to(device),
+                    self.encoding_graph,
+                    **enc_kwargs,
+                )
             )
-        )
+        except Exception as e:
+            print(f"  (summary skipped: {e})")
         print()
 
         print("Processor summary: ")
@@ -964,7 +1037,7 @@ class WeatherPrediction(nn.Module):
         X = self._preprocess_input(grid_node_features=X)
 
         # ENCODER: работает на бипартитном графе Grid→Mesh
-        encoded_features = self.encoder.forward(X=X, edge_index=self.encoding_graph)
+        encoded_features = self._encode(X)
 
         # Разделяем на grid и mesh части
         grid_node_features = encoded_features[: self._num_grid_nodes, :]
@@ -1003,6 +1076,13 @@ class WeatherPrediction(nn.Module):
 
         return decoded_grid_node_features
 
+    def _encode(self, X: torch.Tensor) -> torch.Tensor:
+        """Кодировщик; признаки рёбер передаются, только если они есть."""
+        kw = {}
+        if self._encoding_edge_features is not None:
+            kw["edge_attr"] = self._encoding_edge_features
+        return self.encoder.forward(X=X, edge_index=self.encoding_graph, **kw)
+
     def _decode(self, processed_features: torch.Tensor) -> torch.Tensor:
         """Декодировщик; признаки рёбер передаются, только если они есть."""
         kw = {}
@@ -1030,7 +1110,7 @@ class WeatherPrediction(nn.Module):
             X = X[-self._num_grid_nodes:, :]
 
         X = self._preprocess_input(grid_node_features=X)
-        encoded_features = self.encoder.forward(X=X, edge_index=self.encoding_graph)
+        encoded_features = self._encode(X)
 
         grid_node_features = encoded_features[:self._num_grid_nodes, :]
         mesh_node_features = encoded_features[self._num_grid_nodes:, :]

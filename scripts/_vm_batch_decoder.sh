@@ -21,19 +21,27 @@
 #          long (16 эпох) вместо chw: декодировщик на лучшей базе. Опыт
 #          dec_long, лог improve_dec_long_master.log. Аргументы сочетаются:
 #          «ema +long» — ждать ema и потом стартовать от long.
+#          bash scripts/_vm_batch_decoder.sh dec +enc — дождаться батча dec и
+#          поставить опыт dec_enc: вместе с декодировщиком заменить и
+#          кодировщик (GCN → сообщения с признаками рёбер, как в GraphCast).
+#          База та же chw и те же 8 эпох, что у dec: чистое сравнение
+#          «только декодировщик» против «оба блока» при равном бюджете.
 # Лог:     /workdir/paper_results/improve_dec_master.log
 set -uo pipefail
 V=dec
 AFTER=""
 BASE=chw
+ENC=0
 for a in "$@"; do
   case "$a" in
-    ema|long) AFTER=$a ;;
+    ema|long|dec|dec_long) AFTER=$a ;;
     +long)    BASE=long ;;
-    *) echo "непонятный аргумент «$a»: ждать — ema или long, база — +long"; exit 1 ;;
+    +enc)     ENC=1 ;;
+    *) echo "непонятный аргумент «$a»: ждать — ema, long, dec, dec_long; база — +long; кодировщик — +enc"; exit 1 ;;
   esac
 done
 [[ "$BASE" == "long" ]] && V=dec_long
+[[ "${ENC:-0}" == "1" ]] && V=${V}_enc
 
 if [[ "${DAEMONIZED:-}" != "1" ]]; then
   mkdir -p /workdir/paper_results
@@ -124,10 +132,15 @@ run() {   # run <тег> <опыт> <чекпойнт> [доп. ключи]
 
 # ---------- конфиг ----------
 mkdir -p "experiments/$EXP"
-python - "experiments/$SRC/config.json" "experiments/$EXP/config.json" <<'PY'
+python - "experiments/$SRC/config.json" "experiments/$EXP/config.json" "$ENC" <<'PY'
 import json, sys
-src, dst = sys.argv[1:3]
+src, dst, enc = sys.argv[1:4]
 c = json.load(open(src))
+if enc == "1":
+    c["pipeline"]["encoder"]["gcn"] = {
+        "layer_type": "interaction_net_encoder", "hidden_dims": [256],
+        "output_dim": c["pipeline"]["encoder"]["gcn"]["output_dim"],
+        "activation": "swish", "edge_feature_dim": 4, "use_layer_norm": True}
 c["pipeline"]["decoder"]["gcn"] = {
     "layer_type": "interaction_net_decoder", "hidden_dims": [128],
     "output_dim": c["pipeline"]["decoder"]["gcn"]["output_dim"],
@@ -138,7 +151,8 @@ c["finetune_processor_lr_factor"] = 1.0
 c["early_stopping_patience"] = 100      # косинус до нуля: останавливаться рано незачем
 c["_comment"] = "chw_dec: декодировщик с признаками рёбер, см. scripts/_vm_batch_decoder.sh"
 json.dump(c, open(dst, "w"), indent=2, ensure_ascii=False)
-print(f"[prep] {dst}: эпох {c['num_epochs']}, декодировщик {c['pipeline']['decoder']['gcn']['layer_type']}, "
+print(f"[prep] {dst}: эпох {c['num_epochs']}, кодировщик {c['pipeline']['encoder']['gcn']['layer_type']}, "
+      f"декодировщик {c['pipeline']['decoder']['gcn']['layer_type']}, "
       f"заморозка процессора {c['freeze_processor_epochs']}, темп {c['learning_rate']} {c.get('lr_schedule')}")
 PY
 python - "experiments/$EXP/config.json" <<'PY' || { log "конфиг не проходит схему — стоп"; exit 1; }

@@ -312,6 +312,38 @@ def create_processing_graph(
 
 
 
+def _bipartite_edge_features(s_lat, s_lon, r_lat, r_lon, senders, receivers) -> torch.Tensor:
+    """[длина, смещение xyz] отправителя в локальных координатах получателя, / max длины."""
+    from src.utils import (get_bipartite_relative_position_in_receiver_local_coordinates,
+                           lat_lon_deg_to_spherical)
+    s_phi, s_theta = lat_lon_deg_to_spherical(s_lat, s_lon)
+    r_phi, r_theta = lat_lon_deg_to_spherical(r_lat, r_lon)
+    rel = get_bipartite_relative_position_in_receiver_local_coordinates(
+        senders_node_phi=s_phi, senders_node_theta=s_theta, senders=senders,
+        receivers_node_phi=r_phi, receivers_node_theta=r_theta, receivers=receivers,
+        latitude_local_coordinates=True, longitude_local_coordinates=True,
+    )
+    dist = np.linalg.norm(rel, axis=-1, keepdims=True)
+    scale = dist.max() if len(dist) and dist.max() > 0 else 1.0
+    return torch.tensor(np.concatenate([dist / scale, rel / scale], axis=-1), dtype=torch.float32)
+
+
+def compute_encoding_edge_features(
+    grid_node_lats: np.ndarray,
+    grid_node_lons: np.ndarray,
+    mesh_node_lats: np.ndarray,
+    mesh_node_lons: np.ndarray,
+    edge_index: torch.Tensor,
+    num_grid_nodes: int,
+) -> torch.Tensor:
+    """Признаки рёбер Grid→Mesh для кодировщика: как у декодировщика, но
+    отправитель — узел сетки, получатель — вершина меша."""
+    ei = edge_index.cpu().numpy() if isinstance(edge_index, torch.Tensor) else edge_index
+    return _bipartite_edge_features(grid_node_lats, grid_node_lons,
+                                    mesh_node_lats, mesh_node_lons,
+                                    ei[0], ei[1] - num_grid_nodes)
+
+
 def compute_decoding_edge_features(
     grid_node_lats: np.ndarray,
     grid_node_lons: np.ndarray,
@@ -330,23 +362,11 @@ def compute_decoding_edge_features(
     grid_node_lats/lons — координаты КАЖДОГО узла сетки в порядке индексов
     графа (для регулярной сетки — развёрнутые по строкам широт).
     """
-    from src.utils import (get_bipartite_relative_position_in_receiver_local_coordinates,
-                           lat_lon_deg_to_spherical)
-
     ei = edge_index.cpu().numpy() if isinstance(edge_index, torch.Tensor) else edge_index
-    senders = ei[0] - num_grid_nodes          # индексы вершин меша
-    receivers = ei[1]                          # индексы узлов сетки
-    s_phi, s_theta = lat_lon_deg_to_spherical(mesh_node_lats, mesh_node_lons)
-    r_phi, r_theta = lat_lon_deg_to_spherical(grid_node_lats, grid_node_lons)
-    rel = get_bipartite_relative_position_in_receiver_local_coordinates(
-        senders_node_phi=s_phi, senders_node_theta=s_theta, senders=senders,
-        receivers_node_phi=r_phi, receivers_node_theta=r_theta, receivers=receivers,
-        latitude_local_coordinates=True, longitude_local_coordinates=True,
-    )
-    dist = np.linalg.norm(rel, axis=-1, keepdims=True)
-    scale = dist.max() if len(dist) and dist.max() > 0 else 1.0
-    feats = np.concatenate([dist / scale, rel / scale], axis=-1)
-    return torch.tensor(feats, dtype=torch.float32)
+    # отправитель — вершина меша, получатель — узел сетки
+    return _bipartite_edge_features(mesh_node_lats, mesh_node_lons,
+                                    grid_node_lats, grid_node_lons,
+                                    ei[0] - num_grid_nodes, ei[1])
 
 
 def create_decoding_graph(

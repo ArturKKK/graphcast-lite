@@ -43,6 +43,10 @@ class GraphLayerType(str, Enum):
     # 24.09.2026 вместо GCNConv: у GCN все три вершины входят с одним весом, и
     # в прогнозе отпечатываются треугольники меша (docs/results/error_scales_2026-09-24.md).
     InteractionNetDecoder = "interaction_net_decoder"
+    # Кодировщик Grid→Mesh с признаками рёбер (25.09.2026): вершина меша
+    # собирает узлы сетки с весами, зависящими от их положения, а не с
+    # нормировкой GCN по степеням.
+    InteractionNetEncoder = "interaction_net_encoder"
 
 class ProductGraphType(str, Enum):
     """The different types of product graph."""

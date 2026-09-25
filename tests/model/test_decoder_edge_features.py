@@ -20,7 +20,7 @@ pytestmark = needs_torch
 N_FEAT, OBS = 4, 2
 
 
-def config(decoder_type):
+def config(decoder_type, encoder_type="conv_gcn"):
     from src.config import DataConfig, GraphBuildingConfig, PipelineConfig
     graph = GraphBuildingConfig(**{
         "grid2mesh_edge_creation": "radius", "mesh2grid_edge_creation": "contained",
@@ -33,9 +33,14 @@ def config(decoder_type):
     else:
         dec_gcn = {"layer_type": "interaction_net_decoder", "hidden_dims": [16],
                    "output_dim": N_FEAT, "activation": "swish", "edge_feature_dim": 4}
+    if encoder_type == "conv_gcn":
+        enc_gcn = {"layer_type": "conv_gcn", "hidden_dims": [16, 16],
+                   "output_dim": 16, "activation": "swish"}
+    else:
+        enc_gcn = {"layer_type": "interaction_net_encoder", "hidden_dims": [16],
+                   "output_dim": 16, "activation": "swish", "edge_feature_dim": 4}
     pipeline = PipelineConfig(**{
-        "encoder": {"mlp": mlp, "gcn": {"layer_type": "conv_gcn", "hidden_dims": [16, 16],
-                                        "output_dim": 16, "activation": "swish"}},
+        "encoder": {"mlp": mlp, "gcn": enc_gcn},
         "processor": {"gcn": {"layer_type": "interaction_net", "output_dim": 16,
                               "activation": "swish", "use_layer_norm": True,
                               "num_message_passing_steps": 2, "edge_feature_dim": 4}},
@@ -55,13 +60,13 @@ def flat_nodes(n_lat=6, n_lon=10):
     return LA.reshape(-1).astype(np.float32), LO.reshape(-1).astype(np.float32)
 
 
-def build(decoder_type, lats=None, lons=None, flat=True, seed=0):
+def build(decoder_type, lats=None, lons=None, flat=True, seed=0, encoder_type="conv_gcn"):
     import torch
 
     from src.models import WeatherPrediction
     if lats is None:
         lats, lons = flat_nodes()
-    graph, pipeline, data = config(decoder_type)
+    graph, pipeline, data = config(decoder_type, encoder_type)
     torch.manual_seed(seed)
     return WeatherPrediction(cordinates=(lats, lons), graph_config=graph,
                              pipeline_config=pipeline, data_config=data,
@@ -171,6 +176,72 @@ def test_node_renumbering_permutes_output():
     perm = np.random.default_rng(0).permutation(len(lats))
     a = build("interaction_net_decoder", lats, lons)
     b = build("interaction_net_decoder", lats[perm], lons[perm])
+    b.load_state_dict(a.state_dict())
+    randomise_output(a)
+    randomise_output(b)
+    X = torch.randn(1, len(lats), N_FEAT * OBS)
+    with torch.no_grad():
+        ya = a(X, attention_threshold=0.0)
+        yb = b(X[:, perm], attention_threshold=0.0)
+    assert torch.allclose(ya[perm], yb, atol=1e-5)
+
+
+# ---------- кодировщик с признаками рёбер (25.09.2026) ----------
+
+ENC = "interaction_net_encoder"
+
+
+def test_encoder_edge_features_point_grid_to_mesh():
+    m = build("interaction_net_decoder", encoder_type=ENC)
+    ef, ei, n = m._encoding_edge_features, m.encoding_graph, m._num_grid_nodes
+    assert ef.shape == (ei.shape[1], 4)
+    assert (ei[0] < n).all() and (ei[1] >= n).all(), "рёбра идут от сетки к мешу"
+    d = ef[:, 0].numpy()
+    assert d.max() == pytest.approx(1.0) and d.min() >= 0
+    np.testing.assert_allclose(np.linalg.norm(ef[:, 1:].numpy(), axis=1), d, rtol=1e-5)
+
+
+def test_encoder_position_matters():
+    """Одна вершина, два узла сетки с одинаковыми признаками на разных местах:
+    новый кодировщик различает, откуда пришёл узел, GCN — нет."""
+    import torch
+
+    from src.models import InteractionNetEncoderLayer
+    torch.manual_seed(0)
+    x = torch.randn(3, 8)
+    x[1] = x[0]
+    ei_a = torch.tensor([[0], [2]])
+    ei_b = torch.tensor([[1], [2]])
+    layer = InteractionNetEncoderLayer(node_dim=8, raw_edge_dim=4, hidden_dim=16)
+    with torch.no_grad():
+        ya = layer(x, ei_a, torch.tensor([[.3, .2, .2, 0.]]))
+        yb = layer(x, ei_b, torch.tensor([[.9, -.6, .6, 0.]]))
+    assert not torch.allclose(ya[2], yb[2], atol=1e-4)
+
+
+def test_encoder_and_decoder_load_trained_rest():
+    """От модели со старыми блоками грузятся MLP кодировщика, процессор и MLP
+    декодировщика; новыми остаются только два слоя сообщений."""
+    old = build("conv_gcn", seed=3)
+    new = build("interaction_net_decoder", seed=4, encoder_type=ENC)
+    state = old.state_dict()
+    own = new.state_dict()
+    assert not [k for k, v in state.items() if k in own and own[k].shape != v.shape]
+    missing, unexpected = new.load_state_dict(state, strict=False)
+    prefixes = ("encoder.graph_layer.", "decoder.graph_layer.")
+    assert all(k.startswith(prefixes) for k in missing), missing
+    assert all(k.startswith(prefixes) for k in unexpected), unexpected
+    for k, v in new.state_dict().items():
+        if k.startswith(("encoder.mlp.", "processor.", "decoder.mlp.")):
+            assert torch_equal(v, state[k]), k
+
+
+def test_encoder_node_renumbering_permutes_output():
+    import torch
+    lats, lons = flat_nodes()
+    perm = np.random.default_rng(1).permutation(len(lats))
+    a = build("interaction_net_decoder", lats, lons, encoder_type=ENC)
+    b = build("interaction_net_decoder", lats[perm], lons[perm], encoder_type=ENC)
     b.load_state_dict(a.state_dict())
     randomise_output(a)
     randomise_output(b)
