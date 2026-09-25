@@ -1,0 +1,5 @@
+[24.09 15:52:40] === УЛУЧШЕНИЕ: dec (295d162) ===
+[24.09 15:52:40] жду окончания батча ema (блокировка /workdir/paper_results/.improve_ema.lock)
+[24.09 23:00:26] батч ema закончился — начинаю
+[prep] experiments/multires_krsk_33f_chw_dec/config.json: эпох 8, декодировщик interaction_net_decoder, заморозка процессора 1, темп 7.5e-05 cosine
+[24.09 23:01:26] START обучение multires_krsk_33f_chw_dec 
