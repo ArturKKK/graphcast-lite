@@ -25,23 +25,34 @@
 #          поставить опыт dec_enc: вместе с декодировщиком заменить и
 #          кодировщик (GCN → сообщения с признаками рёбер, как в GraphCast).
 #          База та же chw и те же 8 эпох, что у dec: чистое сравнение
-#          «только декодировщик» против «оба блока» при равном бюджете.
+#          «только декодировщик» против «оба блока» при равном бюджете. ПРОВАЛИЛСЯ
+#          (val 0,00737 против 0,00341 на 3-й эпохе): процессор разом терял вход.
+#          bash scripts/_vm_batch_decoder.sh +encres — поверх готовой модели dec
+#          (с «+long» — поверх dec_long) добавить к GCN-кодировщику поправку
+#          сообщениями с признаками рёбер, стартующую с нуля. Модель начинает
+#          ровно с dec и хуже неё стать не может. Опыт dec_encres
+#          (dec_long_encres). На v4 в очередь за dec_long: «dec_long +long +encres».
 # Лог:     /workdir/paper_results/improve_dec_master.log
 set -uo pipefail
 V=dec
 AFTER=""
 BASE=chw
 ENC=0
+ENCRES=0
 for a in "$@"; do
   case "$a" in
     ema|long|dec|dec_long) AFTER=$a ;;
     +long)    BASE=long ;;
     +enc)     ENC=1 ;;
-    *) echo "непонятный аргумент «$a»: ждать — ema, long, dec, dec_long; база — +long; кодировщик — +enc"; exit 1 ;;
+    +encres)  ENCRES=1 ;;
+    *) echo "непонятный аргумент «$a»: ждать — ema, long, dec, dec_long; база — +long; кодировщик — +enc, +encres"; exit 1 ;;
   esac
 done
 [[ "$BASE" == "long" ]] && V=dec_long
-[[ "${ENC:-0}" == "1" ]] && V=${V}_enc
+[[ "$ENC" == "1" && "$ENCRES" == "1" ]] && { echo "+enc и +encres вместе нельзя"; exit 1; }
+[[ "$ENC" == "1" ]] && V=${V}_enc
+DECSRC=multires_krsk_33f_chw_${V}      # готовая модель с декодировщиком — база для +encres
+[[ "$ENCRES" == "1" ]] && V=${V}_encres
 
 if [[ "${DAEMONIZED:-}" != "1" ]]; then
   mkdir -p /workdir/paper_results
@@ -59,6 +70,7 @@ ROI="50 60 83 98"
 CLIM=$REPO/docs/paper/runs/clim_wb2_nodes.npz
 SRC=multires_krsk_33f_chw
 [[ "$BASE" == "long" ]] && SRC=multires_krsk_33f_chw_long
+[[ "$ENCRES" == "1" ]] && SRC=$DECSRC
 EXP=multires_krsk_33f_chw_${V}
 
 mkdir -p "$OUT" "$HEAVY"
@@ -108,8 +120,8 @@ torch.save(ck.get("model_state_dict", ck), dst)
 print(f"[prep] {src.parent.name}: эпоха {ck.get('epoch','?')} -> {dst}")
 PY
 }
-BASE_ST=$HEAVY/krsk33f_${BASE}_base.pth
-[[ "$BASE" == "chw" ]] && BASE_ST=$HEAVY/krsk33f_chw_last.pth
+BASE_ST=$HEAVY/${SRC}_start.pth
+[[ "$SRC" == "multires_krsk_33f_chw" ]] && BASE_ST=$HEAVY/krsk33f_chw_last.pth
 [[ -f "$BASE_ST" ]] || extract "experiments/$SRC/checkpoint.pth" "$BASE_ST" \
   || { log "нет состояния $SRC — стоп"; exit 1; }
 START=$BASE_ST
@@ -132,10 +144,15 @@ run() {   # run <тег> <опыт> <чекпойнт> [доп. ключи]
 
 # ---------- конфиг ----------
 mkdir -p "experiments/$EXP"
-python - "experiments/$SRC/config.json" "experiments/$EXP/config.json" "$ENC" <<'PY'
+python - "experiments/$SRC/config.json" "experiments/$EXP/config.json" "$ENC" "$ENCRES" <<'PY'
 import json, sys
-src, dst, enc = sys.argv[1:4]
+src, dst, enc, encres = sys.argv[1:5]
 c = json.load(open(src))
+if encres == "1":
+    g = c["pipeline"]["encoder"]["gcn"]
+    assert g["layer_type"] == "conv_gcn", g
+    g["edge_refine"] = True
+    g["edge_feature_dim"] = 4
 if enc == "1":
     c["pipeline"]["encoder"]["gcn"] = {
         "layer_type": "interaction_net_encoder", "hidden_dims": [256],
@@ -151,7 +168,8 @@ c["finetune_processor_lr_factor"] = 1.0
 c["early_stopping_patience"] = 100      # косинус до нуля: останавливаться рано незачем
 c["_comment"] = "chw_dec: декодировщик с признаками рёбер, см. scripts/_vm_batch_decoder.sh"
 json.dump(c, open(dst, "w"), indent=2, ensure_ascii=False)
-print(f"[prep] {dst}: эпох {c['num_epochs']}, кодировщик {c['pipeline']['encoder']['gcn']['layer_type']}, "
+print(f"[prep] {dst}: эпох {c['num_epochs']}, кодировщик {c['pipeline']['encoder']['gcn']['layer_type']}"
+      f"{' + поправка' if c['pipeline']['encoder']['gcn'].get('edge_refine') else ''}, "
       f"декодировщик {c['pipeline']['decoder']['gcn']['layer_type']}, "
       f"заморозка процессора {c['freeze_processor_epochs']}, темп {c['learning_rate']} {c.get('lr_schedule')}")
 PY

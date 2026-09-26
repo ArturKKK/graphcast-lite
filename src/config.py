@@ -192,6 +192,10 @@ class GraphBlock(BaseModel):
     num_message_passing_steps: Optional[int] = None
     edge_feature_dim: Optional[int] = None
     aggregation: Optional[str] = "mean"
+    # Только для conv_gcn в кодировщике: поверх стека GCN добавить слой
+    # сообщений с признаками рёбер как остаточную поправку, начинающую с нуля
+    # (26.09.2026). Модель стартует ровно с прежней и обученных весов не теряет.
+    edge_refine: Optional[bool] = False
 
 
 class ModelConfig(BaseModel):

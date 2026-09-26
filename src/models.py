@@ -348,6 +348,39 @@ class InteractionNetEncoderLayer(nn.Module):
         return self.norm(x + self.node_update(torch.cat([x, agg], dim=-1)))
 
 
+class EdgeRefineLayer(nn.Module):
+    """Остаточная поправка к кодировщику: сообщения с признаками рёбер.
+
+    Ставится поверх стека GCNConv (edge_refine в конфиге). В отличие от
+    InteractionNetEncoderLayer, здесь нет нормировки на выходе, а последний
+    слой поправки инициализирован нулём: до обучения выход совпадает с выходом
+    GCN до бита. Полная замена кодировщика (опыт dec_enc, 25.09.2026) выбивала
+    процессору вход, и за 8 эпох модель не восстановилась: val 0,00737 против
+    0,00341 у одного декодировщика на той же эпохе.
+    """
+
+    def __init__(self, node_dim: int, raw_edge_dim: int, hidden_dim: int,
+                 activation: str = "swish"):
+        super().__init__()
+
+        def mlp(i, o):
+            return nn.Sequential(nn.Linear(i, hidden_dim), _get_activation(activation),
+                                 nn.Linear(hidden_dim, o))
+
+        self.edge_embed = mlp(raw_edge_dim, hidden_dim)
+        self.message = mlp(2 * node_dim + hidden_dim, hidden_dim)
+        self.update = mlp(node_dim + hidden_dim, node_dim)
+        nn.init.zeros_(self.update[-1].weight)
+        nn.init.zeros_(self.update[-1].bias)
+
+    def forward(self, x, edge_index, edge_attr_raw):
+        from torch_geometric.utils import scatter
+        s, r = edge_index[0], edge_index[1]
+        m = self.message(torch.cat([x[s], x[r], self.edge_embed(edge_attr_raw)], dim=-1))
+        agg = scatter(m, r, dim=0, dim_size=x.size(0), reduce="sum")
+        return x + self.update(torch.cat([x, agg], dim=-1))
+
+
 class InteractionNetProcessor(nn.Module):
     """Processor из N шагов InteractionNetwork с UNSHARED weights (как GraphCast).
 
@@ -487,6 +520,21 @@ class GraphLayer(nn.Module):
                     )
                 )
 
+            # Остаточная поправка с признаками рёбер (только conv_gcn). Отдельным
+            # атрибутом, а не в self.layers: имена обученных слоёв не сдвигаются,
+            # и старый чекпойнт грузится как есть.
+            self.refine = None
+            if getattr(graph_config, "edge_refine", False):
+                if graph_config.layer_type != GraphLayerType.ConvGCN:
+                    raise ValueError("edge_refine поддержан только для conv_gcn")
+                self.refine = EdgeRefineLayer(
+                    node_dim=graph_config.output_dim,
+                    raw_edge_dim=graph_config.edge_feature_dim or 4,
+                    hidden_dim=graph_config.output_dim,
+                    activation=graph_config.activation or "swish",
+                )
+                print("[encoder] GCN + поправка сообщениями с признаками рёбер (с нуля)")
+
         elif graph_config.layer_type == GraphLayerType.InteractionNet:
             # InteractionNetProcessor: N шагов message passing с edge features + residuals
             self.output_dim = graph_config.output_dim
@@ -563,6 +611,11 @@ class GraphLayer(nn.Module):
                     X = layer(X, edge_index)
                 else:
                     X = layer(X)
+            if getattr(self, "refine", None) is not None:
+                edge_attr = kwargs.get("edge_attr", None)
+                if edge_attr is None:
+                    raise ValueError("edge_refine требует edge_attr (признаки рёбер Grid→Mesh)")
+                X = self.refine(X, edge_index, edge_attr)
         elif self.layer_type == GraphLayerType.GATConv:
             for layer in self.layers:
                 if type(layer) == GATConv:
@@ -735,7 +788,8 @@ class WeatherPrediction(nn.Module):
             g_lat = np.repeat(self._grid_lat, len(self._grid_lon))
             g_lon = np.tile(self._grid_lon, len(self._grid_lat))
         self.register_buffer("_encoding_edge_features", None, persistent=False)
-        if pipeline_config.encoder.gcn.layer_type == GraphLayerType.InteractionNetEncoder:
+        if (pipeline_config.encoder.gcn.layer_type == GraphLayerType.InteractionNetEncoder
+                or getattr(pipeline_config.encoder.gcn, "edge_refine", False)):
             self.register_buffer(
                 "_encoding_edge_features",
                 compute_encoding_edge_features(

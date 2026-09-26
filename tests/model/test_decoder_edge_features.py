@@ -33,9 +33,11 @@ def config(decoder_type, encoder_type="conv_gcn"):
     else:
         dec_gcn = {"layer_type": "interaction_net_decoder", "hidden_dims": [16],
                    "output_dim": N_FEAT, "activation": "swish", "edge_feature_dim": 4}
-    if encoder_type == "conv_gcn":
+    if encoder_type in ("conv_gcn", "refine"):
         enc_gcn = {"layer_type": "conv_gcn", "hidden_dims": [16, 16],
                    "output_dim": 16, "activation": "swish"}
+        if encoder_type == "refine":
+            enc_gcn.update(edge_refine=True, edge_feature_dim=4)
     else:
         enc_gcn = {"layer_type": "interaction_net_encoder", "hidden_dims": [16],
                    "output_dim": 16, "activation": "swish", "edge_feature_dim": 4}
@@ -250,3 +252,38 @@ def test_encoder_node_renumbering_permutes_output():
         ya = a(X, attention_threshold=0.0)
         yb = b(X[:, perm], attention_threshold=0.0)
     assert torch.allclose(ya[perm], yb, atol=1e-5)
+
+
+# ---------- кодировщик: GCN + поправка с нуля (26.09.2026) ----------
+
+def test_refine_starts_exactly_from_trained_model():
+    """Полная замена кодировщика провалилась: процессор терял вход. Поправка
+    стартует с нуля, и модель с ней до обучения выдаёт ровно то же, что без неё."""
+    import torch
+    base = build("interaction_net_decoder", seed=5)
+    randomise_output(base)
+    ref = build("interaction_net_decoder", seed=6, encoder_type="refine")
+    missing, unexpected = ref.load_state_dict(base.state_dict(), strict=False)
+    assert missing and all(k.startswith("encoder.graph_layer.refine.") for k in missing), missing
+    assert not unexpected, unexpected
+    X = torch.randn(1, base._num_grid_nodes, N_FEAT * OBS)
+    with torch.no_grad():
+        assert torch.equal(base(X, attention_threshold=0.0), ref(X, attention_threshold=0.0))
+
+
+def test_refine_uses_position_after_training_step():
+    """После ненулевой поправки выход зависит от признаков рёбер."""
+    import torch
+    m = build("interaction_net_decoder", seed=7, encoder_type="refine")
+    randomise_output(m)
+    last = m.encoder.graph_layer.refine.update[-1]
+    with torch.no_grad():
+        last.weight.normal_(std=0.1)
+    # Смотрим на выход кодировщика: до выхода модели поправка доходит
+    # ослабленной нормировками процессора, и сравнение там было бы шатким.
+    X = m._preprocess_input(grid_node_features=torch.randn(m._num_grid_nodes, N_FEAT * OBS))
+    with torch.no_grad():
+        e1 = m._encode(X)
+        m._encoding_edge_features.mul_(-1)
+        e2 = m._encode(X)
+    assert (e1 - e2).abs().max() > 1e-4
