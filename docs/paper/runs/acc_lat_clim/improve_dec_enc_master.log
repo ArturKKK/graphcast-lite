@@ -1,0 +1,5 @@
+[25.09 19:31:28] === УЛУЧШЕНИЕ: dec_enc (55b8c05) ===
+[25.09 19:31:28] жду окончания батча dec (блокировка /workdir/paper_results/.improve_dec.lock)
+[25.09 22:33:20] батч dec закончился — начинаю
+[prep] experiments/multires_krsk_33f_chw_dec_enc/config.json: эпох 8, кодировщик interaction_net_encoder, декодировщик interaction_net_decoder, заморозка процессора 1, темп 7.5e-05 cosine
+[25.09 22:34:20] START обучение multires_krsk_33f_chw_dec_enc 
