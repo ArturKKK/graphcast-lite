@@ -135,3 +135,15 @@ def test_run_saver_covers_every_batch_prefix():
             used.add(tag + "_")
     assert used, "не нашёл ни одного раннера с прогонами"
     assert used <= known, f"сохранялка не знает про префиксы {sorted(used - known)}"
+
+
+def test_run_saver_takes_final_recount():
+    """Пересчёт статьи (_vm_batch_fin.sh) пишет файлы с префиксом p_ и, кроме
+    npz и логов, профиль стыка и данные карты. Без них табл. 5 и рис. 1 с
+    виртуалки не доедут."""
+    saver = (ROOT / "scripts" / "_vm_save_runs.sh").read_text()
+    fin = (ROOT / "scripts" / "_vm_batch_fin.sh").read_text()
+    assert '"p_${V}_' in fin
+    assert " p_" in saver.split("PREFIXES=")[1].split("\n")[0]
+    for pat in ("_seam_profile.md", "_seam_map_data.npz"):
+        assert pat in saver and pat in fin, pat

@@ -47,7 +47,14 @@ def esc(s):
 
 
 def main():
-    z = np.load(SRC)
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--src", default=SRC, help="seam_map_data.npz от paper_seam_diagnostic.py")
+    ap.add_argument("--out", default=OUT)
+    ap.add_argument("--map-out", default=None,
+                    help="ещё и одна карта без профиля (рис. 1 статьи: fig_seam_map.svg)")
+    a = ap.parse_args()
+    z = np.load(a.src)
     lat, lon = z["lat"], z["lon"]
     isreg = z["is_regional"]
     val = z["pred_last"]
@@ -65,6 +72,7 @@ def main():
 
     # --- геометрия панелей ---
     W, H = 1020, 440
+    MAP_W = 520          # ширина левой панели (карта) — рис. 1 статьи
     ax, ay, aw, ah = 56, 40, 430, 340          # панель (а)
     bx, by, bw, bh = 610, 40, 370, 340         # панель (б)
 
@@ -176,9 +184,18 @@ def main():
              f'глобальная сетка, 0,703°</text>')
 
     s.append('</svg>')
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    open(OUT, "w").write("\n".join(s))
-    print(f"[fig] сохранено → {OUT} ({os.path.getsize(OUT) // 1024} КБ)")
+    os.makedirs(os.path.dirname(a.out), exist_ok=True)
+    open(a.out, "w").write("\n".join(s))
+    print(f"[fig] сохранено → {a.out} ({os.path.getsize(a.out) // 1024} КБ)")
+    if a.map_out:
+        # Рис. 1 статьи — только левая панель. Профиль (правая панель) журнал
+        # не пропустил бы: те же числа уже в табл. 5. Обрезаем рамку рисунка
+        # по ширине карты; элементы профиля остаются за её пределами невидимыми.
+        head = s[0].replace(f'viewBox="0 0 {W} {H}" width="{W}"',
+                            f'viewBox="0 0 {MAP_W} {H}" width="{MAP_W}"')
+        assert head != s[0], "не нашёл размеры рисунка в заголовке svg"
+        open(a.map_out, "w").write("\n".join([head] + s[1:]))
+        print(f"[fig] карта → {a.map_out}")
 
 
 if __name__ == "__main__":
