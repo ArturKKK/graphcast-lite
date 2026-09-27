@@ -68,6 +68,13 @@ fi
 BUSY=$(pgrep -af "^python.*(src\.main|scripts/predict\.py)" | head -1)
 [[ -n "$BUSY" ]] && { log "карта занята: $BUSY — стоп"; exit 1; }
 
+# После перезапуска машины /data пуст: восстанавливаем окружение и датасет
+# тем же скриптом, что и батчи improve (~40 мин).
+if [[ ! -x "$VENV/bin/python" || ! -f "$D33/data_extra.npy" ]]; then
+  log "нет окружения или датасета — восстанавливаю (~40 мин), лог /workdir/paper_logs/restore33f.log"
+  DAEMONIZED=1 FREE=1 bash scripts/_vm_restore33f.sh
+  log "восстановление rc=$?"
+fi
 [[ -f "$D33/data_extra.npy" ]] || { log "нет датасета $D33 — стоп"; exit 1; }
 source "$VENV/bin/activate" || { log "нет venv — стоп"; exit 1; }
 export PYTHONPATH="$REPO"
