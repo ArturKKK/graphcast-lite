@@ -1,0 +1,6 @@
+[26.09 09:27:36] === УЛУЧШЕНИЕ: dec_long_encres (ff18d52) ===
+[26.09 09:27:36] жду окончания батча dec_long (блокировка /workdir/paper_results/.improve_dec_long.lock)
+[26.09 18:20:59] батч dec_long закончился — начинаю
+[prep] multires_krsk_33f_chw_dec_long: эпоха 7 -> /data/paper_heavy/multires_krsk_33f_chw_dec_long_start.pth
+[prep] experiments/multires_krsk_33f_chw_dec_long_encres/config.json: эпох 8, кодировщик conv_gcn + поправка, декодировщик interaction_net_decoder, заморозка процессора 1, темп 7.5e-05 cosine
+[26.09 18:22:01] START обучение multires_krsk_33f_chw_dec_long_encres 
