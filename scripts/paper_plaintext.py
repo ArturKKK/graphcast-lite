@@ -25,7 +25,8 @@ OUT = ROOT / "docs" / "paper" / "article_gip_text.md"
 
 def tex_plain(tex: str) -> str:
     h = tex_to_html(tex)
-    h = h.replace('<span class="ovl">', "").replace("</i></span>", "̄")
+    # черта сверху (\bar) — только у своего span, иначе она липнет к \mathrm
+    h = re.sub(r'<span class="ovl"><i>(.*?)</i></span>', lambda m: m.group(1) + "\u0304", h)
     h = re.sub(r"<sub>(.*?)</sub>", r"\1", h)
     h = re.sub(r"<sup>(.*?)</sup>", r"^\1", h)
     h = re.sub(r"<[^>]+>", "", h)
