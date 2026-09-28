@@ -50,7 +50,8 @@ TABLES_EN = {
                   "score S (%) per (3). 1607 initial times; region 2501 nodes, inner "
                   "zone 45 nodes.",
     "Таблица 2.": "Table 2. Error at +24 h at the insert nodes: persistence, interpolated "
-                  "global forecast, multiscale model.",
+                  "global forecast, multiscale model. 19-channel model line, first 100 "
+                  "initial times.",
     "Таблица 3.": "Table 3. Effect of loss weighting. Region, 1607 initial times; t2m "
                   "averaged over four lead times, last column — error over the whole "
                   "graph.",

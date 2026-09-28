@@ -37,9 +37,10 @@ INK2 = "#52514e"
 GRID = "#d8d8d4"
 
 # Профиль из seam_profile.md, горизонт +24 ч
-PROF_INS = [(12.5, 2.12, "0–25"), (37.5, 2.08, "25–50"), (75, 2.02, "50–100"),
-            (150, 1.99, "100–200"), (600, 2.07, "200–1000")]
-PROF_GLB = [(-50, 1.87, "−100–0"), (-200, 1.95, "−300–−100"), (-650, 2.05, "−1000–−300")]
+# Итоговая модель (dec_long_encres), p_dec_long_encres_seam_profile.md, 28.09.2026
+PROF_INS = [(12.5, 1.62, "0–25"), (37.5, 1.58, "25–50"), (75, 1.61, "50–100"),
+            (150, 1.56, "100–200"), (600, 1.53, "200–1000")]
+PROF_GLB = [(-50, 1.64, "−100–0"), (-200, 1.75, "−300–−100"), (-650, 1.76, "−1000–−300")]
 
 
 def esc(s):
@@ -194,7 +195,20 @@ def main():
         head = s[0].replace(f'viewBox="0 0 {W} {H}" width="{W}"',
                             f'viewBox="0 0 {MAP_W} {H}" width="{MAP_W}"')
         assert head != s[0], "не нашёл размеры рисунка в заголовке svg"
-        open(a.map_out, "w").write("\n".join([head] + s[1:]))
+        # Рамка viewBox не обрезает рисунок при печати в PDF: элементы правой
+        # панели вылезали справа от карты (28.09.2026). Выбрасываем всё, что
+        # начинается правее ширины карты.
+        import re
+
+        def left_x(el):
+            m = (re.search(r'\b(?:x|x1|cx)="([-\d.]+)"', el)
+                 or re.search(r'points="([-\d.]+),', el)
+                 or re.search(r'\bd="M\s*([-\d.]+)', el))
+            return float(m.group(1)) if m else 0.0
+
+        body = [el for el in s[1:] if el.startswith("</svg") or left_x(el) < MAP_W]
+        body = [el.replace(f'<rect width="{W}"', f'<rect width="{MAP_W}"') for el in body]
+        open(a.map_out, "w").write("\n".join([head] + body))
         print(f"[fig] карта → {a.map_out}")
 
 

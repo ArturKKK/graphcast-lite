@@ -85,3 +85,14 @@ def test_missing_table_caption_is_fatal(monkeypatch):
     with pytest.raises(SystemExit) as e:
         paper_artifact.build()
     assert "Таблица 99." in str(e.value)
+
+
+def test_seam_map_has_no_profile_panel():
+    """Рис. 1 — только карта. Обрезка рамкой viewBox при печати в PDF не
+    срабатывала, и справа вылезала панель профиля (28.09.2026)."""
+    import re
+    svg = (ROOT / "docs" / "paper" / "figures" / "fig_seam_map.svg").read_text()
+    w = float(re.search(r'viewBox="0 0 ([\d.]+)', svg).group(1))
+    xs = [float(v) for v in re.findall(r'\b(?:x|x1|cx)="([-\d.]+)"', svg)]
+    assert xs and max(xs) < w, f"элемент правее рамки: x={max(xs)} при ширине {w}"
+    assert "ошибка на +24" not in svg, "в карте осталась подпись панели профиля"
