@@ -759,7 +759,7 @@ class WeatherPrediction(nn.Module):
         print(f"[graph] уровни меша {graph_config.mesh_levels}, признаки рёбер: {_efm}")
 
         proc_graph_result = create_processing_graph(
-            meshes=self._meshes, mesh_levels=graph_config.mesh_levels,
+            meshes=self._meshes, mesh_levels=self._proc_levels,
             mesh_node_lats=self._mesh_nodes_lat,
             mesh_node_longs=self._mesh_nodes_lon,
         )
@@ -952,6 +952,23 @@ class WeatherPrediction(nn.Module):
                 lat_min, lat_max, lon_min, lon_max,
                 buffer_deg=mesh_buffer,
             )
+
+        # Сгущение над регионом добавляется ещё одним уровнем поверх самого
+        # частого, как в многоуровневой сетке GraphCast: прежние рёбра
+        # процессора остаются все, к ним прибавляются короткие рёбра над
+        # регионом. Новые вершины дописываются в конец, номера прежних не
+        # меняются, поэтому грани всех уровней остаются верными.
+        self._proc_levels = list(graph_config.mesh_levels)
+        refine = getattr(graph_config, "refine_region", None)
+        if refine:
+            from src.mesh.create_mesh import refine_mesh_in_region
+            n0 = len(self._meshes[-1].vertices)
+            self._meshes.append(refine_mesh_in_region(
+                self._meshes[-1], *refine,
+                buffer_deg=getattr(graph_config, "refine_buffer_deg", None) or 2.0))
+            self._proc_levels.append(len(self._meshes) - 1)
+            print(f"[graph] сгущение меша над {refine}: вершин {n0} → "
+                  f"{len(self._meshes[-1].vertices)}")
 
         self._finest_mesh = self._meshes[-1]
         self._num_mesh_nodes = len(self._finest_mesh.vertices)

@@ -23,8 +23,8 @@
 set -uo pipefail
 V=${1:-}
 WAIT=${2:-}
-[[ "$V" =~ ^(dec|dec_long|dec_encres|dec_long_encres|long)$ ]] \
-  || { echo "опыт: dec, dec_long, dec_encres, dec_long_encres или long"; exit 1; }
+[[ "$V" =~ ^(dec|dec_long|dec_encres|dec_long_encres|long|mesh_ref|mesh_ctl)$ ]] \
+  || { echo "опыт: dec, dec_long, dec_encres, dec_long_encres, long, mesh_ref или mesh_ctl"; exit 1; }
 [[ -z "$WAIT" || "$WAIT" == "w" ]] || { echo "второй аргумент — только w (ждать)"; exit 1; }
 
 if [[ "${DAEMONIZED:-}" != "1" ]]; then

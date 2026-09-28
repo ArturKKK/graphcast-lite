@@ -207,6 +207,84 @@ def _two_split_unit_sphere_triangle_faces(
     )
 
 
+def refine_mesh_in_region(
+    mesh: TriangularMesh,
+    lat_min: float, lat_max: float, lon_min: float, lon_max: float,
+    buffer_deg: float = 2.0,
+) -> TriangularMesh:
+    """Сгущает сетку только над регионом: делит там треугольники на 4.
+
+    Зачем (28.09.2026). Шаг меша уровня 6 около 110 км, а сетка вставки 0,25°
+    (~28 км). Детали короче ~220 км процессор не передаёт, их достраивают
+    только кодировщик и декодировщик, и на этих масштабах сидит основное
+    отставание от GraphCast (docs/results/error_scales_2026-09-24.md). Здесь
+    треугольники, центр которых лежит в регионе с запасом buffer_deg, делятся
+    так же, как при переходе на следующий уровень: шаг над регионом ~55 км.
+
+    Сетка остаётся согласованной, без висячих вершин. Соседний треугольник,
+    у которого поделена одна сторона, режется пополам к середине этой
+    стороны; если поделены две или три стороны, он делится на 4 целиком, и
+    так до устойчивости (схема «красное — зелёное» деление).
+
+    Вершины исходной сетки идут первыми и сохраняют номера, новые дописаны в
+    конец. Поэтому грани более грубых уровней ([4, 6] в процессоре) остаются
+    верными, а обученные веса модели подходят без перестройки.
+    """
+    v = np.asarray(mesh.vertices, dtype=np.float64)
+    faces = np.asarray(mesh.faces)
+    lat = np.degrees(np.arcsin(np.clip(v[:, 2], -1, 1)))
+    lon = np.degrees(np.arctan2(v[:, 1], v[:, 0])) % 360.0
+
+    c = v[faces].mean(axis=1)
+    c /= np.linalg.norm(c, axis=1, keepdims=True)
+    clat = np.degrees(np.arcsin(np.clip(c[:, 2], -1, 1)))
+    clon = np.degrees(np.arctan2(c[:, 1], c[:, 0])) % 360.0
+    red = ((clat >= lat_min - buffer_deg) & (clat <= lat_max + buffer_deg)
+           & (clon >= (lon_min - buffer_deg) % 360) & (clon <= (lon_max + buffer_deg) % 360))
+    if not red.any():
+        raise ValueError("в регион сгущения не попал ни один треугольник")
+
+    def edges_of(f):
+        a, b, cc = f
+        return [tuple(sorted((a, b))), tuple(sorted((b, cc))), tuple(sorted((cc, a)))]
+
+    face_edges = [edges_of(f) for f in faces]
+    # Замыкание: треугольник с двумя-тремя поделёнными сторонами делится целиком.
+    while True:
+        split = {e for i in np.where(red)[0] for e in face_edges[i]}
+        grow = [i for i in np.where(~red)[0]
+                if sum(e in split for e in face_edges[i]) >= 2]
+        if not grow:
+            break
+        red[grow] = True
+
+    mid = {}
+    new_v = []
+    for e in sorted(split):
+        p = v[list(e)].mean(axis=0)
+        mid[e] = len(v) + len(new_v)
+        new_v.append(p / np.linalg.norm(p))
+
+    out = []
+    for i, (a, b, cc) in enumerate(faces):
+        if red[i]:
+            ab, bc, ca = mid[tuple(sorted((a, b)))], mid[tuple(sorted((b, cc)))], mid[tuple(sorted((cc, a)))]
+            out += [[a, ab, ca], [ab, b, bc], [ca, bc, cc], [ab, bc, ca]]
+            continue
+        cut = [e in split for e in face_edges[i]]
+        if not any(cut):
+            out.append([a, b, cc])
+            continue
+        # ровно одна поделённая сторона: поворачиваем так, чтобы это была (a, b)
+        k = cut.index(True)
+        a, b, cc = [(a, b, cc), (b, cc, a), (cc, a, b)][k]
+        m = mid[tuple(sorted((a, b)))]
+        out += [[a, m, cc], [m, b, cc]]
+
+    return TriangularMesh(vertices=np.concatenate([v, np.array(new_v)], axis=0),
+                          faces=np.array(out, dtype=np.int32))
+
+
 def filter_mesh(meshes: List[TriangularMesh], mesh_levels: list[int]):
     """ Remove the faces of lower level meshes from the mesh that we want.
         Needed as graphcast creates a hierarchy of meshes and we only want the specific level.

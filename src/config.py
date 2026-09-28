@@ -118,6 +118,13 @@ class GraphBuildingConfig(BaseModel):
     # уровнях [0..6] 98 % рёбер спрессованы у нуля (замер 11.08.2026).
     edge_feature_mode: Optional[str] = "legacy"
 
+    # Сгущение меша над регионом (28.09.2026): [lat_min, lat_max, lon_min,
+    # lon_max]. Треугольники самого частого уровня, центр которых лежит в
+    # регионе с запасом refine_buffer_deg, делятся на 4 (шаг ~55 км вместо
+    # ~110 км). См. src/mesh/create_mesh.py: refine_mesh_in_region.
+    refine_region: Optional[List[float]] = None
+    refine_buffer_deg: Optional[float] = 2.0
+
     # mesh-to-grid graph configs
     mesh2grid_edge_creation: Mesh2GridEdgeCreation
 
