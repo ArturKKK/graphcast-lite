@@ -1,0 +1,27 @@
+[29.09 11:58:55] === МЕШ: ref2 (ed28956) ===
+[29.09 11:58:55] жду другой вариант на этой машине
+[29.09 13:35:48] дождался
+[prep] experiments/multires_krsk_33f_chw_mesh_ref2/config.json: сгущение [50.0, 60.0, 83.0, 98.0] ×2, эпох 8
+[29.09 13:35:48] START обучение multires_krsk_33f_chw_mesh_ref2 
+[29.09 13:39:56] DONE  обучение rc=1
+=== Training started: 2026-09-29T13:36:02.506452 ===
+# commit: ed289566cc49c07cc487d5dc466c8effda17609b  (есть незакоммиченные изменения!)
+# config md5: f9030e9e5ab18c786571096cf3a89189
+# dataset: /data/datasets/multires_krsk_33f
+#   n_time=16072 n_feat=33 nodes=133279
+epochs=8  max_ar=4  epochs_per_stage=8
+epoch  ar  train_loss    val_loss   val_ACC     best_vl  patience  timestamp
+------------------------------------------------------------------------------------------
+ init  --          --     0.01368    0.9905          --        --  13:39:12
+# валидация на 4 горизонтах, отбор по среднему
+# lr: косинус, разогрев 1000 шагов, 12853 шагов/эпоху, всего 102824, до 0 от базового
+Traceback (most recent call last):
+  File "<stdin>", line 2, in <module>
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/serialization.py", line 998, in load
+    with _open_file_like(f, 'rb') as opened_file:
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/serialization.py", line 445, in _open_file_like
+    return _open_file(name_or_buffer, mode)
+  File "/data/venvs/graphcast/lib/python3.10/site-packages/torch/serialization.py", line 426, in __init__
+    super().__init__(open(name, mode))
+FileNotFoundError: [Errno 2] No such file or directory: 'experiments/multires_krsk_33f_chw_mesh_ref2/checkpoint.pth'
+[29.09 13:39:57] нет чекпойнта — оценки не будет
