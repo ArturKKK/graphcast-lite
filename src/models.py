@@ -392,8 +392,9 @@ class InteractionNetProcessor(nn.Module):
     def __init__(self, node_dim: int, raw_edge_dim: int, edge_latent_dim: int,
                  hidden_dim: int, num_steps: int,
                  activation: str = "swish", use_layer_norm: bool = True,
-                 aggregation: str = "mean"):
+                 aggregation: str = "mean", grad_checkpoint: bool = False):
         super().__init__()
+        self.grad_checkpoint = grad_checkpoint
 
         act = _get_activation(activation)
 
@@ -425,9 +426,14 @@ class InteractionNetProcessor(nn.Module):
         # Проецируем edge features в латентное пространство
         edge_attr = self.edge_encoder(edge_attr_raw)
 
-        # Message passing
+        # Message passing. С grad_checkpoint активации шага не хранятся до
+        # обратного прохода, а пересчитываются (только при обучении).
+        from torch.utils.checkpoint import checkpoint
         for step in self.steps:
-            x, edge_attr = step(x, edge_index, edge_attr)
+            if self.grad_checkpoint and self.training and torch.is_grad_enabled():
+                x, edge_attr = checkpoint(step, x, edge_index, edge_attr, use_reentrant=False)
+            else:
+                x, edge_attr = step(x, edge_index, edge_attr)
 
         return x
 
@@ -559,8 +565,10 @@ class GraphLayer(nn.Module):
                 activation=activation,
                 use_layer_norm=use_ln,
                 aggregation=aggregation,
+                grad_checkpoint=bool(getattr(graph_config, "grad_checkpoint", False)),
             )
-            print(f"[processor] InteractionNet: {num_steps} шагов, агрегация {aggregation!r}")
+            print(f"[processor] InteractionNet: {num_steps} шагов, агрегация {aggregation!r}"
+                  f"{', пересчёт активаций' if self.layers.grad_checkpoint else ''}")
 
         elif graph_config.layer_type == GraphLayerType.InteractionNetEncoder:
             assert graph_config.output_dim in (None, input_dim), (

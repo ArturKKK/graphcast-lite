@@ -143,6 +143,9 @@ if v in ("ref", "ref2"):
     c["graph"]["refine_region"] = [50.0, 60.0, 83.0, 98.0]
     c["graph"]["refine_buffer_deg"] = 2.0
     c["graph"]["refine_steps"] = 2 if v == "ref2" else 1
+if v == "ref2":
+    # 29.09: без пересчёта активаций двойное сгущение упало по памяти (79 из 80 ГБ)
+    c["pipeline"]["processor"]["gcn"]["grad_checkpoint"] = True
 c["num_epochs"] = 8
 c["freeze_processor_epochs"] = 0     # одинаково для ref и ctl; процессору надо учиться новым рёбрам
 c["finetune_processor_lr_factor"] = 1.0
@@ -164,6 +167,7 @@ else
   RESUME=""
   [[ -f "experiments/$EXP/checkpoint.pth" ]] && { RESUME="--resume"; log "нашёлся чекпойнт — продолжаю"; }
   log "START обучение $EXP $RESUME"
+  PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
   python -u -m src.main "experiments/$EXP" --pretrained "$START" $RESUME \
       >> "$OUT/improve_mesh_${V}_train.log" 2>&1
   log "DONE  обучение rc=$?"
