@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Сгущение меша над регионом: опыт и контроль от итоговой модели (28.09.2026).
+# Сгущение меша над регионом: опыты и контроль от итоговой модели (28–29.09.2026).
 #
 #   ref — итоговая модель (dec_long_encres) + меш над регионом сгущён до ~55 км
 #         (refine_region в конфиге, src/mesh/create_mesh.py). Процессор видит
@@ -7,6 +7,17 @@
 #         GraphCast. 8 эпох.
 #   ctl — та же модель и те же 8 эпох без сгущения. Без контроля не отличить
 #         выигрыш сгущения от выигрыша лишних эпох (long дала ~1 % сама по себе).
+#   ref2 — сгущение дважды, до ~27 км, почти шаг вставки 0,25° (29.09.2026).
+#         Старт и 8 эпох те же, что у ref, так что контролем служит сам ref.
+#
+# Каждый вариант, кроме обучения и оценки на тесте (t_mesh_*), считает ту же
+# оценку на проверочной выборке (v_mesh_*, --split val). Выбор между вариантами
+# делается по ней, чтобы не подбирать итоговую модель по тестовой выборке.
+# Если обучение уже закончено (ref и ctl 29.09), второй запуск только
+# досчитывает то, чего нет: обучение и тест пропускаются.
+#
+# Очередь. Скрипт ждёт пересчёт статьи (_vm_batch_fin.sh) и другие варианты
+# на этой машине, поэтому можно запускать подряд, не дожидаясь конца.
 #
 # Стартовое состояние берётся из experiments/multires_krsk_33f_chw_dec_long_encres
 # (есть только там, где учили эту модель), а если его нет — из
@@ -16,11 +27,12 @@
 #
 # Запуск:  bash scripts/_vm_batch_mesh.sh ref     (на одной машине)
 #          bash scripts/_vm_batch_mesh.sh ctl     (на другой)
+#          bash scripts/_vm_batch_mesh.sh ref2
 # Лог:     /workdir/paper_results/improve_mesh_<вариант>_master.log
 set -uo pipefail
 V=${1:-}
-[[ "$V" == "ref" || "$V" == "ctl" || "$V" == "share" ]] \
-  || { echo "вариант: ref, ctl или share"; exit 1; }
+[[ "$V" =~ ^(ref|ref2|ctl|share)$ ]] \
+  || { echo "вариант: ref, ref2, ctl или share"; exit 1; }
 
 REPO=/workdir/graphcast-lite
 BASE_EXP=multires_krsk_33f_chw_dec_long_encres
@@ -76,6 +88,14 @@ cd "$REPO" || exit 1
 log() { echo "[$(date '+%d.%m %H:%M:%S')] $*"; }
 log "=== МЕШ: $V ($(git rev-parse --short HEAD)) ==="
 
+# ---------- очередь: пересчёт статьи и другие варианты на этой машине ----------
+for lk in "$OUT"/.fin_*.lock; do
+  [[ -e "$lk" ]] || continue
+  exec 8>>"$lk"; flock -n 8 || { log "жду $(basename "$lk")"; flock 8; }; exec 8>&-
+done
+exec 7>>"$OUT/.gpu_queue.lock"
+flock -n 7 || { log "жду другой вариант на этой машине"; flock 7; log "дождался"; }
+
 BUSY=$(pgrep -af "^python.*(src\.main|scripts/predict\.py)" | head -1)
 [[ -n "$BUSY" ]] && { log "карта занята: $BUSY — стоп"; exit 1; }
 
@@ -119,16 +139,17 @@ c["pipeline"]["decoder"]["gcn"] = {
     "layer_type": "interaction_net_decoder", "hidden_dims": [128],
     "output_dim": c["pipeline"]["decoder"]["gcn"]["output_dim"],
     "activation": "swish", "edge_feature_dim": 4, "use_layer_norm": True}
-if v == "ref":
+if v in ("ref", "ref2"):
     c["graph"]["refine_region"] = [50.0, 60.0, 83.0, 98.0]
     c["graph"]["refine_buffer_deg"] = 2.0
+    c["graph"]["refine_steps"] = 2 if v == "ref2" else 1
 c["num_epochs"] = 8
 c["freeze_processor_epochs"] = 0     # одинаково для ref и ctl; процессору надо учиться новым рёбрам
 c["finetune_processor_lr_factor"] = 1.0
 c["early_stopping_patience"] = 100
 c["_comment"] = f"mesh_{v}: от dec_long_encres, см. scripts/_vm_batch_mesh.sh"
 json.dump(c, open(dst, "w"), indent=2, ensure_ascii=False)
-print(f"[prep] {dst}: сгущение {c['graph'].get('refine_region')}, эпох {c['num_epochs']}")
+print(f"[prep] {dst}: сгущение {c['graph'].get('refine_region')} ×{c['graph'].get('refine_steps', 0)}, эпох {c['num_epochs']}")
 PY
 python - "experiments/$EXP/config.json" <<'PY' || { log "конфиг не проходит схему — стоп"; exit 1; }
 import json, sys
@@ -137,36 +158,44 @@ ExperimentConfig(**json.load(open(sys.argv[1])))
 PY
 
 # ---------- обучение ----------
-RESUME=""
-[[ -f "experiments/$EXP/checkpoint.pth" ]] && { RESUME="--resume"; log "нашёлся чекпойнт — продолжаю"; }
-log "START обучение $EXP $RESUME"
-python -u -m src.main "experiments/$EXP" --pretrained "$START" $RESUME \
-    >> "$OUT/improve_mesh_${V}_train.log" 2>&1
-log "DONE  обучение rc=$?"
-tail -12 "experiments/$EXP/training_log.txt" 2>/dev/null
+if grep -q "Training finished" "experiments/$EXP/training_log.txt" 2>/dev/null; then
+  log "обучение уже закончено — пропускаю"
+else
+  RESUME=""
+  [[ -f "experiments/$EXP/checkpoint.pth" ]] && { RESUME="--resume"; log "нашёлся чекпойнт — продолжаю"; }
+  log "START обучение $EXP $RESUME"
+  python -u -m src.main "experiments/$EXP" --pretrained "$START" $RESUME \
+      >> "$OUT/improve_mesh_${V}_train.log" 2>&1
+  log "DONE  обучение rc=$?"
+  tail -12 "experiments/$EXP/training_log.txt" 2>/dev/null
+fi
 
 # ---------- оценка ----------
 FIN=$HEAVY/${EXP}_last.pth
-python - "experiments/$EXP/checkpoint.pth" "$FIN" <<'PY' || { log "нет чекпойнта — оценки не будет"; exit 1; }
+[[ -f "$FIN" ]] || python - "experiments/$EXP/checkpoint.pth" "$FIN" <<'PY' || { log "нет чекпойнта — оценки не будет"; exit 1; }
 import sys, torch
 ck = torch.load(sys.argv[1], map_location="cpu")
 torch.save(ck.get("model_state_dict", ck), sys.argv[2])
 PY
-run() {   # run <тег> [доп. ключи]
-  local tag="$1"; shift
+run() {   # run <тег> <split> [доп. ключи]
+  local tag="$1" split="$2"; shift 2
   local lf="$OUT/${tag}.log" npz="$OUT/${tag}_samples.npz"
   [[ -f "$npz" ]] && { log "SKIP $tag (уже посчитан)"; return 0; }
+  # поля ошибок (60 МБ) нужны только на тесте: по ним строятся рисунки
+  local err=()
+  [[ "$split" == "test_only" ]] && err=(--save-region-errors "$OUT/${tag}_errors.npz")
   log "START $tag"
   python -u scripts/predict.py "experiments/$EXP" --data-dir "$D33" \
-      --split test_only --ar-steps 4 --max-samples 2000 --per-channel --no-save \
+      --split "$split" --ar-steps 4 --max-samples 2000 --per-channel --no-save \
       --region $ROI --lat-weight --ckpt "$FIN" \
-      --save-sample-metrics "$npz" --save-region-errors "$OUT/${tag}_errors.npz" "$@" \
+      --save-sample-metrics "$npz" "${err[@]}" "$@" \
       > "$lf" 2>&1
   local rc=$? t2
   t2=$(grep -E "^\s+t2m" "$lf" | tail -1 | tr -s ' ' | cut -c1-58)
   log "DONE  $tag rc=$rc | $t2"
 }
-run t_mesh_${V}_roi --climatology "$CLIM"
+run t_mesh_${V}_roi test_only --climatology "$CLIM"
+run v_mesh_${V}_roi val --climatology "$CLIM"
 
 log "=== ВСЁ ==="
-grep -E "DONE  " "$MASTER" | tail -3
+grep -E "DONE  " "$MASTER" | tail -4

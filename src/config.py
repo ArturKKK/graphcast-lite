@@ -124,6 +124,12 @@ class GraphBuildingConfig(BaseModel):
     # ~110 км). См. src/mesh/create_mesh.py: refine_mesh_in_region.
     refine_region: Optional[List[float]] = None
     refine_buffer_deg: Optional[float] = 2.0
+    # Сколько раз сгущать (29.09.2026). Каждый шаг делит треугольники ещё раз
+    # и добавляется своим уровнем процессора: 1 — ~55 км, 2 — ~27 км, это
+    # почти шаг вставки 0,25°. Запас k-го шага вдвое меньше предыдущего
+    # (2°, 1°, …), чтобы следующее деление шло внутри уже сгущённой полосы,
+    # а не по вытянутым треугольникам переходной зоны.
+    refine_steps: Optional[int] = 1
 
     # mesh-to-grid graph configs
     mesh2grid_edge_creation: Mesh2GridEdgeCreation

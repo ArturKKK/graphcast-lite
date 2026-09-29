@@ -963,11 +963,12 @@ class WeatherPrediction(nn.Module):
         if refine:
             from src.mesh.create_mesh import refine_mesh_in_region
             n0 = len(self._meshes[-1].vertices)
-            self._meshes.append(refine_mesh_in_region(
-                self._meshes[-1], *refine,
-                buffer_deg=getattr(graph_config, "refine_buffer_deg", None) or 2.0))
-            self._proc_levels.append(len(self._meshes) - 1)
-            print(f"[graph] сгущение меша над {refine}: вершин {n0} → "
+            buf = getattr(graph_config, "refine_buffer_deg", None) or 2.0
+            for k in range(getattr(graph_config, "refine_steps", None) or 1):
+                self._meshes.append(refine_mesh_in_region(
+                    self._meshes[-1], *refine, buffer_deg=buf / 2 ** k))
+                self._proc_levels.append(len(self._meshes) - 1)
+            print(f"[graph] сгущение меша над {refine} ×{k + 1}: вершин {n0} → "
                   f"{len(self._meshes[-1].vertices)}")
 
         self._finest_mesh = self._meshes[-1]
