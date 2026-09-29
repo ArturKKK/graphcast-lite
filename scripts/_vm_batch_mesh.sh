@@ -9,6 +9,10 @@
 #         выигрыш сгущения от выигрыша лишних эпох (long дала ~1 % сама по себе).
 #   ref2 — сгущение дважды, до ~27 км, почти шаг вставки 0,25° (29.09.2026).
 #         Старт и 8 эпох те же, что у ref, так что контролем служит сам ref.
+#   ref_s43 — повтор ref с другим начальным значением генератора (порядок
+#         примеров). Разброс между повторами показывает, какие разности
+#         итоговой модели осмысленны; до сих пор его знали только по одной
+#         паре прогонов старой модели (п. 5.1 статьи).
 #
 # Каждый вариант, кроме обучения и оценки на тесте (t_mesh_*), считает ту же
 # оценку на проверочной выборке (v_mesh_*, --split val). Выбор между вариантами
@@ -28,11 +32,12 @@
 # Запуск:  bash scripts/_vm_batch_mesh.sh ref     (на одной машине)
 #          bash scripts/_vm_batch_mesh.sh ctl     (на другой)
 #          bash scripts/_vm_batch_mesh.sh ref2
+#          bash scripts/_vm_batch_mesh.sh ref_s43
 # Лог:     /workdir/paper_results/improve_mesh_<вариант>_master.log
 set -uo pipefail
 V=${1:-}
-[[ "$V" =~ ^(ref|ref2|ctl|share)$ ]] \
-  || { echo "вариант: ref, ref2, ctl или share"; exit 1; }
+[[ "$V" =~ ^(ref|ref2|ref_s43|ctl|share)$ ]] \
+  || { echo "вариант: ref, ref2, ref_s43, ctl или share"; exit 1; }
 
 REPO=/workdir/graphcast-lite
 BASE_EXP=multires_krsk_33f_chw_dec_long_encres
@@ -139,10 +144,12 @@ c["pipeline"]["decoder"]["gcn"] = {
     "layer_type": "interaction_net_decoder", "hidden_dims": [128],
     "output_dim": c["pipeline"]["decoder"]["gcn"]["output_dim"],
     "activation": "swish", "edge_feature_dim": 4, "use_layer_norm": True}
-if v in ("ref", "ref2"):
+if v in ("ref", "ref2", "ref_s43"):
     c["graph"]["refine_region"] = [50.0, 60.0, 83.0, 98.0]
     c["graph"]["refine_buffer_deg"] = 2.0
     c["graph"]["refine_steps"] = 2 if v == "ref2" else 1
+if v == "ref_s43":
+    c["random_seed"] = 43
 if v == "ref2":
     # 29.09: без пересчёта активаций двойное сгущение упало по памяти (79 из 80 ГБ)
     c["pipeline"]["processor"]["gcn"]["grad_checkpoint"] = True
