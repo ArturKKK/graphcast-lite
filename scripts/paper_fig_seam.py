@@ -19,7 +19,7 @@ import os
 
 import numpy as np
 
-SRC = "docs/paper/runs/vm4_seam/seam_map_data.npz"
+SRC = "docs/paper/runs/acc_lat_clim/p_mesh_ref_seam_map_data.npz"
 OUT = "docs/paper/figures/fig_seam.svg"
 
 # Область интереса (границы вставки)
@@ -37,10 +37,10 @@ INK2 = "#52514e"
 GRID = "#d8d8d4"
 
 # Профиль из seam_profile.md, горизонт +24 ч
-# Итоговая модель (dec_long_encres), p_dec_long_encres_seam_profile.md, 28.09.2026
-PROF_INS = [(12.5, 1.62, "0–25"), (37.5, 1.58, "25–50"), (75, 1.61, "50–100"),
-            (150, 1.56, "100–200"), (600, 1.53, "200–1000")]
-PROF_GLB = [(-50, 1.64, "−100–0"), (-200, 1.75, "−300–−100"), (-650, 1.76, "−1000–−300")]
+# Итоговая модель со сгущением графа (mesh_ref), p_mesh_ref_seam_profile.md, 30.09.2026
+PROF_INS = [(12.5, 1.58, "0–25"), (37.5, 1.54, "25–50"), (75, 1.56, "50–100"),
+            (150, 1.51, "100–200"), (600, 1.48, "200–1000")]
+PROF_GLB = [(-50, 1.63, "−100–0"), (-200, 1.72, "−300–−100"), (-650, 1.77, "−1000–−300")]
 
 
 def esc(s):

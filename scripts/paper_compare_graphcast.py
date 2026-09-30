@@ -107,6 +107,14 @@ def main():
     for i, t0 in enumerate(t_gc):
         if all((t0 + np.timedelta64(L, "h")) in e5_pos for L in leads) and t0 in e5_pos:
             ok.append(i)
+    # 30.09.2026: GraphCast считали на 803 сроках, нашу модель на 802 (один
+    # срок выпадает на краю нашей тестовой выборки). Сравнение должно идти на
+    # одних и тех же сроках, поэтому при --ours берём только общие.
+    if a.ours:
+        _o = np.load(a.ours, allow_pickle=True)
+        _t = set((DATASET_START + (_o["t_offset"].astype("int64") + OBS_WINDOW - 1)
+                  * np.timedelta64(6, "h")).astype("datetime64[h]"))
+        ok = [i for i in ok if t_gc[i] in _t]
     print(f"пригодных инициализаций: {len(ok)}\n")
     if not ok:
         raise SystemExit("пересечения по времени нет — проверьте окна")

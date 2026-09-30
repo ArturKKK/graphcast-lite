@@ -57,7 +57,7 @@ TABLES_EN = {
                   "graph.",
     "Таблица 4.": "Table 4. RMSE of 2 m temperature (°C) and aggregate skill score for "
                   "different ways of selecting the checkpoint.",
-    "Таблица 6.": "Table 6. Comparison with GraphCast on shared nodes and times: 803 "
+    "Таблица 6.": "Table 6. Comparison with GraphCast on shared nodes and times: 802 "
                   "initialisations, 2501 nodes, latitude weights. RMSE averaged over "
                   "+6…+24 h; ACC against the WeatherBench 2 1990–2019 climatology.",
     "Таблица 5.": "Table 5. RMSE of 2 m temperature (°C) by distance to the insert "
