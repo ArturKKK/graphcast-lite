@@ -93,9 +93,8 @@ def test_gated_layer_requires_levels():
 def test_model_with_level_aggregation_takes_trained_weights(steps):
     """Модель с поправкой грузит веса модели со сгущением без неё: недостаёт
     только нулевых весов уровней, и прямой проход идёт."""
-    import torch
-
     import test_mesh_refine as tm
+    import torch
 
     def build(levels, seed):
         from src.models import WeatherPrediction
@@ -124,9 +123,9 @@ def test_model_with_level_aggregation_takes_trained_weights(steps):
 
 @needs_torch
 def test_wrong_level_count_is_rejected():
+    import test_mesh_refine as tm
     import torch
 
-    import test_mesh_refine as tm
     from src.models import WeatherPrediction
     graph, pipeline, data = tm.config(True, 1)
     pipeline.processor.gcn.level_aggregation = 5
