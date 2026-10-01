@@ -312,6 +312,31 @@ def create_processing_graph(
 
 
 
+def processing_edge_levels(meshes: List[TriangularMesh], mesh_levels: List[int],
+                           edge_index: torch.Tensor) -> torch.Tensor:
+    """Номер уровня меша для каждого ребра процессора (01.10.2026).
+
+    Нужен для раздельной агрегации по уровням (level_aggregation в конфиге):
+    вершина усредняет сообщения каждого уровня отдельно, и короткие рёбра
+    сгущённого меша не разбавляют длинные. Ребро относится к самому грубому из
+    уровней mesh_levels, в котором оно есть: рёбра уровня 6 вне региона
+    сгущения входят и в сгущённый меш, но считаются рёбрами уровня 6, а к
+    уровню сгущения отходят только новые короткие рёбра. Номер — позиция
+    уровня в отсортированном по возрастанию списке mesh_levels.
+    """
+    ei = edge_index.numpy() if isinstance(edge_index, torch.Tensor) else np.asarray(edge_index)
+    n = int(ei.max()) + 1
+    code = np.minimum(ei[0], ei[1]).astype(np.int64) * n + np.maximum(ei[0], ei[1])
+    level = np.full(code.shape, -1, dtype=np.int64)
+    for k, lv in enumerate(sorted(mesh_levels)):
+        e = get_edges_from_faces(meshes[lv].faces)
+        own = np.minimum(e[0], e[1]).astype(np.int64) * n + np.maximum(e[0], e[1])
+        level[(level < 0) & np.isin(code, own)] = k
+    if (level < 0).any():
+        raise ValueError(f"{int((level < 0).sum())} рёбер процессора не нашлись ни в одном уровне")
+    return torch.from_numpy(level)
+
+
 def _bipartite_edge_features(s_lat, s_lon, r_lat, r_lon, senders, receivers) -> torch.Tensor:
     """[длина, смещение xyz] отправителя в локальных координатах получателя, / max длины."""
     from src.utils import (get_bipartite_relative_position_in_receiver_local_coordinates,

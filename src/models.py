@@ -195,8 +195,14 @@ class InteractionNetLayer(nn.Module):
 
     def __init__(self, node_dim: int, edge_dim: int, hidden_dim: int,
                  activation: str = "swish", use_layer_norm: bool = True,
-                 aggregation: str = "mean"):
+                 aggregation: str = "mean", num_levels: int = 0):
         super().__init__()
+        # Раздельная агрегация по уровням меша (01.10.2026): к общему среднему
+        # добавляется сумма средних по уровням с весами на канал. Веса нулевые,
+        # поэтому слой стартует ровно с прежнего и обученные модели грузятся.
+        self.num_levels = num_levels
+        if num_levels:
+            self.level_gate = nn.Parameter(torch.zeros(num_levels, edge_dim))
         # "mean" — историческое значение, на нём обучены все модели статьи.
         # "sum" — как в классическом Interaction Network. Разница принципиальна
         # для многоуровневого меша: при сумме длинные рёбра ДОБАВЛЯЮТ сигнал,
@@ -227,11 +233,13 @@ class InteractionNetLayer(nn.Module):
             self.edge_norm = PygLayerNorm(edge_dim, mode="graph")
             self.node_norm = PygLayerNorm(node_dim, mode="node")
 
-    def forward(self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor):
+    def forward(self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor,
+                edge_level: torch.Tensor = None):
         """
         x: [num_nodes, node_dim]
         edge_index: [2, num_edges]
         edge_attr: [num_edges, edge_dim]
+        edge_level: [num_edges] — номер уровня меша (только при num_levels > 0)
         """
         senders = edge_index[0]
         receivers = edge_index[1]
@@ -244,6 +252,13 @@ class InteractionNetLayer(nn.Module):
         from torch_geometric.utils import scatter
         aggregated = scatter(edge_update, receivers, dim=0, dim_size=x.size(0),
                              reduce=self.aggregation)
+        if self.num_levels:
+            if edge_level is None:
+                raise ValueError("level_aggregation требует номера уровней рёбер")
+            L = self.num_levels
+            per = scatter(edge_update, receivers * L + edge_level, dim=0,
+                          dim_size=x.size(0) * L, reduce="mean").view(x.size(0), L, -1)
+            aggregated = aggregated + (per * self.level_gate).sum(dim=1)
 
         # 3) Node update
         node_input = torch.cat([x, aggregated], dim=-1)
@@ -392,7 +407,8 @@ class InteractionNetProcessor(nn.Module):
     def __init__(self, node_dim: int, raw_edge_dim: int, edge_latent_dim: int,
                  hidden_dim: int, num_steps: int,
                  activation: str = "swish", use_layer_norm: bool = True,
-                 aggregation: str = "mean", grad_checkpoint: bool = False):
+                 aggregation: str = "mean", grad_checkpoint: bool = False,
+                 num_levels: int = 0):
         super().__init__()
         self.grad_checkpoint = grad_checkpoint
 
@@ -413,11 +429,13 @@ class InteractionNetProcessor(nn.Module):
                 activation=activation,
                 use_layer_norm=use_layer_norm,
                 aggregation=aggregation,
+                num_levels=num_levels,
             )
             for _ in range(num_steps)
         ])
 
-    def forward(self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr_raw: torch.Tensor):
+    def forward(self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr_raw: torch.Tensor,
+                edge_level: torch.Tensor = None):
         """
         x: [num_mesh_nodes, node_dim]
         edge_index: [2, E]
@@ -431,9 +449,10 @@ class InteractionNetProcessor(nn.Module):
         from torch.utils.checkpoint import checkpoint
         for step in self.steps:
             if self.grad_checkpoint and self.training and torch.is_grad_enabled():
-                x, edge_attr = checkpoint(step, x, edge_index, edge_attr, use_reentrant=False)
+                x, edge_attr = checkpoint(step, x, edge_index, edge_attr, edge_level,
+                                          use_reentrant=False)
             else:
-                x, edge_attr = step(x, edge_index, edge_attr)
+                x, edge_attr = step(x, edge_index, edge_attr, edge_level)
 
         return x
 
@@ -566,6 +585,7 @@ class GraphLayer(nn.Module):
                 use_layer_norm=use_ln,
                 aggregation=aggregation,
                 grad_checkpoint=bool(getattr(graph_config, "grad_checkpoint", False)),
+                num_levels=int(getattr(graph_config, "level_aggregation", 0) or 0),
             )
             print(f"[processor] InteractionNet: {num_steps} шагов, агрегация {aggregation!r}"
                   f"{', пересчёт активаций' if self.layers.grad_checkpoint else ''}")
@@ -641,7 +661,8 @@ class GraphLayer(nn.Module):
             edge_attr = kwargs.get("edge_attr", None)
             if edge_attr is None:
                 raise ValueError("InteractionNet requires edge_attr (edge features)")
-            return self.layers(x=X, edge_index=edge_index, edge_attr_raw=edge_attr)
+            return self.layers(x=X, edge_index=edge_index, edge_attr_raw=edge_attr,
+                               edge_level=kwargs.get("edge_level", None))
         elif self.layer_type in (GraphLayerType.InteractionNetDecoder,
                                  GraphLayerType.InteractionNetEncoder):
             edge_attr = kwargs.get("edge_attr", None)
@@ -777,6 +798,21 @@ class WeatherPrediction(nn.Module):
         else:
             self.processing_graph = proc_graph_result
             self._processing_edge_features = None
+
+        # Номера уровней рёбер процессора для раздельной агрегации. Буфер
+        # непостоянный: это геометрия, её пересчитывает конструктор.
+        n_lv = int(getattr(pipeline_config.processor.gcn, "level_aggregation", 0) or 0)
+        if not n_lv:
+            self._processing_edge_level = None
+        else:
+            if n_lv != len(self._proc_levels):
+                raise ValueError(f"level_aggregation={n_lv}, а уровней процессора "
+                                 f"{len(self._proc_levels)}: {self._proc_levels}")
+            from src.create_graphs import processing_edge_levels
+            lv = processing_edge_levels(self._meshes, self._proc_levels, self.processing_graph)
+            self.register_buffer("_processing_edge_level", lv, persistent=False)
+            print(f"[graph] раздельная агрегация: рёбер по уровням "
+                  f"{torch.bincount(lv, minlength=n_lv).tolist()}")
 
         # DECODING-граф: для каждого grid — 3 входа от вершин треугольника mesh, который его содержит
         self.decoding_graph = create_decoding_graph(
@@ -1136,6 +1172,7 @@ class WeatherPrediction(nn.Module):
                 X=mesh_node_features, edge_index=self.processing_graph,
                 attention_threshold=attention_threshold,
                 edge_attr=self._processing_edge_features,
+                edge_level=self._processing_edge_level,
             )
         else:
             processed_mesh_node_features = self.processor.forward(
@@ -1206,6 +1243,7 @@ class WeatherPrediction(nn.Module):
                 X=mesh_node_features, edge_index=self.processing_graph,
                 attention_threshold=attention_threshold,
                 edge_attr=self._processing_edge_features,
+                edge_level=self._processing_edge_level,
             )
         else:
             processed_mesh_node_features = self.processor.forward(

@@ -13,6 +13,12 @@
 #         примеров). Разброс между повторами показывает, какие разности
 #         итоговой модели осмысленны; до сих пор его знали только по одной
 #         паре прогонов старой модели (п. 5.1 статьи).
+#   lvl  — ref + раздельная агрегация по уровням меша (level_aggregation,
+#         01.10.2026): вершина усредняет сообщения каждого уровня отдельно,
+#         веса уровней стартуют с нуля. Контроль — ref.
+#   lvl2 — ref2 + та же агрегация. ref2 проиграл ref на 0,6–3 % по всем полям;
+#         если причина в разбавлении длинных рёбер короткими, lvl2 его догонит
+#         или обгонит. Контроль — ref2 и ref.
 #
 # Каждый вариант, кроме обучения и оценки на тесте (t_mesh_*), считает ту же
 # оценку на проверочной выборке (v_mesh_*, --split val). Выбор между вариантами
@@ -33,11 +39,12 @@
 #          bash scripts/_vm_batch_mesh.sh ctl     (на другой)
 #          bash scripts/_vm_batch_mesh.sh ref2
 #          bash scripts/_vm_batch_mesh.sh ref_s43
+#          bash scripts/_vm_batch_mesh.sh lvl     (и lvl2)
 # Лог:     /workdir/paper_results/improve_mesh_<вариант>_master.log
 set -uo pipefail
 V=${1:-}
-[[ "$V" =~ ^(ref|ref2|ref_s43|ctl|share)$ ]] \
-  || { echo "вариант: ref, ref2, ref_s43, ctl или share"; exit 1; }
+[[ "$V" =~ ^(ref|ref2|ref_s43|lvl|lvl2|ctl|share)$ ]] \
+  || { echo "вариант: ref, ref2, ref_s43, lvl, lvl2, ctl или share"; exit 1; }
 
 REPO=/workdir/graphcast-lite
 BASE_EXP=multires_krsk_33f_chw_dec_long_encres
@@ -144,14 +151,21 @@ c["pipeline"]["decoder"]["gcn"] = {
     "layer_type": "interaction_net_decoder", "hidden_dims": [128],
     "output_dim": c["pipeline"]["decoder"]["gcn"]["output_dim"],
     "activation": "swish", "edge_feature_dim": 4, "use_layer_norm": True}
-if v in ("ref", "ref2", "ref_s43"):
+if v in ("ref", "ref2", "ref_s43", "lvl", "lvl2"):
     c["graph"]["refine_region"] = [50.0, 60.0, 83.0, 98.0]
     c["graph"]["refine_buffer_deg"] = 2.0
-    c["graph"]["refine_steps"] = 2 if v == "ref2" else 1
+    c["graph"]["refine_steps"] = 2 if v in ("ref2", "lvl2") else 1
+if v in ("lvl", "lvl2"):
+    # уровни процессора: mesh_levels и по одному на каждый шаг сгущения
+    c["pipeline"]["processor"]["gcn"]["level_aggregation"] = (
+        len(c["graph"]["mesh_levels"]) + c["graph"]["refine_steps"])
 if v == "ref_s43":
     c["random_seed"] = 43
-if v == "ref2":
-    # 29.09: без пересчёта активаций двойное сгущение упало по памяти (79 из 80 ГБ)
+if v in ("ref2", "lvl", "lvl2"):
+    # 29.09: без пересчёта активаций двойное сгущение упало по памяти (79 из 80 ГБ).
+    # Раздельная агрегация добавляет тензор вершины × уровни × 256 на каждый
+    # раунд, а ref шёл почти впритык, поэтому пересчёт и для lvl. Результат
+    # он не меняет (tests/model/test_grad_checkpoint.py), только время.
     c["pipeline"]["processor"]["gcn"]["grad_checkpoint"] = True
 c["num_epochs"] = 8
 c["freeze_processor_epochs"] = 0     # одинаково для ref и ctl; процессору надо учиться новым рёбрам
